@@ -30,3 +30,8 @@ tsconfig.tsbuildinfo
 
 # backup DB
 *.db.bak*
+
+# generati da Next (cambiano tra dev e build)
+next-env.d.ts
+# il DB si allinea con db:push, niente migrazioni
+drizzle/
