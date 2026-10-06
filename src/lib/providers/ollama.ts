@@ -1,3 +1,4 @@
+import { ollama as cfg } from "@/lib/config";
 import type { LLMProvider, GenerateOptions } from "./types";
 
 const BASE = () => process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
@@ -18,9 +19,10 @@ export const ollamaProvider: LLMProvider = {
         messages,
         stream: false,
         format: opts.schema ?? (opts.json ? "json" : undefined),
-        // gpt-oss & co.: `think:false` per output diretto senza catena di reasoning.
-        ...(opts.think === undefined ? {} : { think: opts.think }),
+        // modelli reasoning: thinking off di default (vedi config.ollama), opt-in per chiamata.
+        think: opts.think ?? cfg.think,
         options: {
+          num_ctx: cfg.numCtx,
           temperature: opts.temperature ?? 0.7,
           num_predict: opts.maxTokens ?? 1024,
         },

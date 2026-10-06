@@ -21,15 +21,28 @@ export type Task =
   | "rerank";    // reranking dei chunk recuperati
 
 export const models: Record<Task, ModelRef> = {
-  chat:      { provider: "ollama", model: "gpt-oss:20b" },
-  summarize: { provider: "ollama", model: "gpt-oss:20b" },
-  quiz:      { provider: "ollama", model: "gpt-oss:20b" },
-  grade:     { provider: "ollama", model: "gpt-oss:20b" },
-  embed:     { provider: "ollama", model: "bge-m3" },
-  rerank:    { provider: "ollama", model: "gpt-oss:20b" }, // listwise via LLM (vedi rag/rerank.ts)
+  chat:      { provider: "ollama", model: "gemma4:12b" },
+  summarize: { provider: "ollama", model: "gemma4:12b" },
+  quiz:      { provider: "ollama", model: "gemma4:12b" },
+  grade:     { provider: "ollama", model: "gemma4:12b" },
+  embed:     { provider: "ollama", model: "qwen3-embedding:0.6b" },
+  rerank:    { provider: "ollama", model: "gemma4:12b" }, // listwise via LLM (vedi rag/rerank.ts)
 };
 
-/** Dimensione dell'embedding del modello in `models.embed`. bge-m3 = 1024. */
+/**
+ * Opzioni runtime per Ollama.
+ *  - `numCtx`: finestra di contesto. Il default di Ollama (4096) tronca in silenzio
+ *    l'inizio del prompt, cioè proprio il contesto RAG.
+ *  - `think`: i modelli recenti sono "reasoning" di default; con il thinking attivo
+ *    il budget `num_predict` può esaurirsi prima della risposta (output vuoto).
+ *    Default false; una singola chiamata può riattivarlo con `opts.think`.
+ */
+export const ollama = {
+  numCtx: 16384,
+  think: false,
+};
+
+/** Dimensione dell'embedding del modello in `models.embed`. qwen3-embedding:0.6b = 1024. */
 export const EMBED_DIM = 1024;
 
 /**
