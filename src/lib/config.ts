@@ -49,12 +49,21 @@ export const EMBED_DIM = 1024;
  * Reranker. `cross-encoder` = bge-reranker-v2-m3 reale via Transformers.js/ONNX,
  * in-process e local-first (modello scaricato una volta in `cacheDir`). Con
  * `llm` si usa il rerank listwise via `models.rerank` (fallback automatico se il
- * cross-encoder fallisce a caricarsi). dtype `q8` = pesi quantizzati (~280MB).
+ * cross-encoder fallisce a caricarsi).
+ *
+ * `device: "cuda"` usa la GPU con `dtype` fp16 (~0.6s per 20 chunk); se CUDA non si
+ * carica si ripiega su CPU con `cpuDtype` q8 (~3.4s). Su GPU i pesi q8 sono lenti:
+ * molti operatori interi non hanno kernel CUDA e tornano su CPU.
+ * Le librerie CUDA 12 richieste da onnxruntime-node le aggiunge `scripts/with-cuda.sh`.
  */
 export const reranker = {
   strategy: "cross-encoder" as "cross-encoder" | "llm",
   model: "onnx-community/bge-reranker-v2-m3-ONNX",
-  dtype: "q8" as "q8" | "int8" | "fp16" | "fp32",
+  device: "cuda" as "cuda" | "cpu",
+  dtype: "fp16" as "q8" | "int8" | "fp16" | "fp32",
+  cpuDtype: "q8" as "q8" | "int8" | "fp16" | "fp32",
+  batchSize: 8,   // coppie per forward: limita il picco di memoria
+  maxLength: 512, // token per coppia (query+testo); oltre si tronca
   cacheDir: ".models",
 };
 

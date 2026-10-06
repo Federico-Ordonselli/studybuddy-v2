@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "scripts/with-cuda.sh next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "scripts/with-cuda.sh next start",
     "ingest": "tsx scripts/ingest.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
