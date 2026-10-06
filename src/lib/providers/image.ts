@@ -24,8 +24,30 @@ export async function generateImage(prompt: string): Promise<GeneratedImage> {
   }
 }
 
+/**
+ * Ripara gli errori XML più comuni negli SVG generati dall'LLM. Come <img> l'SVG deve
+ * essere XML ben formato (l'HTML inline era tollerante): un attributo duplicato
+ * (es. due `id` sullo stesso tag) o una `&` nuda rendono l'immagine vuota.
+ */
+function toWellFormedXml(svg: string): string {
+  const tag = /<([A-Za-z][\w:.-]*)((?:\s+[^\s=/>]+(?:\s*=\s*(?:"[^"]*"|'[^']*'))?)*)\s*(\/?)>/g;
+  const attr = /([^\s=/>]+)(?:\s*=\s*("[^"]*"|'[^']*'))?/g;
+  return svg
+    .replace(tag, (_m, name: string, attrs: string, selfClose: string) => {
+      const seen = new Set<string>();
+      const kept: string[] = [];
+      for (const [, key, value] of attrs.matchAll(attr)) {
+        if (seen.has(key)) continue; // tiene la prima occorrenza
+        seen.add(key);
+        kept.push(value === undefined ? key : `${key}=${value}`);
+      }
+      return `<${name}${kept.map((a) => " " + a).join("")}${selfClose ? "/" : ""}>`;
+    })
+    .replace(/&(?!(?:[A-Za-z]+|#\d+|#x[0-9A-Fa-f]+);)/g, "&amp;");
+}
+
 /** Estrae il blocco <svg>…</svg> e rimuove costrutti pericolosi/inutili. */
-function sanitizeSvg(raw: string): string | null {
+export function sanitizeSvg(raw: string): string | null {
   // tollera un eventuale troncamento del tag di chiusura (auto-close)
   const start = raw.search(/<svg[\s>]/i);
   if (start < 0) return null;
@@ -39,7 +61,7 @@ function sanitizeSvg(raw: string): string | null {
   if (!/viewBox=/i.test(svg)) svg = svg.replace(/<svg/i, '<svg viewBox="0 0 400 300"');
   // reso come <img> (data URL): senza namespace il browser non lo disegna
   if (!/<svg[^>]*\sxmlns=/i.test(svg)) svg = svg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
-  return svg;
+  return toWellFormedXml(svg);
 }
 
 /** Placeholder vettoriale se l'LLM non produce un SVG valido. */
