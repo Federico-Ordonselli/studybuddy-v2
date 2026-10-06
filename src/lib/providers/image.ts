@@ -37,6 +37,8 @@ function sanitizeSvg(raw: string): string | null {
     .replace(/\son\w+\s*=\s*"[^"]*"/gi, "") // handler inline
     .replace(/\son\w+\s*=\s*'[^']*'/gi, "");
   if (!/viewBox=/i.test(svg)) svg = svg.replace(/<svg/i, '<svg viewBox="0 0 400 300"');
+  // reso come <img> (data URL): senza namespace il browser non lo disegna
+  if (!/<svg[^>]*\sxmlns=/i.test(svg)) svg = svg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
   return svg;
 }
 

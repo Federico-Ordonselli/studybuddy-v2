@@ -397,7 +397,8 @@ function StudioView({ domainId }: { domainId?: number }) {
                 <div style={S.slideImg} className="slide-img">
                   {s.image
                     ? (s.image.format === "svg"
-                        ? <div style={{ width: "100%", height: "100%" }} dangerouslySetInnerHTML={{ __html: s.image.content }} />
+                        // come <img> il browser non esegue script/handler dell'SVG generato dall'LLM
+                        ? <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.image.content)}`} alt={s.title} />
                         : <img src={s.image.content} alt={s.title} />)
                     : <div style={{ display: "grid", placeItems: "center", height: "100%", color: "var(--muted)", fontSize: 13 }}><span className="spin" /> &nbsp;immagine…</div>}
                 </div>

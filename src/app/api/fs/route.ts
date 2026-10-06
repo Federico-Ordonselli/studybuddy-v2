@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
+import { FS_ROOT as ROOT, insideRoot as safe } from "@/lib/fsRoot";
 
 export const runtime = "nodejs";
 
-// Browser cartelle, in sandbox dentro la home (override con STUDYBUDDY_FS_ROOT).
-const ROOT = path.resolve(process.env.STUDYBUDDY_FS_ROOT ?? os.homedir());
-
-function safe(p: string): string | null {
-  const resolved = path.resolve(p || ROOT);
-  if (resolved !== ROOT && !resolved.startsWith(ROOT + path.sep)) return null;
-  return resolved;
-}
+// Browser cartelle, in sandbox dentro la home (vedi lib/fsRoot).
 
 /** Elenca le sottocartelle di `path` (per la selezione del materiale). */
 export async function GET(req: NextRequest) {
