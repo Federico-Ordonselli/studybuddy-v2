@@ -18,7 +18,7 @@ import { transcribeToSrt, whisperAvailable } from "@/lib/transcribe";
 // Versione della logica di parsing/chunking: entra in `fileHash` così che, quando
 // migliora un parser, il re-ingest rielabori anche i file il cui contenuto non è
 // cambiato (altrimenti verrebbero saltati perché i byte sono identici). Bump = refresh.
-const PARSER_VERSION = "2";
+const PARSER_VERSION = "4";
 
 type Kind = "transcript" | "pdf" | "html" | "video" | "text" | "skip";
 
@@ -64,12 +64,35 @@ export function parseSubtitles(raw: string): TranscriptCue[] {
 }
 
 /**
+ * Toglie le immagini incorporate come data URI (anche 15 MB in un attributo): non
+ * portano testo e con stringhe così lunghe le regex di V8 vanno in stack overflow
+ * (sia quella dei tag di node-html-parser sia un `replace` con quantificatore),
+ * quindi scansione lineare con indexOf.
+ */
+function stripDataUris(html: string): string {
+  let out = "";
+  let i = 0;
+  for (let j = html.indexOf("data:", i); j >= 0; j = html.indexOf("data:", i)) {
+    // Solo valori di attributo / url(): "metadata: …" nel testo resta intatto.
+    if (!`"'(`.includes(html[j - 1])) { out += html.slice(i, j + 5); i = j + 5; continue; }
+    let k = j + 5;
+    while (k < html.length && html[k] !== '"' && html[k] !== "'" && html[k] !== ")") k++;
+    out += html.slice(i, j) + (k - j > 256 ? "data:" : html.slice(j, k));
+    i = k;
+  }
+  return out + html.slice(i);
+}
+
+/**
  * Estrae il main content da una reading HTML di Coursera.
  * Le reading vivono in <co-content>; per le pagine senza wrapper si ricade sul body.
  * Si tengono code/pre/tabelle (cheat sheet) e si scartano script/style/svg/chrome.
  */
 export function parseHtml(raw: string): string {
-  const root = parseHtmlDom(raw, { comment: false });
+  const html = stripDataUris(raw);
+  // Senza `pre` fra i blockTextElements (default: script/noscript/style/pre) il
+  // contenuto dei <pre> resta markup letterale ("<c- b>interface</c->…").
+  const root = parseHtmlDom(html, { comment: false, blockTextElements: { script: true, noscript: true, style: true } });
   root
     .querySelectorAll("script,style,noscript,svg,iframe,link,meta,head,nav,header,footer")
     .forEach((el) => el.remove());

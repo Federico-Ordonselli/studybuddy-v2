@@ -28,11 +28,20 @@ export function deleteDocumentChunks(documentId: number) {
   initFts();
   const delVec = sqlite.prepare("DELETE FROM vec_chunks WHERE chunk_id = ?");
   const delFts = sqlite.prepare("DELETE FROM chunks_fts WHERE rowid = ?");
-  for (const r of rows) {
-    delVec.run(BigInt(r.id)); // sqlite-vec: PK come BigInt
-    delFts.run(r.id);
-  }
-  db.delete(chunks).where(eq(chunks.documentId, documentId)).run();
+  // Le carte puntano al chunk da cui sono nate (attribuzione best-effort): senza
+  // sganciarle la FK fa fallire il re-ingest dei documenti che hanno carte.
+  const unlinkCards = sqlite.prepare(
+    "UPDATE cards SET source_chunk_id = NULL WHERE source_chunk_id IN (SELECT id FROM chunks WHERE document_id = ?)"
+  );
+  // Tutto o niente: un errore a metà lascerebbe chunk senza vettori/FTS.
+  sqlite.transaction(() => {
+    for (const r of rows) {
+      delVec.run(BigInt(r.id)); // sqlite-vec: PK come BigInt
+      delFts.run(r.id);
+    }
+    unlinkCards.run(documentId);
+    db.delete(chunks).where(eq(chunks.documentId, documentId)).run();
+  })();
 }
 
 /** Salva i chunk (+ embedding) di un documento. */

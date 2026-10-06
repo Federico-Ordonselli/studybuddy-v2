@@ -5,11 +5,40 @@ import type { ChunkRecord } from "./store";
 const approxTokens = (s: string) => Math.ceil(s.length / 4);
 
 /**
+ * Spezza un blocco che da solo supera il budget: prima per righe, poi per frasi,
+ * infine taglio secco. Serve per l'HTML (structuredText separa i blocchi con un
+ * solo "\n", quindi una pagina intera è un unico "paragrafo") e per PDF senza a capo.
+ */
+function splitOversize(text: string, max: number): string[] {
+  if (text.length <= max) return [text];
+  for (const sep of [/\n/, /(?<=[.!?;])\s+/, /\s+/]) {
+    const parts = text.split(sep).filter(Boolean);
+    if (parts.length < 2) continue;
+    const joiner = sep.source === "\\n" ? "\n" : " ";
+    const out: string[] = [];
+    let buf = "";
+    for (const part of parts.flatMap((p) => splitOversize(p, max))) {
+      if (buf && buf.length + joiner.length + part.length > max) { out.push(buf); buf = part; }
+      else buf = buf ? buf + joiner + part : part;
+    }
+    if (buf) out.push(buf);
+    return out;
+  }
+  const out: string[] = [];
+  for (let i = 0; i < text.length; i += max) out.push(text.slice(i, i + max));
+  return out;
+}
+
+/**
  * Chunking semplice e robusto: divide per paragrafi e accorpa fino a ~chunkTokens,
- * con overlap. TODO(claude-code): chunking strutturale (heading-aware) per i PDF.
+ * con overlap. I paragrafi troppo lunghi vengono spezzati (splitOversize).
+ * TODO(claude-code): chunking strutturale (heading-aware) per i PDF.
  */
 export function chunkText(text: string): string[] {
-  const paras = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  // Spazio per l'overlap che viene anteposto al pezzo successivo.
+  const max = (rag.chunkTokens - rag.chunkOverlap) * 4;
+  const paras = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+    .flatMap((p) => splitOversize(p, max));
   const out: string[] = [];
   let buf = "";
   for (const p of paras) {
