@@ -12,11 +12,11 @@ import { whisper as cfg } from "@/lib/config";
  * Backend supportati (auto-detect in quest'ordine): faster-whisper (script Python),
  * whisper.cpp (binario + modello .bin, via ffmpeg→wav), openai-whisper (CLI).
  */
-const SIDECAR = path.resolve(process.cwd(), "scripts/whisper_sidecar.py");
+const SIDECAR = path.resolve(/* turbopackIgnore: true */ process.cwd(), "scripts/whisper_sidecar.py");
 
 /** Python del venv di progetto se presente, altrimenti il python3 di sistema. */
 function pythonBin(): string {
-  const venv = path.resolve(process.cwd(), ".venv/bin/python");
+  const venv = path.resolve(/* turbopackIgnore: true */ process.cwd(), ".venv/bin/python");
   return fs.existsSync(venv) ? venv : "python3";
 }
 

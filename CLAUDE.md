@@ -54,9 +54,19 @@ Attenzione ai **duplicati** slide-PDF vs trascrizione: stesso contenuto da due f
 - I modelli recenti sono "reasoning": con il thinking attivo `num_predict` si esaurisce prima della risposta (output vuoto). Per questo `config.ollama.think = false` di default (opt-in per chiamata con `opts.think`). `config.ollama.numCtx` = 16k: il default Ollama (4096) tronca in silenzio il contesto RAG.
 - Grading: un giudizio non valido (dopo un retry) **lancia** invece di restituire quality 0, che per SM-2 azzererebbe la carta.
 - Immagini slide: `config.image.backend` (`svg-llm` default locale; `automatic1111`/`openai` opt-in). Le SVG sono mostrate come `<img>` data URL (niente script per costruzione), quindi devono essere XML ben formato: `sanitizeSvg` aggiunge `xmlns` e ripara attributi duplicati / `&` nude.
-- Sicurezza (app locale che espone il filesystem): `src/middleware.ts` su `/api/*` accetta solo host locali (DNS rebinding/LAN; override `STUDYBUDDY_ALLOWED_HOSTS`) e scritture `application/json` (CSRF). I percorsi dal client passano dalla sandbox `lib/fsRoot.ts` (home, override `STUDYBUDDY_FS_ROOT`).
+- Sicurezza (app locale che espone il filesystem): `src/proxy.ts` (ex middleware, Next 16) su `/api/*` accetta solo host locali (DNS rebinding/LAN; override `STUDYBUDDY_ALLOWED_HOSTS`) e scritture `application/json` (CSRF). I percorsi dal client passano dalla sandbox `lib/fsRoot.ts` (home, override `STUDYBUDDY_FS_ROOT`).
 - Whisper: sidecar Python in `.venv` (faster-whisper installato; `transcribe.ts` usa `.venv/bin/python` se presente). GPU richiede cuBLAS/cuDNN per ctranslate2: senza, il sidecar fa **fallback automatico su CPU/int8** (base ~7s per 4 min di video). Re-ingest non ri-trascrive (idempotenza per `fileHash` del .mp4).
 - Re-ingest idempotente per `fileHash`: se migliori un parser in `sources/coursera.ts` i file invariati verrebbero saltati → **bumpa `PARSER_VERSION`** per forzare il refresh.
 
 ## Comandi
 `npm run dev` · `npm run ingest -- <dir> <dominio>` · `npm run db:push` · `npm run db:studio` · `npm run typecheck`
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -22,7 +22,7 @@ function hostAllowed(hostHeader: string | null): boolean {
   return LOCAL_HOSTS.has(host) || EXTRA_HOSTS.has(host);
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   if (!hostAllowed(req.headers.get("host"))) {
     return NextResponse.json({ error: "host non consentito" }, { status: 403 });
   }
