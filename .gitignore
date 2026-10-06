@@ -1,0 +1,26 @@
+# dipendenze e build
+node_modules/
+.next/
+out/
+
+# cache modelli Transformers.js (reranker cross-encoder, ~560MB)
+.models/
+
+# database SQLite locale
+*.db
+*.db-wal
+*.db-shm
+
+# runtime del launcher (pid + log)
+.run/
+
+# env
+.env
+.env.local
+
+# corso scaricato (materiale, non versionato)
+Courses/
+
+# venv Python (sidecar Whisper)
+.venv/
+tsconfig.tsbuildinfo

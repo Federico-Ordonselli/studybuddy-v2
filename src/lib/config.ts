@@ -1,0 +1,80 @@
+/**
+ * Central model routing. Ogni TASK punta a un provider + modello.
+ * Cambiare backend di un task = cambiare una riga qui.
+ *
+ * Local-first: tutto su Ollama di default. Per mandare un singolo task
+ * pesante all'API (es. summarize), basta cambiare provider in "anthropic".
+ */
+export type ProviderName = "ollama" | "anthropic" | "openai-compatible";
+
+export interface ModelRef {
+  provider: ProviderName;
+  model: string;
+}
+
+export type Task =
+  | "chat"       // tutor conversazionale
+  | "summarize"  // riassunti di capitoli/trascrizioni
+  | "quiz"       // generazione domande (structured output)
+  | "grade"      // LLM-as-judge sulle risposte aperte
+  | "embed"      // embeddings per il retrieval
+  | "rerank";    // reranking dei chunk recuperati
+
+export const models: Record<Task, ModelRef> = {
+  chat:      { provider: "ollama", model: "gpt-oss:20b" },
+  summarize: { provider: "ollama", model: "gpt-oss:20b" },
+  quiz:      { provider: "ollama", model: "gpt-oss:20b" },
+  grade:     { provider: "ollama", model: "gpt-oss:20b" },
+  embed:     { provider: "ollama", model: "bge-m3" },
+  rerank:    { provider: "ollama", model: "gpt-oss:20b" }, // listwise via LLM (vedi rag/rerank.ts)
+};
+
+/** Dimensione dell'embedding del modello in `models.embed`. bge-m3 = 1024. */
+export const EMBED_DIM = 1024;
+
+/**
+ * Reranker. `cross-encoder` = bge-reranker-v2-m3 reale via Transformers.js/ONNX,
+ * in-process e local-first (modello scaricato una volta in `cacheDir`). Con
+ * `llm` si usa il rerank listwise via `models.rerank` (fallback automatico se il
+ * cross-encoder fallisce a caricarsi). dtype `q8` = pesi quantizzati (~280MB).
+ */
+export const reranker = {
+  strategy: "cross-encoder" as "cross-encoder" | "llm",
+  model: "onnx-community/bge-reranker-v2-m3-ONNX",
+  dtype: "q8" as "q8" | "int8" | "fp16" | "fp32",
+  cacheDir: ".models",
+};
+
+/**
+ * Generazione immagini per le slide. Pluggable e local-first.
+ *  - `svg-llm` (default): illustrazioni SVG diagrammatiche generate da gpt-oss, in
+ *    locale, zero infra. `automatic1111`/`openai` sono predisposti ma opt-in.
+ */
+export const image = {
+  backend: "svg-llm" as "svg-llm" | "automatic1111" | "openai",
+  baseUrl: process.env.SD_BASE_URL ?? "http://localhost:7860", // per automatic1111
+  model: "gpt-image-1",                                         // per openai
+};
+
+/**
+ * Whisper fallback: trascrive i (pochi) video senza .srt/.vtt, via sidecar locale.
+ * `backend: "auto"` rileva faster-whisper → whisper.cpp → openai-whisper; se nessuno
+ * è installato l'ingest salta i video (no-op). Attivo solo con `--whisper` nella CLI.
+ */
+export const whisper = {
+  backend: "auto" as "auto" | "faster-whisper" | "whisper.cpp" | "openai-whisper",
+  model: process.env.WHISPER_MODEL ?? "base", // tiny|base|small|medium|large-v3
+  language: process.env.WHISPER_LANG || undefined, // es. "en"; undefined = auto-detect
+  cppBinary: process.env.WHISPER_CPP_BIN ?? "whisper-cli", // per whisper.cpp
+  cppModel: process.env.WHISPER_CPP_MODEL ?? "", // path al .bin (whisper.cpp)
+};
+
+/** Parametri RAG di default. */
+export const rag = {
+  chunkTokens: 500,
+  chunkOverlap: 80,
+  topK: 20,        // candidati dal retrieval (per ramo: dense e sparse)
+  topN: 6,         // chunk tenuti dopo il rerank
+  hybrid: true,    // fonde dense (sqlite-vec) + sparse (BM25/FTS5) via RRF
+  rrfK: 60,        // costante della Reciprocal Rank Fusion
+};

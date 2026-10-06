@@ -1,0 +1,37 @@
+{
+  "name": "studybuddy-v2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "ingest": "tsx scripts/ingest.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "@huggingface/transformers": "^4.2.0",
+    "better-sqlite3": "^11.8.0",
+    "drizzle-orm": "^0.38.0",
+    "next": "^15.2.0",
+    "node-html-parser": "^7.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sqlite-vec": "^0.1.6",
+    "unpdf": "^1.6.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "drizzle-kit": "^0.30.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5.7.0"
+  }
+}
