@@ -1,4 +1,5 @@
 import "./globals.css";
+import "@/components/mappe/studio.css";
 
 export const metadata = {
   title: "StudyBuddy v2",

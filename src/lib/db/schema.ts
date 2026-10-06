@@ -58,3 +58,17 @@ export const sessions = sqliteTable("sessions", {
   state: text("state", { mode: "json" }),           // stato serializzato della macchina a stati
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
+
+/**
+ * Mappe concettuali esplorabili (editor in components/mappe). `doc` è il documento
+ * v1 completo (concetti, tele annidate, relazioni): la struttura la valida
+ * `lib/mappe/formato-mappa.js`, qui serve solo l'indice per dominio e la revisione.
+ */
+export const conceptMaps = sqliteTable("concept_maps", {
+  id: text("id").primaryKey(),
+  domainId: integer("domain_id").references(() => domains.id),
+  title: text("title").notNull(),
+  revision: integer("revision").notNull().default(0),
+  doc: text("doc", { mode: "json" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});

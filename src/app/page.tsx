@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import MapStudio from "@/components/mappe/MapStudio";
 
 type Mode = "socratic" | "quiz" | "review" | "studio";
 
@@ -63,6 +64,7 @@ export default function Home() {
   const [result, setResult] = useState<ReviewResult | null>(null);
   const [genTopic, setGenTopic] = useState("");
   const [busy, setBusy] = useState(false);
+  const [wide, setWide] = useState(false); // la mappa concettuale usa tutta la larghezza
 
   useEffect(() => {
     fetch("/api/domains").then((r) => r.json()).then((d) => {
@@ -167,7 +169,7 @@ export default function Home() {
     : pendingQ ? "Scrivi la tua risposta…" : "Argomento su cui generare una domanda…";
 
   return (
-    <main style={S.main}>
+    <main style={{ ...S.main, maxWidth: mode === "studio" && wide ? 1600 : 860 }}>
       <header style={S.header}>
         <div style={{ fontWeight: 700, fontSize: 18 }}>StudyBuddy <span style={{ color: "var(--accent)" }}>v2</span></div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -198,7 +200,8 @@ export default function Home() {
       )}
 
       {mode === "studio" ? (
-        <StudioView domainId={domainId} />
+        <StudioView domainId={domainId} onWide={setWide}
+          onAskTutor={(text) => { setMode("socratic"); setInput(text); }} />
       ) : mode === "review" ? (
         <ReviewView
           due={due} card={card} answer={answer} setAnswer={setAnswer} result={result}
@@ -322,24 +325,24 @@ function ReviewView(p: {
 }
 
 type Tool = "summary" | "map" | "slides";
-interface ConceptNode { id: string; label: string }
-interface ConceptEdge { from: string; to: string; label?: string }
 interface SlideT { title: string; bullets: string[]; imagePrompt: string; image?: { format: string; content: string } }
 
-function StudioView({ domainId }: { domainId?: number }) {
+function StudioView({ domainId, onWide, onAskTutor }: { domainId?: number; onWide: (wide: boolean) => void; onAskTutor: (text: string) => void }) {
   const [topic, setTopic] = useState("");
   const [tool, setTool] = useState<Tool | null>(null);
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
-  const [map, setMap] = useState<{ nodes: ConceptNode[]; edges: ConceptEdge[] } | null>(null);
   const [slides, setSlides] = useState<SlideT[] | null>(null);
 
+  useEffect(() => { onWide(tool === "map"); }, [tool, onWide]);
+
   async function run(t: Tool) {
+    // La mappa ha il suo editor (elenco, generazione, salvataggio): basta aprirlo.
+    if (t === "map") { setTool(t); setSummary(null); setSlides(null); return; }
     if (!topic.trim() || !domainId || loading) return;
-    setTool(t); setLoading(true); setSummary(null); setMap(null); setSlides(null);
+    setTool(t); setLoading(true); setSummary(null); setSlides(null);
     try {
       if (t === "summary") setSummary((await post<{ summary: string }>("/api/summarize", { domainId, topic })).summary);
-      else if (t === "map") setMap(await post<{ nodes: ConceptNode[]; edges: ConceptEdge[] }>("/api/conceptmap", { domainId, topic }));
       else {
         const r = await post<{ slides: SlideT[] }>("/api/slides", { domainId, topic, n: 4 });
         setSlides(r.slides);
@@ -365,23 +368,23 @@ function StudioView({ domainId }: { domainId?: number }) {
   return (
     <div style={S.review}>
       <div style={S.reviewBar}>
-        <input value={topic} onChange={(e) => setTopic(e.target.value)}
+        {tool !== "map" && <input value={topic} onChange={(e) => setTopic(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && tool) run(tool); }}
-          placeholder="Argomento da studiare…" style={{ ...S.select, flex: 1, minWidth: 220 }} disabled={!domainId} />
+          placeholder="Argomento da studiare…" style={{ ...S.select, flex: 1, minWidth: 220 }} disabled={!domainId} />}
         {tools.map(([t, label]) => (
-          <button key={t} onClick={() => run(t)} disabled={loading || !domainId || !topic.trim()}
+          <button key={t} onClick={() => run(t)} disabled={loading || !domainId || (t !== "map" && !topic.trim())}
             style={{ ...S.tab, border: "1px solid var(--border)", borderRadius: 8, ...(tool === t ? S.tabActive : {}) }}>
             {label}
           </button>
         ))}
       </div>
 
-      {loading && <div style={{ ...S.empty, marginTop: 24 }}><span className="spin" /> {tool === "slides" ? "genero le slide…" : tool === "map" ? "costruisco la mappa…" : "riassumo il materiale…"}</div>}
+      {loading && <div style={{ ...S.empty, marginTop: 24 }}><span className="spin" /> {tool === "slides" ? "genero le slide…" : "riassumo il materiale…"}</div>}
 
-      {!loading && !tool && <div style={S.empty}>Scrivi un argomento e scegli uno strumento: riassunto map-reduce, mappa concettuale, o slide con immagini generate.</div>}
+      {!loading && !tool && <div style={S.empty}>Scrivi un argomento e scegli uno strumento: riassunto map-reduce o slide con immagini generate. La mappa concettuale si esplora entrando nelle bolle.</div>}
 
       {summary !== null && <div style={S.card}><Markdown text={summary} /></div>}
-      {map !== null && (map.nodes.length ? <div style={S.card}><ConceptMapSvg nodes={map.nodes} edges={map.edges} /></div> : <div style={S.empty}>Nessuna mappa generata.</div>)}
+      {tool === "map" && <MapStudio domainId={domainId} onAskTutor={onAskTutor} />}
       {slides !== null && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {slides.map((s, i) => (
@@ -408,46 +411,6 @@ function StudioView({ domainId }: { domainId?: number }) {
         </div>
       )}
     </div>
-  );
-}
-
-/** Mappa concettuale: layout radiale deterministico (nodo 0 al centro). */
-function ConceptMapSvg({ nodes, edges }: { nodes: ConceptNode[]; edges: ConceptEdge[] }) {
-  const W = 720, H = 460, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 70;
-  const pos = new Map<string, { x: number; y: number }>();
-  nodes.forEach((n, i) => {
-    if (i === 0) pos.set(n.id, { x: cx, y: cy });
-    else {
-      const a = (2 * Math.PI * (i - 1)) / Math.max(1, nodes.length - 1) - Math.PI / 2;
-      pos.set(n.id, { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) });
-    }
-  });
-  const w = (label: string) => Math.min(170, 30 + label.length * 7);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
-      {edges.map((e, i) => {
-        const a = pos.get(e.from), b = pos.get(e.to);
-        if (!a || !b) return null;
-        return (
-          <g key={i}>
-            <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#2a2f3a" strokeWidth={1.5} />
-            {e.label && <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} fill="#98a0b3" fontSize={10} textAnchor="middle">{e.label}</text>}
-          </g>
-        );
-      })}
-      {nodes.map((n, i) => {
-        const p = pos.get(n.id)!; const bw = w(n.label);
-        return (
-          <g key={n.id}>
-            <rect x={p.x - bw / 2} y={p.y - 16} width={bw} height={32} rx={8}
-              fill={i === 0 ? "#2b6cff" : "#1e222b"} stroke={i === 0 ? "#6ea8fe" : "#2a2f3a"} strokeWidth={1.5} />
-            <text x={p.x} y={p.y + 4} fill="#e6e8ee" fontSize={11.5} textAnchor="middle">
-              {n.label.length > 22 ? n.label.slice(0, 21) + "…" : n.label}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
   );
 }
 
