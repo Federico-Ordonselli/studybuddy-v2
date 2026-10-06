@@ -24,3 +24,9 @@ Courses/
 # venv Python (sidecar Whisper)
 .venv/
 tsconfig.tsbuildinfo
+
+# output Playwright (test e2e)
+.playwright-mcp/
+
+# backup DB
+*.db.bak*
