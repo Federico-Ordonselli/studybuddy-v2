@@ -7,7 +7,7 @@
     "dev": "scripts/with-cuda.sh next dev",
     "build": "next build",
     "start": "scripts/with-cuda.sh next start",
-    "ingest": "tsx scripts/ingest.ts",
+    "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "lint": "next lint",
