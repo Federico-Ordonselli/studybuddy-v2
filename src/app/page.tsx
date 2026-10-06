@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 type Mode = "socratic" | "quiz" | "review" | "studio";
 
-interface Domain { id: number; name: string; docs: number }
+interface Domain { id: number; name: string; docs: number; parentId: number | null }
 
 interface Citation {
   n: number;
@@ -173,7 +173,7 @@ export default function Home() {
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <select value={domainId ?? ""} onChange={(e) => setDomainId(Number(e.target.value))} style={S.select}>
             {domains.length === 0 && <option value="">nessun dominio — usa npm run ingest</option>}
-            {domains.map((d) => <option key={d.id} value={d.id}>{d.name} ({d.docs})</option>)}
+            {domains.map((d) => <option key={d.id} value={d.id}>{d.parentId != null ? "\u00a0\u00a0↳ " : ""}{d.name} ({d.docs})</option>)}
           </select>
           <div style={S.tabs}>
             {(["socratic", "quiz", "review", "studio"] as Mode[]).map((m) => (
