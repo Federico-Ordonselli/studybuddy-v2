@@ -29,7 +29,7 @@ export async function generateCards(domainId: number, topic: string, n = 5): Pro
   const chunks = await retrieve(topic, domainId);
   if (!chunks.length) return { created: 0 };
 
-  const qs = await generateQuiz(asContext(chunks), n);
+  const qs = await generateQuiz(asContext(chunks), n, { topic, kind: "open" });
   const sourceChunkId = chunks[0]?.chunkId ?? null; // attribuzione best-effort
   let created = 0;
   for (const q of qs) {

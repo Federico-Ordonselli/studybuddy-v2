@@ -1,6 +1,6 @@
 import { retrieve, asContext, toCitations, type Citation } from "@/lib/rag/pipeline";
 import { generate, type ChatMessage } from "@/lib/providers";
-import { generateQuiz, type QuizQuestion } from "./quiz";
+import { generateQuiz, normalizeOption, type QuizQuestion } from "./quiz";
 import { gradeAnswer, type Grade } from "./grade";
 
 export type TutorMode = "socratic" | "quiz" | "review";
@@ -38,7 +38,7 @@ export async function socraticTurn(
 /** Modalita' quiz: genera una domanda dal materiale di un argomento. */
 export async function quizTurn(topic: string, domainId?: number): Promise<TutorTurn> {
   const chunks = await retrieve(topic, domainId);
-  const [q] = await generateQuiz(asContext(chunks), 1);
+  const [q] = await generateQuiz(asContext(chunks), 1, { topic });
   return {
     reply: q?.question ?? "Nessuna domanda generata.",
     question: q,
@@ -51,6 +51,18 @@ export async function gradeTurn(
   q: QuizQuestion,
   studentAnswer: string
 ): Promise<TutorTurn> {
-  const grade = await gradeAnswer(q.question, q.answer, studentAnswer);
+  const grade = q.type === "mcq" && q.options?.length ? gradeChoice(q, studentAnswer) : await gradeAnswer(q.question, q.answer, studentAnswer);
   return { reply: grade.feedback, grade };
+}
+
+/**
+ * Le mcq hanno una sola risposta giusta: confronto esatto, niente LLM-as-judge
+ * (che premiava opzioni sbagliate ma "concettualmente vicine"). Errata = 1 per SM-2.
+ */
+function gradeChoice(q: QuizQuestion, chosen: string): Grade {
+  const correct = normalizeOption(chosen) === normalizeOption(q.answer);
+  const why = q.rationale?.trim() ? ` ${q.rationale.trim()}` : "";
+  return correct
+    ? { quality: 5, correct: true, feedback: `Corretto.${why}` }
+    : { quality: 1, correct: false, feedback: `Non è corretta. Risposta giusta: «${q.answer}».${why}` };
 }
