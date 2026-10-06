@@ -58,8 +58,11 @@ export async function indexChunks(documentId: number, records: ChunkRecord[]) {
   }
 }
 
-/** Espande un dominio nel suo scope di ricerca: un `macro` include tutti i micro-corsi figli. */
-function resolveScope(domainId?: number): number[] | null {
+/**
+ * Espande un dominio nel suo scope: un `macro` include tutti i micro-corsi figli.
+ * Unica regola condivisa da retrieval, conteggi in UI e coda del ripasso.
+ */
+export function resolveScope(domainId?: number): number[] | null {
   if (domainId == null) return null;
   const kids = sqlite.prepare("SELECT id FROM domains WHERE parent_id = ?").all(domainId) as Array<{ id: number }>;
   return [domainId, ...kids.map((k) => k.id)];

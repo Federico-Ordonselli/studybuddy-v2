@@ -1,7 +1,8 @@
-import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cards } from "@/lib/db/schema";
 import { retrieve, asContext } from "@/lib/rag/pipeline";
+import { resolveScope } from "@/lib/rag/store";
 import { generateQuiz } from "./quiz";
 import { gradeAnswer, type Grade } from "./grade";
 import { sm2, nextDue } from "./sm2";
@@ -45,12 +46,17 @@ export async function generateCards(domainId: number, topic: string, n = 5): Pro
   return { created };
 }
 
-/** Numero di carte attualmente in scadenza (dueAt <= ora) per il dominio. */
+/** Carte in scadenza (dueAt <= ora) nello scope del dominio: un macro include le carte dei figli. */
+function dueIn(domainId: number) {
+  return and(inArray(cards.domainId, resolveScope(domainId) ?? [domainId]), lte(cards.dueAt, new Date()));
+}
+
+/** Numero di carte attualmente in scadenza per il dominio (figli inclusi). */
 export function dueCount(domainId: number): number {
   const row = db
     .select({ c: sql<number>`count(*)` })
     .from(cards)
-    .where(and(eq(cards.domainId, domainId), lte(cards.dueAt, new Date())))
+    .where(dueIn(domainId))
     .get();
   return row?.c ?? 0;
 }
@@ -60,15 +66,18 @@ export function nextDueCard(domainId: number): ReviewCard | null {
   const row = db
     .select({ id: cards.id, question: cards.question })
     .from(cards)
-    .where(and(eq(cards.domainId, domainId), lte(cards.dueAt, new Date())))
+    .where(dueIn(domainId))
     .orderBy(asc(cards.dueAt))
     .limit(1)
     .get();
   return row ?? null;
 }
 
-/** Valuta la risposta a una carta e riprogramma con SM-2. */
-export async function reviewCard(cardId: number, answer: string): Promise<ReviewResult | null> {
+/**
+ * Valuta la risposta a una carta e riprogramma con SM-2. `scopeDomainId` è il dominio
+ * selezionato in UI (può essere il macro): serve per contare le carte rimaste in coda.
+ */
+export async function reviewCard(cardId: number, answer: string, scopeDomainId?: number): Promise<ReviewResult | null> {
   const card = db.select().from(cards).where(eq(cards.id, cardId)).get();
   if (!card) return null;
 
@@ -83,11 +92,12 @@ export async function reviewCard(cardId: number, answer: string): Promise<Review
     .where(eq(cards.id, cardId))
     .run();
 
+  const scope = scopeDomainId ?? card.domainId;
   return {
     grade,
     expected: card.answer,
     intervalDays: next.intervalDays,
     dueAt: due.getTime(),
-    remaining: card.domainId ? dueCount(card.domainId) : 0,
+    remaining: scope ? dueCount(scope) : 0,
   };
 }

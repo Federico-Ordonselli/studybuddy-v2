@@ -12,10 +12,10 @@ export async function GET(req: NextRequest) {
 
 /** Valuta la risposta a una carta e la riprogramma con SM-2. */
 export async function POST(req: NextRequest) {
-  const { cardId, answer } = await req.json();
+  const { cardId, answer, domainId } = await req.json();
   if (!cardId) return NextResponse.json({ error: "cardId richiesto" }, { status: 400 });
   try {
-    const res = await reviewCard(cardId, answer ?? "");
+    const res = await reviewCard(cardId, answer ?? "", domainId ? Number(domainId) : undefined);
     if (!res) return NextResponse.json({ error: "carta non trovata" }, { status: 404 });
     return NextResponse.json(res);
   } catch (e) {

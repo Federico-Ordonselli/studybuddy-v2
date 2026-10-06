@@ -117,7 +117,7 @@ export default function Home() {
     if (!card || !answer.trim() || busy) return;
     setBusy(true);
     try {
-      const r = await post<ReviewResult>("/api/review", { cardId: card.id, answer: answer.trim() });
+      const r = await post<ReviewResult>("/api/review", { cardId: card.id, answer: answer.trim(), domainId });
       setResult(r); setDue(r.remaining);
     } catch (e) {
       setResult({ grade: { quality: 0, correct: false, feedback: `Errore: ${e}` }, expected: "", intervalDays: 0, dueAt: 0, remaining: due });
