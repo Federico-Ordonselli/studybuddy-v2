@@ -1,82 +1,133 @@
 # StudyBuddy v2
 
-Companion di studio **local-first** con RAG: ingerisce un corso Coursera scaricato
-(trascrizioni .srt/.vtt, PDF, HTML), recupera i passaggi pertinenti, fa da tutor socratico
-con citazioni al minuto del video, genera quiz, riassunti map-reduce, **mappe concettuali** e
-**slide con immagini generate** (SVG locali), e schedula il ripasso con SM-2.
+**A local-first AI study companion.** Point it at a downloaded online course (video transcripts, PDFs, HTML readings) and it becomes a personal tutor. It answers Socratically and cites the exact minute of the lecture video. It also generates quizzes and spaced-repetition flashcards, map-reduce summaries, slides, and explorable concept maps. Everything runs on your machine through Ollama, so no data leaves it and there is no per-token bill.
 
-Rebuild di StudyBuddy v1 (Streamlit + qwen2.5:14b + ChromaDB) su stack moderno e modulare.
+![Socratic tutor: a citation opens the lecture video at the right minute](docs/screenshots/socratic-tutor.png)
+
+> Rebuild of [StudyBuddy v1](https://github.com/Federico-Ordonselli/studybuddy) (Python + Streamlit + ChromaDB) on a modular TypeScript stack, with hybrid retrieval, a real cross-encoder reranker, and a new UI.
+
+## Features
+
+### Socratic tutor with video-timestamp citations
+Ask a question, even in Italian about English material. The tutor doesn't hand you the answer. It guides you with questions and hints, and it relies **only** on passages retrieved from the course. Every answer lists numbered sources. A transcript citation opens the built-in player at the exact timestamp. Conversations are saved and resumed.
+
+<img src="docs/screenshots/citations.png" alt="Socratic dialogue with numbered citations and video timestamps" width="640">
+
+### Quizzes graded by an LLM judge
+Pick a topic and you get a multiple-choice question generated with structured output (a JSON schema enforced on the model). Answers are graded 0–5 by an LLM-as-judge prompt, with an explanation grounded in the course text.
+
+<img src="docs/screenshots/quiz.png" alt="Flexbox quiz graded 5/5" width="640">
+
+### Spaced repetition (SM-2)
+Flashcards are generated from a topic or from a concept-map node. You answer in your own words, the LLM grades the answer, and **SM-2** schedules the next review. An invalid grade throws instead of recording a 0, which would reset a card you already know.
+
+<img src="docs/screenshots/review-sm2.png" alt="Review card graded and rescheduled" width="640">
+
+### Explorable concept maps
+The model proposes a central concept, related concepts, and labelled relations. Each concept comes with a definition, an explanation, examples, and **sources**. Double-click a bubble to **enter** it (animated zoom). The first time, the sub-level is generated from the material, reusing titles already on the map. This creates cross-level links (dashed "portal" pills) instead of duplicate nodes. Every AI proposal is applied as atomic commands, so undo/redo works on AI edits too.
+
+![Concept map with the concept card open](docs/screenshots/concept-map.png)
+![Inside a bubble: generated sub-concepts and cross-level links](docs/screenshots/concept-map-level.png)
+
+### Summaries and slides
+Map-reduce summaries over a topic or a whole module. The slides come with SVG illustrations drawn locally by the LLM; the image backend is pluggable (AUTOMATIC1111 or an image API).
+
+<img src="docs/screenshots/summary.png" alt="Structured summary" width="49%"> <img src="docs/screenshots/slides.png" alt="Generated slide with SVG illustration" width="49%">
+
+## How it works
+
+```
+ Course folder (course/module/lesson/)        Ingestion
+  .srt/.vtt ─► subtitle parser (timestamps) ─┐  ┌─────────────────────────────────────┐
+  .pdf      ─► unpdf (pdf.js, no native deps)┼─►│ chunking + breadcrumb + timestamps  │
+  .html     ─► node-html-parser              │  │ per-file hash → idempotent re-ingest│
+  .mp4 w/o subtitles ─► Whisper sidecar ─────┘  │ dedup of twin sources / chunks      │
+                                                └──────────────────┬──────────────────┘
+                                                                   ▼
+                                SQLite: documents · chunks · sqlite-vec · FTS5
+                                                                   │
+ Question ─► dense (sqlite-vec) ─┐                                 │
+          └► BM25 (FTS5)       ──┴─► RRF fusion ─► cross-encoder (GPU) ─► top 6
+                                                                   │
+                        generate(task) ─► Ollama (or opt-in API) ◄─┘
+                                                                   │
+           Socratic tutor · Quiz · Grading · SM-2 · Summaries · Slides · Concept maps
+```
+
+- **Hybrid retrieval.** Dense search alone misses exact terms (`useEffect`, `git rebase`). Lexical search alone can't match an Italian question to English material. StudyBuddy runs both: multilingual `qwen3-embedding` on **sqlite-vec** and **BM25** on FTS5. It fuses them with **Reciprocal Rank Fusion**, which merges by rank, so incomparable cosine and BM25 scores never need normalizing.
+- **Real reranker.** `bge-reranker-v2-m3` runs in-process via Transformers.js / ONNX Runtime on CUDA (fp16, ~0.6 s for 20 passages). If CUDA isn't available it falls back to CPU (q8, ~3.4 s); if the model fails to load, it falls back to LLM listwise reranking.
+- **Provider-agnostic.** Every LLM call goes through `generate(task, opts)` / `embed(texts)`. `src/lib/config.ts` maps each task (chat, quiz, grade, summarize, embed, rerank) to a provider and model. Ollama is the default; Anthropic or any OpenAI-compatible endpoint is opt-in **per task**.
+- **Safe for a local app that touches the filesystem.** `src/proxy.ts` only accepts local `Host` headers, which blocks DNS rebinding, and only `application/json` writes, which forces a CORS preflight against CSRF. Client paths go through a home-directory sandbox, and the video endpoint only streams files that were actually ingested.
 
 ## Stack
-- **Next.js 15** (App Router) + TypeScript
-- **SQLite + Drizzle** per i dati relazionali
-- **sqlite-vec** come vector store (niente servizio esterno)
-- **Ollama** per l'inference locale; provider layer pluggabile (Anthropic / OpenAI-compatible opzionali)
 
-## Modelli (default, per 16GB VRAM — RTX 4080 Super)
-Configurati in `src/lib/config.ts`, uno per task:
-- chat / summarize / quiz / grade → `gpt-oss:20b`
-- embed → `bge-m3` (multilingue IT/EN, 1024-dim)
-- rerank → cross-encoder `bge-reranker-v2-m3` (Transformers.js/ONNX, in-process; fallback listwise LLM)
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript 7 · SQLite + Drizzle ORM · sqlite-vec · FTS5 · Ollama · Transformers.js / onnxruntime-node · unpdf · node-html-parser · faster-whisper (optional)
 
-Cambiare provider di un task = una riga in `config.ts`. L'API di Anthropic NON è inclusa nel
-piano Pro: va pagata a consumo dalla Console (resta opt-in).
+Default models, chosen with a small bake-off on tutoring, quiz generation and grading. They fit together in 16 GB of VRAM:
+
+| Task | Model |
+|---|---|
+| chat, quiz, grade, summarize | `gemma4:12b` |
+| embeddings (1024-d, multilingual) | `qwen3-embedding:0.6b` |
+| rerank | `onnx-community/bge-reranker-v2-m3-ONNX` |
 
 ## Setup
-```bash
-# 1. modelli locali
-ollama pull gpt-oss:20b
-ollama pull bge-m3
 
-# 2. dipendenze
+Requirements: Node.js ≥ 22, [Ollama](https://ollama.com) ≥ 0.35, ~10 GB of VRAM recommended (CPU works, slowly).
+
+```bash
+ollama pull gemma4:12b
+ollama pull qwen3-embedding:0.6b
+
 npm install
-
-# 3. env + db
-cp .env.example .env
+echo "DB_PATH=studybuddy.db" > .env.local   # optional, this is the default
 npm run db:push
-
-# 4. dev
-npm run dev
+npm run dev                                  # http://localhost:3000
 ```
 
-## Ingestion di un corso Coursera
-Indicizza una cartella scaricata (corso/modulo/lezione con .srt/.vtt, .html, .pdf):
+The reranker model downloads into `.models/` on first use.
+
+**Optional GPU reranking.** `onnxruntime-node` is built against CUDA 12. If your system has a different CUDA version, install the CUDA 12 runtime libraries into a project venv. `npm run dev` adds them to `LD_LIBRARY_PATH` through `scripts/with-cuda.sh`:
+
 ```bash
-# punta a un singolo corso per avere module/lesson puliti dal path
-npm run ingest -- "Courses/Meta Front-End Developer/Introduction-to-version-control" "Version Control"
+python -m venv .venv
+.venv/bin/pip install nvidia-cublas-cu12 nvidia-cuda-runtime-cu12 nvidia-cufft-cu12
 ```
-Salta i `.mp4` (la trascrizione copre il testo) e i `.txt` gemelli dell'`.srt`;
-dedup-a i chunk con contenuto identico (es. stessa reading come html e pdf).
 
-Per trascrivere i (pochi) video **senza** `.srt`/`.vtt`, aggiungi `--whisper` (richiede un
-backend: `faster-whisper` nel `.venv`, oppure `whisper.cpp`/`openai-whisper` nel PATH):
+**Optional Whisper fallback** for videos without subtitles: `.venv/bin/pip install faster-whisper` (whisper.cpp and openai-whisper are auto-detected too).
+
+## Ingesting a course
+
+The expected layout is `course/module/lesson/` with mixed files. Subtitles are the primary source; videos are skipped, but their paths are kept so citations can link to them.
+
 ```bash
-npm run ingest -- "Courses/Meta Front-End Developer/Introduction-to-version-control" "Version Control" --whisper
+npm run ingest -- "path/to/course" "Course name"
+npm run ingest -- "path/to/course" "Course name" --whisper   # also transcribe videos without subtitles
 ```
 
-## API (per provare lo scaffold)
-```bash
-# indicizza testo
-curl -X POST localhost:3000/api/ingest \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"Capitolo 1","text":"...testo lungo..."}'
+Re-ingesting is idempotent: unchanged files are skipped by hash, and modified files are replaced. `POST /api/ingest-folder` ingests a folder of courses as a parent domain with one child per course.
 
-# turno tutor socratico
-curl -X POST localhost:3000/api/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"mode":"socratic","message":"spiegami i transformer"}'
-```
+## Project structure
 
-## Struttura
 ```
 src/lib/
-  config.ts          # routing modello-per-task
-  db/                # drizzle schema + client sqlite-vec
-  providers/         # ollama | anthropic | openai-compatible (interfaccia comune)
-  rag/               # chunk → embed/store → retrieve → rerank → pipeline
-  tutor/             # sm2 | quiz | grade | session (macchina a stati)
-src/app/
-  api/ingest, api/chat
+  config.ts        model-per-task routing, RAG / reranker / Whisper settings
+  providers/       ollama | anthropic | openai-compatible | image backends
+  rag/             chunking, sqlite-vec + FTS5 store, hybrid search, rerank, course parsers
+  tutor/           socratic session, quiz, grading, SM-2 cards
+  mappe/           concept-map core (format, atomic commands, undo/redo, LLM proposals)
+  conceptmap.ts    map generation and "enter a concept" expansion
+  summarize.ts     map-reduce summaries
+  slides.ts        slide decks
+src/components/mappe/   SVG canvas and editor (framework-free DOM, hosted in React)
+src/app/api/            thin route handlers
+src/proxy.ts            host allowlist + JSON-only writes
 ```
 
-Vedi `CLAUDE.md` per il roadmap dei prossimi passi.
+## Limitations
+
+- Single-user and local-only by design: no auth, no sync.
+- SVG illustrations from a 12B model are simple and sometimes imprecise.
+- Quiz options sometimes reuse the English wording of the source material.
+
+Screenshots show real output generated locally on a purchased front-end course. Video frames, course names and file paths are blurred. No course material is included in this repository.
