@@ -1,0 +1,15 @@
+StudyBuddy v2
+Copyright (c) 2026 Federico Ordonselli
+
+Exception: the concept-map engine is not covered by this license.
+
+The following files are derived from a separate project and remain under the
+PolyForm Noncommercial License 1.0.0, full text in
+`src/components/mappe/LICENSE`:
+
+  - src/components/mappe/*.js and src/components/mappe/*.css
+  - src/lib/mappe/*.js
+
+The rest of the repository, including the React host
+(`src/components/mappe/MapStudio.tsx`) and the persistence layer
+(`src/lib/mappe/store.ts`), is under the MIT License above.
