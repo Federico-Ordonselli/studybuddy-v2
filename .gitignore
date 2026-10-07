@@ -35,3 +35,6 @@ tsconfig.tsbuildinfo
 next-env.d.ts
 # il DB si allinea con db:push, niente migrazioni
 drizzle/
+
+# launcher personale (percorsi locali)
+studybuddy.sh

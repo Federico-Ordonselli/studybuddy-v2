@@ -131,3 +131,7 @@ src/proxy.ts            host allowlist + JSON-only writes
 - Quiz options sometimes reuse the English wording of the source material.
 
 Screenshots show real output generated locally on a purchased front-end course. Video frames, course names and file paths are blurred. No course material is included in this repository.
+
+## License
+
+[MIT](LICENSE), except the concept-map engine (`src/components/mappe/*.js|*.css`, `src/lib/mappe/*.js`), which is derived from a separate project and remains under the [PolyForm Noncommercial License 1.0.0](src/components/mappe/LICENSE).
