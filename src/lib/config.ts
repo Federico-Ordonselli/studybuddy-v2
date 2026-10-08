@@ -54,8 +54,9 @@ export const EMBED_DIM = 1024;
  * `device: "cuda"` usa la GPU con `dtype` fp16 (~0.6s per 20 chunk); se CUDA non si
  * carica si ripiega su CPU con `cpuDtype` q8 (~3.4s). Su GPU i pesi q8 sono lenti:
  * molti operatori interi non hanno kernel CUDA e tornano su CPU.
- * onnxruntime-node 1.30 usa CUDA 13 (lib di sistema, o dell'immagine Docker); le lib
- * CUDA 12 che aggiunge `scripts/with-cuda.sh` servono a ctranslate2 (Whisper).
+ * onnxruntime-node 1.30 usa CUDA 13 (lib di sistema, o dell'immagine Docker). Le lib
+ * CUDA 12 + cuDNN 9 della .venv servono solo a ctranslate2 (Whisper): le vede solo il
+ * sottoprocesso Python (`whisperEnv` in transcribe.ts), mai il processo Node.
  */
 export const reranker = {
   strategy: "cross-encoder" as "cross-encoder" | "llm",

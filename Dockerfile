@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
-# StudyBuddy con GPU. CUDA 13 + cuDNN per onnxruntime-node 1.30 (reranker);
-# CUDA 12 + cuDNN 9 per ctranslate2 (Whisper) arrivano da pip nella .venv e
-# scripts/with-cuda.sh le mette in LD_LIBRARY_PATH (sonames diversi: convivono).
+# StudyBuddy con GPU. CUDA 13 + cuDNN 9 dell'immagine per onnxruntime-node 1.30
+# (reranker, nel processo Node). CUDA 12 + cuDNN 9 per ctranslate2 (Whisper) arrivano
+# da pip nella .venv e le vede solo il sottoprocesso Python: src/lib/transcribe.ts le
+# mette nel suo LD_LIBRARY_PATH (stesso soname libcudnn.so.9: non vanno mescolate).
 FROM node:24.16.0-bookworm-slim AS node
 
 FROM nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04 AS base
@@ -35,8 +36,8 @@ RUN npm run build
 FROM base AS venv
 RUN python3 -m venv /app/.venv \
  && /app/.venv/bin/pip install --no-cache-dir \
-      faster-whisper==1.2.1 "av==17.1.0" \
-      nvidia-cublas-cu12 "nvidia-cudnn-cu12>=9,<10" \
+      faster-whisper==1.2.1 ctranslate2==4.8.0 "av==17.1.0" \
+      "nvidia-cublas-cu12>=12,<13" "nvidia-cudnn-cu12>=9,<10" \
       yt-dlp
 
 # ---- runtime ----
@@ -57,4 +58,4 @@ COPY --from=build /app/src ./src
 RUN mkdir -p /app/data && chown -R 1000:1000 /app/.next /app/data
 USER 1000:1000
 EXPOSE 3000
-CMD ["sh", "-c", "exec scripts/with-cuda.sh node_modules/.bin/next start -H \"$HOST\" -p \"$PORT\""]
+CMD ["sh", "-c", "exec node_modules/.bin/next start -H \"$HOST\" -p \"$PORT\""]
