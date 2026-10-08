@@ -37,6 +37,7 @@
 }
 
 @layer base {
+  html { color-scheme: dark; } /* scrollbar e controlli nativi scuri */
   html, body { height: 100%; }
   body {
     background: var(--color-bg);
