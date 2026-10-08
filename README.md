@@ -88,20 +88,21 @@ ollama pull qwen3-embedding:0.6b
 
 npm install
 echo "DB_PATH=studybuddy.db" > .env.local
-DB_PATH=studybuddy.db npx tsx scripts/create-db.ts   # new database with the schema
-npm run dev                                          # http://localhost:3000
+npm run dev                                          # http://localhost:3000 (a new database is created on first start)
 ```
 
 The reranker model downloads into `.models/` on first use. The vector and full-text tables (`sqlite-vec`, FTS5) are created by the app, so don't run `drizzle-kit push` on a database that already has data: they aren't part of the Drizzle schema.
 
-**Optional GPU reranking.** `onnxruntime-node` is built against CUDA 12. If your system has a different CUDA version, install the CUDA 12 runtime libraries into a project venv. `npm run dev` adds them to `LD_LIBRARY_PATH` through `scripts/with-cuda.sh`:
+**GPU reranking** uses `onnxruntime-node` 1.30, which runs on the system CUDA 13 libraries. Without a usable GPU it falls back to CPU.
+
+**Optional Whisper fallback** for videos without subtitles: `.venv/bin/pip install faster-whisper`, plus the CUDA 12 libraries for GPU transcription (whisper.cpp and openai-whisper are auto-detected too):
 
 ```bash
 python -m venv .venv
-.venv/bin/pip install nvidia-cublas-cu12 nvidia-cuda-runtime-cu12 nvidia-cufft-cu12
+.venv/bin/pip install faster-whisper nvidia-cublas-cu12 nvidia-cudnn-cu12
 ```
 
-**Optional Whisper fallback** for videos without subtitles: `.venv/bin/pip install faster-whisper` (whisper.cpp and openai-whisper are auto-detected too).
+`npm run dev` and `npm start` put the `.venv` CUDA libraries on `LD_LIBRARY_PATH` through `scripts/with-cuda.sh`. Without them Whisper falls back to CPU; the reranker still uses the GPU.
 
 ## Run with Docker (GPU)
 
