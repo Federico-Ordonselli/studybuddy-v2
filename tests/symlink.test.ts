@@ -45,9 +45,10 @@ test("analyzeLibrary: segue i link a cartelle dentro la sandbox, segnala gli alt
   assert.ok(skipped.every((s) => s.reason));
 });
 
-test("newInLibrary: i link fuori sandbox non compaiono nel banner", async () => {
-  const names = (await P.newInLibrary(lib)).map((f) => f.name).sort();
-  assert.deepEqual(names, ["dentro", "normale"]);
+test("newInLibrary: i link fuori sandbox non compaiono nel banner, ma sono segnalati", async () => {
+  const { fresh, skipped } = await P.newInLibrary(lib);
+  assert.deepEqual(fresh.map((f) => f.name).sort(), ["dentro", "normale"]);
+  assert.deepEqual(skipped.map((s) => s.name).sort(), ["esterno", "rotto"]);
 });
 
 test("walk: i file-link fuori sandbox vengono ignorati, quelli dentro tenuti", async () => {

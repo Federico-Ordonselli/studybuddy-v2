@@ -53,8 +53,8 @@ function CourseCard({ c, library }: { c: CourseNode; library: Library }) {
   );
 }
 
-export default function LibraryView({ library, fresh, libraryDirName }: {
-  library: Library; fresh: { path: string; name: string }[]; libraryDirName: string;
+export default function LibraryView({ library, fresh, skipped, libraryDirName }: {
+  library: Library; fresh: { path: string; name: string }[]; skipped: number; libraryDirName: string;
 }) {
   const [q, setQ] = useState("");
   const empty = !library.macros.length && !library.loose.length;
@@ -91,10 +91,19 @@ export default function LibraryView({ library, fresh, libraryDirName }: {
         )}
       </header>
 
-      {fresh.length > 0 && (
+      {(fresh.length > 0 || skipped > 0) && (
         <Link href="/add" className="block mb-8 border border-accent-soft bg-surface rounded-lg px-4 py-3 text-sm hover:border-accent transition-colors">
-          <b className="text-accent">{fresh.length} {fresh.length === 1 ? "nuovo corso trovato" : "nuovi corsi trovati"}</b>{" "}
-          in {libraryDirName}/: {fresh.map((f) => f.name).join(", ")} — <span className="underline">Importa</span>
+          {fresh.length > 0 && <>
+            <b className="text-accent">{fresh.length} {fresh.length === 1 ? "nuovo corso trovato" : "nuovi corsi trovati"}</b>{" "}
+            in {libraryDirName}/: {fresh.map((f) => f.name).join(", ")}
+          </>}
+          {skipped > 0 && (
+            <span className="text-fg-dim">
+              {fresh.length > 0 ? " · " : `In ${libraryDirName}/: `}
+              ⚠ {skipped} {skipped === 1 ? "link ignorato" : "link ignorati"} (rotti o fuori dalla cartella consentita)
+            </span>
+          )}
+          {" — "}<span className="underline">{fresh.length > 0 ? "Importa" : "Dettagli"}</span>
         </Link>
       )}
 

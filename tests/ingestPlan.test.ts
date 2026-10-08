@@ -94,11 +94,11 @@ test("stato: aggiornato dopo la registrazione degli hash, poi modificato", async
 });
 
 test("newInLibrary: solo le cartelle con materiale non ancora importate", async () => {
-  const fresh = (await P.newInLibrary(lib)).map((f) => f.name).sort();
+  const fresh = (await P.newInLibrary(lib)).fresh.map((f) => f.name).sort();
   assert.ok(fresh.includes("Spec Alfa") && fresh.includes("corso-singolo"));
   assert.ok(!fresh.includes("Corso dell'Arte è")); // importata nel test precedente
   assert.ok(!fresh.includes("vuota"));
-  assert.deepEqual(await P.newInLibrary(path.join(lib, "non-esiste")), []);
+  assert.deepEqual(await P.newInLibrary(path.join(lib, "non-esiste")), { fresh: [], skipped: [] });
 });
 
 test("defaultPlan: corso esistente tiene il suo macro; nuovi sotto il macro della cartella", async () => {
@@ -155,7 +155,7 @@ test("newInLibrary: una cartella-macro con tutti i corsi già importati altrove 
     "Spec Gamma/Corso-A/01_m/a.srt": "1\n00:00:01,000 --> 00:00:02,000\na\n",
     "Spec Gamma/Corso-B/01_m/b.srt": "1\n00:00:01,000 --> 00:00:02,000\nb\n",
   });
-  const names = async () => (await P.newInLibrary(l2)).map((f) => f.name);
+  const names = async () => (await P.newInLibrary(l2)).fresh.map((f) => f.name);
   assert.deepEqual(await names(), ["Spec Gamma"]);
   // un corso importato sotto un altro macro: l'altro è ancora da importare
   L.createCourse("A", path.join(l2, "Spec Gamma", "Corso-A"), L.createMacro("Altrove"));
