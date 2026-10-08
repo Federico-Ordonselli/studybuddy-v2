@@ -1,4 +1,5 @@
-import { sqliteTable, integer, text, real } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { sqliteTable, integer, text, real, primaryKey } from "drizzle-orm/sqlite-core";
 
 /**
  * Domini di studio. Gerarchia a due livelli: un dominio `macro` (la specializzazione,
@@ -12,6 +13,8 @@ export const domains = sqliteTable("domains", {
   parentId: integer("parent_id"),                   // macro → micro (self-ref, no FK per evitare cicli)
   kind: text("kind").notNull().default("course"),   // macro | course
   path: text("path"),                               // cartella sorgente su disco
+  // Aree (tag) della Libreria: SOLO layout, nessun effetto su retrieval/ripasso/mappe.
+  areas: text("areas", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
@@ -25,6 +28,17 @@ export const documents = sqliteTable("documents", {
   meta: text("meta", { mode: "json" }),            // { course, module, lesson, order, videoPath? }
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
+
+/**
+ * Ogni file elaborato da `ingestCourse`, anche quelli che non producono documenti
+ * (vuoti o con chunk tutti duplicati). L'analisi dell'import confronta gli hash con
+ * questa tabella: con i soli `documents` quei file risulterebbero "nuovi" per sempre.
+ */
+export const ingestedFiles = sqliteTable("ingested_files", {
+  domainId: integer("domain_id").notNull().references(() => domains.id),
+  source: text("source").notNull(),
+  fileHash: text("file_hash").notNull(),
+}, (t) => [primaryKey({ columns: [t.domainId, t.source] })]);
 
 /** Chunk di testo. L'embedding vive nella virtual table sqlite-vec (vec_chunks). */
 export const chunks = sqliteTable("chunks", {
