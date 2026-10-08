@@ -19,11 +19,13 @@ export const db = drizzle(sqlite, { schema });
  * non fa nulla: le aggiunte successive le fanno le `ensure*Schema()`.
  */
 export function initSchema() {
-  // Controllo e creazione nella stessa transazione IMMEDIATE: `next build` apre il DB da
-  // più worker in parallelo, e su un file nuovo il check fuori dalla transazione corre.
+  const tables = () => (sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'").get() as { n: number }).n;
+  // Caso comune (DB con tabelle): una lettura, nessun lock di scrittura.
+  if (tables() > 0) return;
+  // DB vuoto: ricontrollo e creazione nella stessa transazione IMMEDIATE, perché `next build`
+  // apre il DB da più worker in parallelo e su un file nuovo il primo check corre.
   sqlite.transaction(() => {
-    const n = (sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'").get() as { n: number }).n;
-    if (n > 0) return;
+    if (tables() > 0) return;
     for (const stmt of SCHEMA_SQL) sqlite.exec(stmt);
   }).immediate();
 }
@@ -31,7 +33,7 @@ export function initSchema() {
 /**
  * Aggiorna un DB già esistente alle aggiunte della Libreria (`domains.areas`,
  * `ingested_files`) senza `db:push`, che non conosce vec_chunks/chunks_fts.
- * Idempotente; su un DB vuoto non fa nulla (lo schema lo crea drizzle).
+ * Idempotente; su un DB nuovo non serve (lo schema completo lo crea `initSchema()`).
  */
 export function ensureLibrarySchema() {
   const cols = sqlite.prepare("PRAGMA table_info(domains)").all() as { name: string }[];
