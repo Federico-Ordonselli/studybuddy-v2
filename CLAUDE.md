@@ -14,6 +14,8 @@ L'input principale è un **corso Coursera scaricato** (cartella `corso/modulo/le
 - `.html` = letture → estratto con **node-html-parser** (`parseHtml`: `<co-content>` o fallback `<body>`, tiene code/pre/tabelle, scarta script/style/chrome).
 - `.mp4`/`.mkv` = saltati di default (la trascrizione copre il testo); si tiene il path per il link al video. Con `--whisper` i video **senza** .srt/.vtt vengono trascritti (fallback #8).
 
+**Cartella-libreria**: i corsi si copiano a mano in `Courses/` (override `STUDYBUDDY_LIBRARY_DIR`, `lib/libraryDir.ts`) e si importano da `/add`. Ogni sottocartella è un elemento: **macro** se la maggioranza delle sue sottocartelle con materiale ha nomi non numerati (corsi di una specializzazione), **corso** se sono numerate (moduli `01_…`) — `classifyFolder` in `lib/ingestPlan.ts`, correggibile nell'anteprima. Gerarchia a 2 livelli macro → corsi (`resolveScope`); le **aree** (`domains.areas`) sono solo layout.
+
 Mappatura: corso → un **dominio**; ogni file testuale → un **documento** con `meta` { course, module, lesson, crumbs, path, fileHash }. `crumbs` è la breadcrumb completa (robusta alla profondità del path). I chunk di trascrizione portano `meta` { startSec, endSec } per citazioni cliccabili al minuto del video.
 `ingestCourse(courseDir, domainId)` fa il walk + ingestione end-to-end (transcript/text pronti).
 
@@ -26,7 +28,7 @@ Attenzione ai **duplicati** slide-PDF vs trascrizione: stesso contenuto da due f
 - Tutor: SM-2, generazione quiz (structured output), grading LLM-as-judge, turni socratic/quiz/review.
 - DB: schema Drizzle (domains, documents+meta, chunks+meta, cards, sessions).
 - Route: `/api/ingest`, `/api/chat` (citazioni + `domainId` + `sessionId`), `/api/domains`, `/api/video` (stream mp4 con Range, validato sui sorgenti ingeriti), `/api/cards` (genera carte), `/api/review` (GET coda due / POST grading+SM-2), `/api/session` (ripresa).
-- UI (`app/page.tsx`, client): selettore dominio + modalità **socratico/quiz/ripasso**, thread chat, citazioni cliccabili → player al minuto del video, quiz con opzioni mcq + grading, vista ripasso SM-2 (genera carte → coda due → valuta → riprogramma).
+- UI a pagine: **Libreria** `/` (Server Component: card macro/corsi raggruppate per **aree**, filtro, banner dei corsi nuovi trovati nella cartella-libreria, organizzazione manuale via `/api/library`), **area studio** `/study/[id]?mode=tutor|quiz|review|studio` (`components/study/*`: breadcrumb, cambio corso, citazioni → video al minuto, quiz, ripasso SM-2, Studio), **Aggiungi** `/add` (analisi della cartella-libreria → anteprima modificabile → import con progresso). Stile e palette condivisi con `learning-vault` (Tailwind v4, font `@fontsource-variable/*`); le viste di studio usano ancora stili inline con gli alias `--panel`/`--accent`… definiti in `globals.css`.
 - Retrieval scopabile per dominio (`retrieve(query, domainId)`); citazioni in `rag/pipeline.ts` (`toCitations`).
 - Persistenza: carte SM-2 in `tutor/cards.ts` (generate/dueCount/nextDueCard/reviewCard); sessione socratica in `tutor/sessions.ts` (history in `sessions.state`, ripresa via `sessionId` salvato in localStorage).
 - Studio: riassunti map-reduce (`lib/summarize.ts`, per argomento o modulo), **mappe concettuali esplorabili** (vedi sotto), slide con immagini (`lib/slides.ts` + `providers/image.ts`). Immagini = **SVG generate dall'LLM** (`backend svg-llm`, `think:false`), pluggable verso `automatic1111`/`openai`. Route: `/api/summarize`, `/api/maps*`, `/api/slides` (deck veloce), `/api/slides/image` (immagine lazy per-slide). UI = tab **Studio**.
@@ -63,9 +65,13 @@ Attenzione ai **duplicati** slide-PDF vs trascrizione: stesso contenuto da due f
 - Chunking: `chunkText` spezza i paragrafi oltre budget (righe → frasi → taglio), perché `structuredText` dell'HTML separa i blocchi con un solo `\n` (prima una pagina = un chunk, fino a 270k). `parseHtml` parsa i `<pre>` (di default node-html-parser li lascia markup letterale) e toglie i `data:` URI con una scansione lineare: immagini base64 da 15 MB mandano in stack overflow le regex di V8.
 - Re-ingest e carte: `deleteDocumentChunks` sgancia `cards.source_chunk_id` (FK) in una transazione; senza, il re-ingest dei documenti con carte falliva a metà.
 - Re-ingest idempotente per `fileHash`: se migliori un parser in `sources/coursera.ts` i file invariati verrebbero saltati → **bumpa `PARSER_VERSION`** per forzare il refresh.
+- Organizzazione: `lib/library.ts` valida gli invarianti (macro senza genitore, corsi solo dentro macro, elimina solo macro senza dati di studio propri). Un dominio esistente cambia nome/macro/aree solo dalla Libreria o da un piano esplicito di `/add` (`parsePlan`/`applyPlan` in `lib/ingestTree.ts`): re-importare non disfa gli spostamenti manuali.
+- `ingested_files` registra ogni file elaborato (anche senza chunk): l'analisi di `/add` confronta gli hash (`fileHashOf`, include `PARSER_VERSION`) per dire nuovo/aggiornato/modificato. Un import alla volta (`activeJob`, 409).
+- **Non usare `npm run db:push` sul DB reale**: le tabelle virtuali `vec_chunks`/`chunks_fts` non sono nello schema Drizzle. Migrazioni = SQL esplicito dopo un backup. DB nuovo: `DB_PATH=… npx tsx scripts/create-db.ts`.
+- Test: `npm test` (`node:test` via tsx, DB temporaneo per file con `tests/helpers/db.ts`, nessuna dipendenza da Ollama). `learning-vault/` è escluso dal typecheck e i suoi dati sono gitignored.
 
 ## Comandi
-`npm run dev` · `npm run ingest -- <dir> <dominio>` · `npm run db:push` · `npm run db:studio` · `npm run typecheck`
+`npm run dev` · `npm run ingest -- <dir> <dominio>` · `npm run db:push` · `npm run db:studio` · `npm run typecheck` · `npm test`
 
 <!-- BEGIN:nextjs-agent-rules -->
 
