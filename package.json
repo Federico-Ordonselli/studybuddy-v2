@@ -10,7 +10,8 @@
     "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
