@@ -114,3 +114,15 @@ test("defaultPlan: corso esistente tiene il suo macro; nuovi sotto il macro dell
   const key = grouped.macros.at(-1)!.key;
   assert.deepEqual(grouped.courses.find((c) => c.path === due.path)!.parent, { macroKey: key });
 });
+
+test("analyzeFolder: una cartella già importata tiene il tipo del DB, non quello indovinato", async () => {
+  const numerata = path.join(lib, "..", "girata-macro");
+  makeTree(numerata, { "01_a/a.srt": "1\n00:00:01,000 --> 00:00:02,000\na\n", "02_b/b.srt": "1\n00:00:01,000 --> 00:00:02,000\nb\n" });
+  L.createMacro("Girata a macro", [], [], numerata); // l'utente ha corretto l'euristica al primo import
+  assert.equal((await P.analyzeFolder(numerata))?.kind, "macro");
+
+  const nomi = path.join(lib, "..", "girata-corso");
+  makeTree(nomi, { "Uno/a.srt": "1\n00:00:01,000 --> 00:00:02,000\na\n", "Due/b.srt": "1\n00:00:01,000 --> 00:00:02,000\nb\n" });
+  L.createCourse("Girata a corso", nomi, null);
+  assert.equal((await P.analyzeFolder(nomi))?.kind, "course");
+});

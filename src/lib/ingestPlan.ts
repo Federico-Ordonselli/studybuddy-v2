@@ -79,9 +79,11 @@ export async function analyzeFolder(
   opts: { as?: "macro" | "course"; whisper?: boolean } = {}
 ): Promise<ItemAnalysis | null> {
   const whisper = !!opts.whisper;
-  const kind = opts.as ?? (await classifyFolder(dir, whisper));
-  if (!kind) return null;
   const existing = findByPath(dir);
+  // Già importata: vale il tipo nel DB (magari corretto a mano nell'anteprima), non l'euristica.
+  const known = existing?.kind === "macro" || existing?.kind === "course" ? existing.kind : undefined;
+  const kind = opts.as ?? known ?? (await classifyFolder(dir, whisper));
+  if (!kind) return null;
   if (kind === "course") {
     const c = await analyzeCourse(dir, whisper);
     return { kind, path: dir, name: c.name, existingId: c.existingId, areas: c.areas, courses: [c] };
