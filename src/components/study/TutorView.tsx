@@ -28,7 +28,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     fetch(`/api/session?id=${sid}`).then((r) => r.json()).then((s) => {
       if (s.history?.length) {
         setSessionId(sid);
-        setMsgs(s.history.map((m: { role: "user" | "assistant"; content: string }) => ({ role: m.role, content: m.content })));
+        setMsgs(s.history.map((m: { role: "user" | "assistant"; content: string; citations?: Citation[] }) => ({ role: m.role, content: m.content, citations: m.citations })));
       }
     }).catch(() => {});
   }, [domainId, mode]);

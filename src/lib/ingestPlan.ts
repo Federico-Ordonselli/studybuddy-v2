@@ -138,10 +138,14 @@ export async function analyzePath(
   return { items: it ? [it] : [], skipped: [] };
 }
 
-/** Rilevamento economico per la Libreria: niente hashing, solo path non ancora domini. */
-export async function newInLibrary(dir: string): Promise<{ path: string; name: string }[]> {
+/**
+ * Rilevamento economico per la Libreria: niente hashing, solo path non ancora domini.
+ * `skipped` = link ignorati (rotti o fuori sandbox), così il banner li può segnalare.
+ */
+export async function newInLibrary(dir: string): Promise<{ fresh: { path: string; name: string }[]; skipped: SkippedEntry[] }> {
   const out: { path: string; name: string }[] = [];
-  for (const s of (await libraryEntries(dir)).dirs) {
+  const { dirs, skipped } = await libraryEntries(dir);
+  for (const s of dirs) {
     if (findByPath(s)) continue;
     const kind = await classifyFolder(s);
     if (!kind) continue;
@@ -150,7 +154,7 @@ export async function newInLibrary(dir: string): Promise<{ path: string; name: s
     if (kind === "macro" && (await contentSubdirs(s, false)).every((c) => findByPath(c))) continue;
     out.push({ path: s, name: path.basename(s) });
   }
-  return out;
+  return { fresh: out, skipped };
 }
 
 /**

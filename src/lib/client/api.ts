@@ -3,7 +3,8 @@
  * scritture senza `Content-Type: application/json` (anche DELETE).
  */
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number) { super(message); }
+  /** `body` = la risposta JSON intera: alcuni errori portano dati utili (es. `skipped` col 422). */
+  constructor(message: string, readonly status: number, readonly body: Record<string, unknown> = {}) { super(message); }
 }
 
 export async function api<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
@@ -13,7 +14,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || j.error) throw new ApiError(j.error ?? `HTTP ${r.status}`, r.status);
+  if (!r.ok || j.error) throw new ApiError(j.error ?? `HTTP ${r.status}`, r.status, j);
   return j as T;
 }
 

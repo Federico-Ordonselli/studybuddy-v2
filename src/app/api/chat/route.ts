@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { socraticTurn, quizTurn, gradeTurn, type TutorMode } from "@/lib/tutor/session";
-import { getOrCreateSession, saveState } from "@/lib/tutor/sessions";
+import { appendTurn, forModel, getOrCreateSession, saveState } from "@/lib/tutor/sessions";
 
 export const runtime = "nodejs";
 
@@ -16,10 +16,8 @@ export async function POST(req: NextRequest) {
       const session = await getOrCreateSession("socratic", domainId, body.sessionId);
       const history = session.state?.history ?? [];
       const message = body.message ?? "";
-      const turn = await socraticTurn(history, message, domainId);
-      saveState(session.id, {
-        history: [...history, { role: "user", content: message }, { role: "assistant", content: turn.reply }],
-      });
+      const turn = await socraticTurn(forModel(history), message, domainId);
+      saveState(session.id, { history: appendTurn(history, message, turn.reply, turn.citations) });
       return NextResponse.json({ ...turn, sessionId: session.id });
     }
     if (mode === "quiz") {

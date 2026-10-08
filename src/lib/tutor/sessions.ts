@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/providers";
+import type { Citation } from "@/lib/rag/pipeline";
 
 /**
  * Persistenza dello stato del tutor in `sessions.state`.
@@ -10,9 +11,28 @@ import type { ChatMessage } from "@/lib/providers";
  * implicita nella tabella `cards` (vedi `tutor/cards.ts`).
  */
 
-export interface SocraticState {
-  history: ChatMessage[];
+/** Turno salvato: le risposte dell'assistente tengono le citazioni, per mostrarle alla ripresa. */
+export interface TutorMessage extends ChatMessage {
+  citations?: Citation[];
 }
+
+export interface SocraticState {
+  history: TutorMessage[];
+}
+
+/** History dopo un turno socratico (le sessioni salvate prima delle citazioni restano valide). */
+export function appendTurn(
+  history: TutorMessage[],
+  message: string,
+  reply: string,
+  citations: Citation[] = []
+): TutorMessage[] {
+  return [...history, { role: "user", content: message }, { role: "assistant", content: reply, citations }];
+}
+
+/** Al modello vanno solo i turni: le citazioni sono per la UI. */
+export const forModel = (history: TutorMessage[]): ChatMessage[] =>
+  history.map(({ role, content }) => ({ role, content }));
 
 export interface SessionRow {
   id: number;
