@@ -37,7 +37,11 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
     try {
       const r = await post<{ items: ItemAnalysis[]; skipped: SkippedEntry[] }>("/api/ingest-folder/analyze", path ? { path } : {});
       setItems(r.items); setSkipped(r.skipped ?? []); setPlan(defaultPlan(r.items)); setPhase("edit");
-    } catch (e) { setErr((e as Error).message); setItems([]); setSkipped([]); setPlan(null); setPhase("edit"); }
+    } catch (e) {
+      // 422 = niente da importare, ma le voci ignorate (link rotti/fuori sandbox) spiegano perché.
+      const skipped = e instanceof ApiError ? (e.body.skipped as SkippedEntry[] | undefined) : undefined;
+      setErr((e as Error).message); setItems([]); setSkipped(skipped ?? []); setPlan(null); setPhase("edit");
+    }
   }
 
   function poll(id: string) {
