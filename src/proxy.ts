@@ -26,7 +26,7 @@ export function proxy(req: NextRequest) {
   if (!hostAllowed(req.headers.get("host"))) {
     return NextResponse.json({ error: "host non consentito" }, { status: 403 });
   }
-  if (req.method !== "GET" && req.method !== "HEAD") {
+  if (req.nextUrl.pathname.startsWith("/api/") && req.method !== "GET" && req.method !== "HEAD") {
     const type = req.headers.get("content-type") ?? "";
     if (!type.toLowerCase().startsWith("application/json")) {
       return NextResponse.json({ error: "Content-Type application/json richiesto" }, { status: 415 });
@@ -35,4 +35,6 @@ export function proxy(req: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: "/api/:path*" };
+// Anche le pagine: la Libreria e l'area studio sono Server Component che rendono
+// nomi e percorsi dei corsi nell'HTML. Esclusi solo gli asset statici di Next.
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
