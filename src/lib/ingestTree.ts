@@ -63,14 +63,19 @@ export function parsePlan(body: unknown): IngestPlan {
 }
 
 export function applyPlan(plan: IngestPlan): IngestStep[] {
+  const included = plan.courses.filter((c) => c.include);
+  if (!included.length) throw new LibraryError("nessun corso selezionato");
   return sqlite.transaction(() => {
-    const included = plan.courses.filter((c) => c.include);
     const used = new Set(included.flatMap((c) => (c.parent && "macroKey" in c.parent ? [c.parent.macroKey] : [])));
+    const usedIds = new Set(included.flatMap((c) => (c.parent && "existingId" in c.parent ? [c.parent.existingId] : [])));
     const byKey = new Map<string, { id: number; name: string }>();
 
     for (const m of plan.macros) {
       if (m.existingId != null) {
-        updateDomain(m.existingId, { name: m.name, areas: m.areas });
+        const kind = (sqlite.prepare("SELECT kind FROM domains WHERE id = ?").get(m.existingId) as { kind: string } | undefined)?.kind;
+        if (kind !== "macro") throw new LibraryError(`"${m.name}" non è un macro esistente`);
+        // Una scheda vecchia porta nome/aree di allora: si applicano solo se il macro serve a questo import.
+        if (used.has(m.key) || usedIds.has(m.existingId)) updateDomain(m.existingId, { name: m.name, areas: m.areas });
         byKey.set(m.key, { id: m.existingId, name: m.name });
         continue;
       }
