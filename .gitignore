@@ -38,3 +38,7 @@ drizzle/
 
 # launcher personale (percorsi locali)
 studybuddy.sh
+
+# learning-vault (progetto personale affiancato): DB con le note e impostazioni locali
+learning-vault/data/
+learning-vault/.claude/

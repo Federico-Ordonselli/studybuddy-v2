@@ -83,14 +83,36 @@ Vedi sezione 3.
 
 ## 3. Flusso di import con anteprima
 
-1. **Scegli cartella**: browser esistente `GET /api/fs` (sandbox `lib/fsRoot.ts`). Pulsante **Analizza** sulla cartella corrente.
-2. **Analisi** — `POST /api/ingest-folder/analyze { path }`, logica pura in `lib/ingestPlan.ts` (`analyzeFolder(path)`), sola lettura, niente LLM:
-   - struttura: sottocartelle con materiale ⇒ macro + un corso per sottocartella; altrimenti corso singolo; niente materiale ⇒ errore leggibile;
+### Cartella-libreria predefinita
+
+Il modo principale per aggiungere corsi è **copiarli a mano nella cartella-libreria** e poi importarli dall'app; scegliere altre cartelle col browser serve solo quando c'è bisogno.
+
+- `config.library.dir`: default `Courses/` nella root del progetto (già gitignored), override con `STUDYBUDDY_LIBRARY_DIR`. Deve stare dentro la sandbox `lib/fsRoot.ts`.
+- La cartella-libreria **non è mai un macro**: ogni sua sottocartella diretta è un elemento indipendente, classificato come macro o come corso singolo (regola sotto).
+- **Rilevamento in Libreria** (economico, a ogni caricamento): `readdir` della cartella-libreria e confronto dei path con `domains.path`. Le sottocartelle con materiale che non sono ancora domini compaiono in un banner "N nuovi corsi trovati in Courses/ — Importa" → `/add` con l'analisi di quegli elementi già pronta. Niente hashing qui: i file modificati dentro corsi già importati si vedono col pulsante **Controlla aggiornamenti**, che fa l'analisi completa.
+- `/add` si apre direttamente sull'analisi della cartella-libreria. Il browser cartelle è un'azione secondaria ("Scegli un'altra cartella…").
+
+### Classificazione macro vs corso
+
+Regola generica (in `lib/ingestPlan.ts`, non legata a un corso specifico), applicata a ogni elemento:
+
+- considera le sottocartelle dirette con materiale ingeribile;
+- se **la maggioranza ha un prefisso numerico** (`^\d+[\s._-]`, es. `01_components`, `2. Intro`) ⇒ sono moduli ⇒ l'elemento è un **corso**;
+- se la maggioranza non è numerata ⇒ l'elemento è un **macro** e ogni sottocartella con materiale è un suo corso;
+- nessuna sottocartella con materiale ma file diretti ⇒ **corso**.
+
+Esempi: `Meta Front-End Developer/` (8 nomi + 1 `0. Websites…`) ⇒ macro; `generative-ai-…/` (`01_…`, `02_…`, `03_…`) ⇒ corso. Nell'anteprima ogni elemento ha comunque l'interruttore **corso singolo ↔ macro** per correggere l'euristica.
+
+### Passi
+
+1. **Scegli cartella**: di default la cartella-libreria (analizzata subito); in alternativa il browser esistente `GET /api/fs` (sandbox `lib/fsRoot.ts`) con **Analizza** sulla cartella corrente. Una cartella scelta col browser è trattata come un singolo elemento.
+2. **Analisi** — `POST /api/ingest-folder/analyze { path, asLibrary? }`, logica pura in `lib/ingestPlan.ts` (`analyzeLibrary(dir)` / `analyzeFolder(path)`), sola lettura, niente LLM:
+   - struttura: regola di classificazione sopra; niente materiale ⇒ errore leggibile;
    - per corso: conteggi per tipo (trascrizioni, PDF, HTML, video) e video senza `.srt/.vtt`;
    - stato rispetto al DB, con lo **stesso `fileHash`** dell'ingest (`PARSER_VERSION` incluso; funzione di hash estratta ed esportata da `sources/coursera.ts`): `new` (cartella non nel DB), `upToDate`, oppure `changed` con n° file nuovi/modificati. I video non vengono hashati;
    - se una cartella è già un dominio, la proposta usa nome/macro/aree **dal DB**, non dal disco.
-   - Output: `{ macro?: { path, name, existingId?, areas }, courses: [{ path, name, existingId?, parentId?, areas, counts, videosWithoutSubs, status, changedFiles }] }`.
-3. **Anteprima modificabile**: macro (rinomina / aggancia a macro esistente / nessun macro), aree; per corso checkbox, nome, aree; preselezionati solo i corsi con qualcosa da fare. Opzione Whisper visibile solo se ci sono video senza sottotitoli, con avviso sui tempi.
+   - Output: una lista di **elementi**, ciascuno `{ kind: "macro" | "course", path, name, existingId?, areas, courses?: [...] }`, con per ogni corso `{ path, name, existingId?, parentId?, areas, counts, videosWithoutSubs, status, changedFiles }`.
+3. **Anteprima modificabile**: per elemento: interruttore corso ↔ macro; macro (rinomina / aggancia a macro esistente / nessun macro), aree; per corso checkbox, nome, aree; preselezionati solo i corsi con qualcosa da fare. È possibile anche **raggruppare in un nuovo macro** più corsi singoli trovati (es. due corsi della stessa specializzazione copiati separatamente). Opzione Whisper visibile solo se ci sono video senza sottotitoli, con avviso sui tempi.
 4. **Import** — `POST /api/ingest-folder { plan, whisper }`: il server ri-valida ogni path nella sandbox e gli invarianti, applica il piano ai domini (unico punto, oltre alla Libreria, che può cambiare nome/genitore/aree di un dominio esistente), poi avvia il job in background esistente (`lib/jobs.ts`) con progresso per corso. `ingestSelection` viene rifattorizzato per eseguire un piano invece di dedurlo. Fine: **Vai alla libreria** / **Studia ora**.
 
 Casi limite:
@@ -115,7 +137,7 @@ Ogni azione ri-valida gli invarianti. Dopo un'azione la Libreria si aggiorna con
 Oggi il progetto non ha test. Si aggiunge `npm test` = `tsx --test` (`node:test`, nessuna dipendenza nuova), su DB SQLite temporaneo (`DB_PATH` in tmp) e cartelle-fixture create in tmp:
 
 - `lib/library.ts`: macro dentro macro rifiutato, corso con genitore `course` rifiutato, eliminazione macro con/senza dati propri, aree e spostamenti;
-- `lib/ingestPlan.ts`: macro + corsi, corso singolo, cartella vuota, video senza srt, file modificato dopo un ingest ⇒ `changed`, `PARSER_VERSION` diverso ⇒ tutto `changed`;
+- `lib/ingestPlan.ts`: cartella-libreria con un macro e due corsi singoli (moduli numerati ⇒ corso, non macro), cartella-libreria mai classificata come macro, macro con una sottocartella numerata spuria ⇒ resta macro, corso singolo, cartella vuota, rilevamento "nuovi" senza hashing, video senza srt, file modificato dopo un ingest ⇒ `changed`, `PARSER_VERSION` diverso ⇒ tutto `changed`;
 - non-sovrascrittura: ingest, spostamento manuale, re-ingest ⇒ `parentId`/nome/aree invariati.
 
 Gli embedding nei test che ingeriscono passano da un provider finto (iniezione o config), per non dipendere da Ollama.
