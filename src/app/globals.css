@@ -47,6 +47,7 @@
   button { cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: default; }
   ::selection { background: var(--color-accent); color: var(--color-bg); }
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--color-accent); }
 }
 
 .spin {
