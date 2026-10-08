@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api, post } from "@/lib/client/api";
 import type { IngestJob } from "@/lib/jobs";
-import { defaultPlan, type IngestPlan, type ItemAnalysis } from "@/lib/ingestPlanTypes";
+import { defaultPlan, type IngestPlan, type ItemAnalysis, type SkippedEntry } from "@/lib/ingestPlanTypes";
 import type { Library } from "@/lib/library";
 import FolderBrowser from "./FolderBrowser";
 import ImportProgress from "./ImportProgress";
@@ -23,6 +23,7 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
   const [phase, setPhase] = useState<Phase>("loading");
   const [source, setSource] = useState<string | null>(null); // null = cartella-libreria
   const [items, setItems] = useState<ItemAnalysis[]>([]);
+  const [skipped, setSkipped] = useState<SkippedEntry[]>([]);
   const [plan, setPlan] = useState<IngestPlan | null>(null);
   const [library, setLibrary] = useState<Library | null>(null);
   const [job, setJob] = useState<IngestJob | null>(null);
@@ -34,9 +35,9 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
   async function analyze(path: string | null) {
     setPhase("loading"); setErr(null); setSource(path);
     try {
-      const r = await post<{ items: ItemAnalysis[] }>("/api/ingest-folder/analyze", path ? { path } : {});
-      setItems(r.items); setPlan(defaultPlan(r.items)); setPhase("edit");
-    } catch (e) { setErr((e as Error).message); setItems([]); setPlan(null); setPhase("edit"); }
+      const r = await post<{ items: ItemAnalysis[]; skipped: SkippedEntry[] }>("/api/ingest-folder/analyze", path ? { path } : {});
+      setItems(r.items); setSkipped(r.skipped ?? []); setPlan(defaultPlan(r.items)); setPhase("edit");
+    } catch (e) { setErr((e as Error).message); setItems([]); setSkipped([]); setPlan(null); setPhase("edit"); }
   }
 
   function poll(id: string) {
@@ -106,6 +107,11 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
       </header>
 
       {err && <p className="text-danger text-sm">{err}</p>}
+      {phase === "edit" && skipped.length > 0 && (
+        <ul className="text-xs text-fg-dim border border-border rounded-lg px-4 py-3 flex flex-col gap-1">
+          {skipped.map((s) => <li key={s.name}>⚠ <span className="text-fg-muted">{s.name}</span> ignorata: {s.reason}</li>)}
+        </ul>
+      )}
       {phase === "loading" && <p className="text-fg-dim"><span className="spin" /> analizzo la cartella…</p>}
       {phase === "browse" && <FolderBrowser onAnalyze={(p) => analyze(p)} onCancel={() => setPhase("edit")} />}
       {phase === "edit" && plan && (items.length ? (

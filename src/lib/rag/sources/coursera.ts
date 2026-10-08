@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { parse as parseHtmlDom } from "node-html-parser";
 import { db, sqlite } from "@/lib/db";
+import { realInsideRoot } from "@/lib/fsRoot";
 import { documents } from "@/lib/db/schema";
 import { indexChunks, deleteDocumentChunks, type ChunkRecord } from "@/lib/rag/store";
 import { chunkText, chunkTranscript, type TranscriptCue } from "@/lib/rag/chunk";
@@ -125,6 +126,9 @@ export async function walk(dir: string): Promise<string[]> {
   for (const e of entries) {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) files.push(...(await walk(full)));
+    // Link simbolici: solo file il cui percorso reale sta nella sandbox (lib/fsRoot.ts).
+    // Le cartelle-link dentro un corso non si seguono (niente cicli).
+    else if (e.isSymbolicLink()) { if (realInsideRoot(full) && (await fs.stat(full).catch(() => null))?.isFile()) files.push(full); }
     else files.push(full);
   }
   return files;

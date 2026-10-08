@@ -50,7 +50,7 @@ test("classifyFolder: parità numerati/non numerati ⇒ corso", async () => {
 });
 
 test("analyzeLibrary: la cartella-libreria non è un macro; ogni elemento è classificato", async () => {
-  const items = await P.analyzeLibrary(lib);
+  const { items } = await P.analyzeLibrary(lib);
   const byName = new Map(items.map((i) => [i.name, i]));
   assert.equal(byName.get("Spec Alfa")?.kind, "macro");
   assert.deepEqual(byName.get("Spec Alfa")?.courses.map((c) => c.name).sort(), ["Corso-due", "Corso-uno"]);

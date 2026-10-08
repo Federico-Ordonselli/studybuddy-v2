@@ -1,5 +1,5 @@
 import { sqlite } from "@/lib/db";
-import { insideRoot } from "@/lib/fsRoot";
+import { realInsideRoot } from "@/lib/fsRoot";
 import {
   LibraryError, cleanName, normalizeAreas, findByPath, updateDomain, createMacro, createCourse,
 } from "@/lib/library";
@@ -29,7 +29,7 @@ export interface IngestStep { dir: string; domainId: number; name: string; macro
 
 function safePath(p: unknown): string {
   if (typeof p !== "string" || !p) throw new LibraryError("percorso mancante");
-  const s = insideRoot(p);
+  const s = realInsideRoot(p); // anche i link simbolici devono restare nella sandbox
   if (!s) throw new LibraryError("percorso fuori dalla root consentita", 403);
   return s;
 }

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -13,4 +14,24 @@ export function insideRoot(p: string): string | null {
   const resolved = path.resolve(p || FS_ROOT);
   if (resolved !== FS_ROOT && !resolved.startsWith(FS_ROOT + path.sep)) return null;
   return resolved;
+}
+
+/**
+ * Come `insideRoot`, ma sul percorso reale (link simbolici risolti): un link dentro la
+ * sandbox che punta fuori non passa. Un percorso che non esiste resta al controllo lessicale.
+ */
+export function realInsideRoot(p: string): string | null {
+  const lexical = insideRoot(p);
+  if (!lexical) return null;
+  let real: string;
+  try { real = fs.realpathSync(lexical); } catch { return lexical; }
+  const root = realRoot();
+  return real === root || real.startsWith(root + path.sep) ? lexical : null;
+}
+
+let cachedRoot: string | undefined;
+function realRoot(): string {
+  // la home stessa può essere un link (es. /home → /var/home)
+  if (!cachedRoot) { try { cachedRoot = fs.realpathSync(FS_ROOT); } catch { cachedRoot = FS_ROOT; } }
+  return cachedRoot;
 }

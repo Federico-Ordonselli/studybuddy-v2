@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { sqlite } from "@/lib/db";
+import { realInsideRoot } from "@/lib/fsRoot";
 import { findByPath } from "@/lib/library";
 import {
   walk, classify, stem, selectWork, fileHashOf, hasIngestibleContent, subdirs,
 } from "@/lib/rag/sources/coursera";
-import type { CourseAnalysis, FileCounts, ItemAnalysis } from "@/lib/ingestPlanTypes";
+import type { CourseAnalysis, FileCounts, ItemAnalysis, LibraryAnalysis, SkippedEntry } from "@/lib/ingestPlanTypes";
 
 /**
  * Analisi delle cartelle per l'import (sola lettura, niente LLM): classifica macro vs
@@ -101,13 +102,14 @@ export async function analyzeFolder(
 }
 
 /** La cartella-libreria non è mai un macro: ogni sottocartella è un elemento a sé. */
-export async function analyzeLibrary(dir: string, whisper = false): Promise<ItemAnalysis[]> {
+export async function analyzeLibrary(dir: string, whisper = false): Promise<LibraryAnalysis> {
+  const { dirs, skipped } = await libraryEntries(dir);
   const items: ItemAnalysis[] = [];
-  for (const s of await safeSubdirs(dir)) {
+  for (const s of dirs) {
     const it = await analyzeFolder(s, { whisper });
     if (it) items.push(it);
   }
-  return items;
+  return { items, skipped };
 }
 
 const isInside = (child: string, parent: string) => child.startsWith(parent + path.sep);
@@ -120,25 +122,28 @@ const isInside = (child: string, parent: string) => child.startsWith(parent + pa
 export async function analyzePath(
   dir: string,
   opts: { libraryDir: string; whisper?: boolean }
-): Promise<{ items: ItemAnalysis[] }> {
+): Promise<LibraryAnalysis> {
   const whisper = !!opts.whisper;
-  if (dir === opts.libraryDir) return { items: await analyzeLibrary(dir, whisper) };
+  if (dir === opts.libraryDir) return analyzeLibrary(dir, whisper);
   if (isInside(opts.libraryDir, dir)) {
+    const { dirs, skipped } = await libraryEntries(dir);
     const items: ItemAnalysis[] = [];
-    for (const s of await safeSubdirs(dir)) {
-      if (s === opts.libraryDir || isInside(opts.libraryDir, s)) items.push(...(await analyzePath(s, opts)).items);
-      else { const it = await analyzeFolder(s, { whisper }); if (it) items.push(it); }
+    for (const s of dirs) {
+      if (s === opts.libraryDir || isInside(opts.libraryDir, s)) {
+        const sub = await analyzePath(s, opts);
+        items.push(...sub.items); skipped.push(...sub.skipped);
+      } else { const it = await analyzeFolder(s, { whisper }); if (it) items.push(it); }
     }
-    return { items };
+    return { items, skipped };
   }
   const it = await analyzeFolder(dir, { whisper });
-  return { items: it ? [it] : [] };
+  return { items: it ? [it] : [], skipped: [] };
 }
 
 /** Rilevamento economico per la Libreria: niente hashing, solo path non ancora domini. */
 export async function newInLibrary(dir: string): Promise<{ path: string; name: string }[]> {
   const out: { path: string; name: string }[] = [];
-  for (const s of await safeSubdirs(dir)) {
+  for (const s of (await libraryEntries(dir)).dirs) {
     if (findByPath(s)) continue;
     const kind = await classifyFolder(s);
     if (!kind) continue;
@@ -150,10 +155,27 @@ export async function newInLibrary(dir: string): Promise<{ path: string; name: s
   return out;
 }
 
-async function safeSubdirs(dir: string): Promise<string[]> {
-  try {
-    return (await subdirs(dir)).filter((s) => !path.basename(s).startsWith(".")).sort((a, b) => a.localeCompare(b));
-  } catch {
-    return []; // cartella-libreria assente: nessun elemento
+/**
+ * Sottocartelle (non nascoste) di una cartella-libreria. Chi copia i corsi può anche
+ * linkarli: un link si segue solo se il percorso reale sta nella sandbox (lib/fsRoot.ts),
+ * altrimenti finisce in `skipped` con il motivo, così l'anteprima lo può dire.
+ */
+async function libraryEntries(dir: string): Promise<{ dirs: string[]; skipped: SkippedEntry[] }> {
+  let entries;
+  try { entries = await fs.readdir(dir, { withFileTypes: true }); }
+  catch { return { dirs: [], skipped: [] }; } // cartella-libreria assente: nessun elemento
+  const dirs: string[] = [];
+  const skipped: SkippedEntry[] = [];
+  for (const e of entries) {
+    if (e.name.startsWith(".")) continue;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) { dirs.push(full); continue; }
+    if (!e.isSymbolicLink()) continue;
+    const st = await fs.stat(full).catch(() => null);
+    if (!st) skipped.push({ name: e.name, reason: "link simbolico rotto" });
+    else if (!st.isDirectory()) continue; // link a un file: non è un corso
+    else if (!realInsideRoot(full)) skipped.push({ name: e.name, reason: "link simbolico verso una cartella fuori da quella consentita" });
+    else dirs.push(full);
   }
+  return { dirs: dirs.sort((a, b) => a.localeCompare(b)), skipped };
 }
