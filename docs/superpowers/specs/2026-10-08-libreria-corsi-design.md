@@ -35,9 +35,10 @@ L'utente ha un secondo progetto, `learning-vault` (hub personale: aree di intere
 
 ## 1. Modello dati
 
-Nessuna tabella nuova.
+Una sola tabella nuova (`ingested_files`, sotto).
 
 - **`domains.areas`**: colonna JSON `string[]`, default `[]`. Letta solo dalla Libreria. Retrieval, ripasso, mappe non la leggono mai.
+- **`ingested_files`** `(domain_id, source, file_hash)`, PK `(domain_id, source)`: ogni file elaborato da `ingestCourse`, **anche quelli che non producono documenti** (vuoti o con chunk tutti duplicati). Serve all'analisi per dire "aggiornato": confrontare solo con `documents.meta.fileHash` segnerebbe quei file come nuovi per sempre (misurato: 79 file da ingerire vs 77 documenti in un corso reale). Per i DB esistenti l'analisi usa anche `documents.meta.fileHash`; i pochi file vuoti risultano "nuovi" una volta sola, finché un re-import non li registra.
 - **Macro manuale**: riga `domains` con `kind = "macro"`, `path = null`.
 - **Regola di non-sovrascrittura**: l'upsert per `path` (oggi `upsertDomain` in `lib/ingestTree.ts`) **non modifica** `name`, `kind`, `parentId`, `areas` di un dominio già esistente. Solo un piano esplicito dall'anteprima o un'azione in Libreria li cambiano. Vale anche per la CLI `npm run ingest`: la struttura dedotta dalle cartelle si applica solo ai domini nuovi.
 - **Invarianti** (validati server-side in `lib/library.ts`, errore 400 leggibile):
@@ -79,7 +80,7 @@ Vedi sezione 3.
 ### Comune
 
 - `app/layout.tsx`: header minimo (marchio "StudyBuddy" → Libreria) e font.
-- Tailwind v4 (`@tailwindcss/postcss`), token del vault in `@theme` dentro `globals.css`. Gli stili inline di `page.tsx` vengono convertiti in classi durante lo spostamento. `components/mappe/studio.css` resta com'è (scoped).
+- Tailwind v4 (`@tailwindcss/postcss`), token del vault in `@theme` dentro `globals.css`; font self-hosted via `@fontsource-variable/*` (niente rete a runtime né in build: local-first). Le **nuove** pagine (Libreria, Aggiungi, barra dell'area studio) usano classi Tailwind. Le viste di studio spostate da `page.tsx` **tengono i loro stili inline**: i vecchi token (`--panel`, `--accent`…) diventano alias dei token del vault, quindi cambiano palette senza riscrittura; la conversione a classi si fa con l'unione al vault. `components/mappe/studio.css` legge gli stessi alias e resta com'è.
 
 ## 3. Flusso di import con anteprima
 
