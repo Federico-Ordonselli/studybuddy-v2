@@ -110,6 +110,31 @@ export async function analyzeLibrary(dir: string, whisper = false): Promise<Item
   return items;
 }
 
+const isInside = (child: string, parent: string) => child.startsWith(parent + path.sep);
+
+/**
+ * Analisi di una cartella scelta in /add. La cartella-libreria (anche scelta col browser)
+ * è una libreria; una sua cartella madre pure, con la libreria espansa al suo posto: così
+ * i corsi lì dentro non diventano mai «un macro chiamato Courses». Altrimenti un elemento solo.
+ */
+export async function analyzePath(
+  dir: string,
+  opts: { libraryDir: string; whisper?: boolean }
+): Promise<{ items: ItemAnalysis[] }> {
+  const whisper = !!opts.whisper;
+  if (dir === opts.libraryDir) return { items: await analyzeLibrary(dir, whisper) };
+  if (isInside(opts.libraryDir, dir)) {
+    const items: ItemAnalysis[] = [];
+    for (const s of await safeSubdirs(dir)) {
+      if (s === opts.libraryDir || isInside(opts.libraryDir, s)) items.push(...(await analyzePath(s, opts)).items);
+      else { const it = await analyzeFolder(s, { whisper }); if (it) items.push(it); }
+    }
+    return { items };
+  }
+  const it = await analyzeFolder(dir, { whisper });
+  return { items: it ? [it] : [] };
+}
+
 /** Rilevamento economico per la Libreria: niente hashing, solo path non ancora domini. */
 export async function newInLibrary(dir: string): Promise<{ path: string; name: string }[]> {
   const out: { path: string; name: string }[] = [];

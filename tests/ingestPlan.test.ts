@@ -126,3 +126,24 @@ test("analyzeFolder: una cartella già importata tiene il tipo del DB, non quell
   L.createCourse("Girata a corso", nomi, null);
   assert.equal((await P.analyzeFolder(nomi))?.kind, "course");
 });
+
+test("analyzePath: la cartella-libreria scelta col browser si analizza come libreria, non come macro", async () => {
+  const { items } = await P.analyzePath(lib, { libraryDir: lib });
+  const names = items.map((i) => i.name);
+  assert.ok(names.includes("Spec Alfa") && names.includes("corso-singolo"));
+  assert.equal(items.find((i) => i.path === lib), undefined);
+});
+
+test("analyzePath: una cartella madre della libreria espande la libreria al suo posto", async () => {
+  const parent = path.join(lib, "..");
+  const { items } = await P.analyzePath(parent, { libraryDir: lib });
+  assert.equal(items.find((i) => i.path === lib), undefined); // la libreria non diventa «un macro»
+  assert.ok(items.some((i) => i.path === path.join(lib, "Spec Alfa") && i.kind === "macro"));
+  assert.ok(items.some((i) => i.path === path.join(lib, "corso-singolo") && i.kind === "course"));
+});
+
+test("analyzePath: una cartella qualunque resta un elemento solo", async () => {
+  const { items } = await P.analyzePath(path.join(lib, "Spec Alfa"), { libraryDir: lib });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].kind, "macro");
+});
