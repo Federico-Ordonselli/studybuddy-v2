@@ -14,6 +14,7 @@ import type { IngestPlan, PlanCourse, PlanMacro, PlanParent } from "@/lib/ingest
  * dominio esistente: nessuna deduzione automatica dalle cartelle.
  */
 export interface CourseProgress {
+  domainId: number;
   name: string;
   macro?: string;
   total: number;
@@ -112,7 +113,7 @@ export async function runPlan(
   opts: { whisper?: boolean; report?: (courses: CourseProgress[]) => void } = {}
 ): Promise<CourseProgress[]> {
   const courses: CourseProgress[] = steps.map((s) => ({
-    name: s.name, macro: s.macro, total: 0, done: 0, documents: 0, chunks: 0, status: "pending",
+    domainId: s.domainId, name: s.name, macro: s.macro, total: 0, done: 0, documents: 0, chunks: 0, status: "pending",
   }));
   opts.report?.(courses);
   for (let i = 0; i < steps.length; i++) {

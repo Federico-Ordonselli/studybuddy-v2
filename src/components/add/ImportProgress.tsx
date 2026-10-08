@@ -14,6 +14,7 @@ export default function ImportProgress({ job, lost }: { job: IngestJob | null; l
   }
   if (!job) return null;
   const done = job.status !== "running";
+  const first = job.courses.find((c) => c.status === "done");
   return (
     <div className="flex flex-col gap-3">
       {job.courses.map((c, i) => {
@@ -31,9 +32,11 @@ export default function ImportProgress({ job, lost }: { job: IngestJob | null; l
           </div>
         );
       })}
+      {job.error && <p className="text-danger text-sm break-all">{job.error}</p>}
       {done && (
         <div className="flex gap-3 mt-2">
-          <Link href="/" className="bg-accent text-bg rounded-md px-4 py-2 font-medium">Vai alla libreria</Link>
+          {first && <Link href={`/study/${first.domainId}`} className="bg-accent text-bg rounded-md px-4 py-2 font-medium">Studia ora</Link>}
+          <Link href="/" className={first ? "border border-border rounded-md px-4 py-2 hover:border-border-strong" : "bg-accent text-bg rounded-md px-4 py-2 font-medium"}>Vai alla libreria</Link>
         </div>
       )}
     </div>

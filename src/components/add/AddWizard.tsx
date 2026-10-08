@@ -11,6 +11,13 @@ import PlanEditor from "./PlanEditor";
 
 type Phase = "loading" | "edit" | "browse" | "importing";
 
+function importTitle(job: IngestJob | null, lost: boolean) {
+  if (lost) return "Import interrotto";
+  if (!job || job.status === "running") return "Import in corso";
+  const failed = job.status === "error" || job.courses.some((c) => c.status === "error");
+  return failed ? "Import completato con errori" : "Import completato";
+}
+
 /** Aggiungi corso: analisi della cartella-libreria → anteprima modificabile → import con progresso. */
 export default function AddWizard({ libraryDirName }: { libraryDirName: string }) {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -74,7 +81,7 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
         <div>
           <div className="text-[10px] uppercase tracking-[0.3em] text-fg-dim mb-2">Aggiungi corso</div>
           <h1 className="font-display text-3xl md:text-4xl tracking-tight leading-none">
-            {phase === "importing" ? "Import in corso" : source ? source.split("/").pop() : `Cartella ${libraryDirName}/`}
+            {phase === "importing" ? importTitle(job, lost) : source ? source.split("/").pop() : `Cartella ${libraryDirName}/`}
           </h1>
           {phase === "edit" && !source && (
             <p className="text-sm text-fg-muted mt-2">Copia i corsi scaricati in <code>{libraryDirName}/</code>: compaiono qui. Scegliere un’altra cartella serve solo se il corso sta altrove.</p>

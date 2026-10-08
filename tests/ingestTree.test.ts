@@ -126,6 +126,15 @@ test("applyPlan: existingId di un macro che non è un macro ⇒ errore, niente m
   assert.equal(L.findByPath(path.join(lib, "Spec Beta", "Corso-a"))!.name, a.name);
 });
 
+test("runPlan: il progresso porta il domainId del corso (per «Studia ora»)", async () => {
+  const dir = path.join(lib, "..", "vuoto-run");
+  makeTree(dir, { "01_m/v.html": "<html><body></body></html>" });
+  const id = L.createCourse("Vuoto", dir, null);
+  const courses = await I.runPlan([{ dir, domainId: id, name: "Vuoto" }]);
+  assert.equal(courses[0].status, "done");
+  assert.equal(courses[0].domainId, id);
+});
+
 test("activeJob: c'è un solo job attivo alla volta", () => {
   assert.equal(J.activeJob(), undefined);
   const j = J.createJob();
