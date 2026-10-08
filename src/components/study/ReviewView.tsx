@@ -13,10 +13,11 @@ export default function ReviewView({ domainId }: { domainId: number }) {
   const [result, setResult] = useState<ReviewResult | null>(null);
   const [genTopic, setGenTopic] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false); // senza, al primo render compariva «nessuna carta»
 
   async function loadDue(d: number) {
     const r = await fetch(`/api/review?domainId=${d}`).then((x) => x.json());
-    setDue(r.due ?? 0); setCard(r.card ?? null); setResult(null); setAnswer("");
+    setDue(r.due ?? 0); setCard(r.card ?? null); setResult(null); setAnswer(""); setLoaded(true);
   }
 
   async function generateCards() {
@@ -52,7 +53,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
   return (
     <div style={S.review}>
       <div style={S.reviewBar}>
-        <span>🗂 <b>{due}</b> {due === 1 ? "carta in scadenza" : "carte in scadenza"}</span>
+        <span>🗂 <b>{loaded ? due : "…"}</b> {due === 1 ? "carta in scadenza" : "carte in scadenza"}</span>
         <div style={{ display: "flex", gap: 8, flex: 1, justifyContent: "flex-end" }}>
           <input value={genTopic} onChange={(e) => setGenTopic(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") generateCards(); }}
@@ -63,7 +64,9 @@ export default function ReviewView({ domainId }: { domainId: number }) {
         </div>
       </div>
 
-      {!card ? (
+      {!loaded ? (
+        <div style={S.empty}><span className="spin" /></div>
+      ) : !card ? (
         <div style={S.empty}>Nessuna carta in scadenza. Genera nuove carte da un argomento qui sopra.</div>
       ) : (
         <div style={S.card}>
