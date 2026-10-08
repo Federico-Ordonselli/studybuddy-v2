@@ -103,6 +103,20 @@ python -m venv .venv
 
 **Optional Whisper fallback** for videos without subtitles: `.venv/bin/pip install faster-whisper` (whisper.cpp and openai-whisper are auto-detected too).
 
+## Run with Docker (GPU)
+
+Requirements: Docker with the NVIDIA Container Toolkit, and [Ollama](https://ollama.com) running on the host with the models in `src/lib/config.ts` pulled.
+
+```bash
+mkdir -p data
+cp .env.example .env        # set COURSES_DIR to the absolute path of your courses folder
+docker compose up -d --build
+```
+
+Open http://localhost:3000. Courses are mounted read-only at the same path as on the host; the database and model caches live in `./data`. Check the setup at http://localhost:3000/api/health (`?warm=1` loads the reranker and reports `cuda` or `cpu`).
+
+No GPU: `docker compose -f docker-compose.yml -f compose.cpu.yaml up -d --build` (reranker and Whisper fall back to CPU).
+
 ## Adding courses
 
 1. Copy each downloaded course (or a whole specialization) into `Courses/` in the project root. Set `STUDYBUDDY_LIBRARY_DIR` to use another folder inside your home.
