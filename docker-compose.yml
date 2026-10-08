@@ -19,8 +19,8 @@ services:
       # i corsi stanno allo stesso percorso dell'host: i percorsi già nel DB restano validi
       STUDYBUDDY_LIBRARY_DIR: ${COURSES_DIR:?imposta COURSES_DIR in .env (percorso assoluto della cartella dei corsi)}
       STUDYBUDDY_FS_ROOT: ${COURSES_DIR}
-      HOST: ${HOST:-127.0.0.1}
-      PORT: ${PORT:-3000}
+      HOST: ${STUDYBUDDY_HOST:-127.0.0.1}
+      PORT: ${STUDYBUDDY_PORT:-3000}
     volumes:
       - ./data:/app/data
       - ${COURSES_DIR}:${COURSES_DIR}:ro

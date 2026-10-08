@@ -102,7 +102,7 @@ python -m venv .venv
 .venv/bin/pip install faster-whisper nvidia-cublas-cu12 nvidia-cudnn-cu12
 ```
 
-`npm run dev` and `npm start` put the `.venv` CUDA libraries on `LD_LIBRARY_PATH` through `scripts/with-cuda.sh`. Without them Whisper falls back to CPU; the reranker still uses the GPU.
+The CUDA 12 libraries in `.venv` are added to `LD_LIBRARY_PATH` of the Whisper subprocess only (`src/lib/transcribe.ts`), never of the Node process: the reranker keeps using the system CUDA 13 and cuDNN. Without them Whisper falls back to CPU; the reranker still uses the GPU.
 
 ## Run with Docker (GPU)
 
@@ -114,7 +114,7 @@ cp .env.example .env        # set COURSES_DIR to the absolute path of your cours
 docker compose up -d --build
 ```
 
-Open http://localhost:3000. Courses are mounted read-only at the same path as on the host; the database and model caches live in `./data`. Check the setup at http://localhost:3000/api/health (`?warm=1` loads the reranker and reports `cuda` or `cpu`).
+Open http://localhost:3000. Courses are mounted read-only at the same path as on the host; the database and model caches live in `./data`. Check the setup at http://localhost:3000/api/health (`?warm=1` loads the reranker, runs one test inference and reports `cuda` or `cpu`). Set `STUDYBUDDY_PORT` / `STUDYBUDDY_HOST` in `.env` to change the port or bind address.
 
 No GPU: `docker compose -f docker-compose.yml -f compose.cpu.yaml up -d --build` (reranker and Whisper fall back to CPU).
 
