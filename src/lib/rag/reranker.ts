@@ -17,9 +17,19 @@ let state: RerankerState = "idle";
 /** Dove gira il cross-encoder: `idle` finché nessuno lo ha caricato. */
 export const rerankerState = (): RerankerState => state;
 
-/** Carica il modello senza fare un rerank (per /api/health?warm=1). */
+/**
+ * Carica il modello e fa un'inferenza di prova (per /api/health?warm=1): così `cuda`
+ * vuol dire che un forward pass è davvero girato sulla GPU, non solo che il modello
+ * si è caricato. Se l'inferenza fallisce lo stato diventa `error`.
+ */
 export async function warmReranker(): Promise<void> {
   await load();
+  try {
+    await scoreCrossEncoder("warm", ["warm"]);
+  } catch (e) {
+    state = "error";
+    throw e;
+  }
 }
 
 function load() {

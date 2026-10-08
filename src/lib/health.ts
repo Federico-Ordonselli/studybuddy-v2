@@ -22,6 +22,10 @@ function checkDb(): Health["db"] {
   }
 }
 
+// whisperAvailable() avvia Python: basta una volta per processo (installare un backend richiede un riavvio)
+let whisperCached: boolean | undefined;
+const whisperOnce = () => (whisperCached ??= whisperAvailable());
+
 async function checkOllama(): Promise<Health["ollama"]> {
   const url = ollamaBaseUrl();
   try {
@@ -34,10 +38,10 @@ async function checkOllama(): Promise<Health["ollama"]> {
   }
 }
 
-/** Stato dei pezzi che servono all'app. `warm` carica il reranker (GPU o CPU) prima di rispondere. */
+/** Stato dei pezzi che servono all'app. `warm` carica il reranker (GPU o CPU) e fa un'inferenza di prova prima di rispondere. */
 export async function getHealth(opts: { warm?: boolean } = {}): Promise<Health> {
   if (opts.warm) await warmReranker().catch(() => {}); // l'errore resta in rerankerState()
   const db = checkDb();
   const ollama = await checkOllama();
-  return { ok: db.ok && ollama.ok, db, ollama, reranker: rerankerState(), whisper: { available: whisperAvailable() } };
+  return { ok: db.ok && ollama.ok, db, ollama, reranker: rerankerState(), whisper: { available: whisperOnce() } };
 }

@@ -1,5 +1,8 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { useTempDb } from "./helpers/db";
@@ -45,4 +48,19 @@ test("health: Ollama spento ⇒ ok:false con errore leggibile, in fretta", async
   assert.ok(h.ollama.error && h.ollama.error.length > 0);
   assert.equal(h.ok, false);
   assert.equal(h.db.ok, true);
+});
+
+test("health: whisperAvailable si calcola una volta per processo (niente Python a ogni richiesta)", async () => {
+  const first = (await H.getHealth()).whisper.available;
+  // senza PATH e fuori dal progetto nessun backend sarebbe trovabile: se cambia, non è in cache
+  const cwd = process.cwd(), pathEnv = process.env.PATH;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sb-nowhisper-"));
+  try {
+    process.chdir(tmp);
+    process.env.PATH = "";
+    assert.equal((await H.getHealth()).whisper.available, first);
+  } finally {
+    process.chdir(cwd);
+    process.env.PATH = pathEnv;
+  }
 });
