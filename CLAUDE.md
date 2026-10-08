@@ -67,7 +67,7 @@ Attenzione ai **duplicati** slide-PDF vs trascrizione: stesso contenuto da due f
 - Re-ingest idempotente per `fileHash`: se migliori un parser in `sources/coursera.ts` i file invariati verrebbero saltati → **bumpa `PARSER_VERSION`** per forzare il refresh.
 - Organizzazione: `lib/library.ts` valida gli invarianti (macro senza genitore, corsi solo dentro macro, elimina solo macro senza dati di studio propri). Un dominio esistente cambia nome/macro/aree solo dalla Libreria o da un piano esplicito di `/add` (`parsePlan`/`applyPlan` in `lib/ingestTree.ts`): re-importare non disfa gli spostamenti manuali.
 - `ingested_files` registra ogni file elaborato (anche senza chunk): l'analisi di `/add` confronta gli hash (`fileHashOf`, include `PARSER_VERSION`) per dire nuovo/aggiornato/modificato. Un import alla volta (`activeJob`, 409).
-- **Non usare `npm run db:push` sul DB reale**: le tabelle virtuali `vec_chunks`/`chunks_fts` non sono nello schema Drizzle. Migrazioni = SQL esplicito dopo un backup. DB nuovo: `DB_PATH=… npx tsx scripts/create-db.ts`.
+- **Non usare `npm run db:push` sul DB reale**: le tabelle virtuali `vec_chunks`/`chunks_fts` non sono nello schema Drizzle. Migrazioni = SQL esplicito dopo un backup; le aggiunte della Libreria (`domains.areas`, `ingested_files`) le applica da sé `ensureLibrarySchema()` all'apertura del DB (`lib/db/index.ts`, idempotente). DB nuovo: `DB_PATH=… npx tsx scripts/create-db.ts`.
 - Test: `npm test` (`node:test` via tsx, DB temporaneo per file con `tests/helpers/db.ts`, nessuna dipendenza da Ollama). `learning-vault/` è escluso dal typecheck e i suoi dati sono gitignored.
 
 ## Comandi
