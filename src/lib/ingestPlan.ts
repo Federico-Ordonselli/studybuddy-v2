@@ -4,7 +4,7 @@ import { sqlite } from "@/lib/db";
 import { realInsideRoot } from "@/lib/fsRoot";
 import { findByPath } from "@/lib/library";
 import {
-  walk, classify, stem, selectWork, fileHashOf, hasIngestibleContent, subdirs,
+  walk, classify, uncoveredVideos, selectWork, fileHashOf, hasIngestibleContent, subdirs,
 } from "@/lib/rag/sources/coursera";
 import type { CourseAnalysis, FileCounts, ItemAnalysis, LibraryAnalysis, SkippedEntry } from "@/lib/ingestPlanTypes";
 
@@ -43,13 +43,11 @@ function knownHashes(domainId: number): Map<string, string> {
 async function analyzeCourse(dir: string, whisper: boolean): Promise<CourseAnalysis> {
   const files = await walk(dir);
   const counts: FileCounts = { transcript: 0, html: 0, pdf: 0, text: 0, video: 0 };
-  const transcriptStems = new Set<string>();
   for (const f of files) {
     const k = classify(f);
-    if (k === "transcript") transcriptStems.add(stem(f));
     if (k !== "skip") counts[k]++;
   }
-  const videosWithoutSubs = files.filter((f) => classify(f) === "video" && !transcriptStems.has(stem(f))).length;
+  const videosWithoutSubs = uncoveredVideos(files).size;
   const work = selectWork(files, whisper);
 
   const existing = findByPath(dir);
