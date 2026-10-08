@@ -26,3 +26,9 @@ export function createJob(): IngestJob {
 export function getJob(id: string): IngestJob | undefined {
   return jobs.get(id);
 }
+
+/** Il job di ingestione in corso, se c'è: se ne esegue uno alla volta (stesso DB). */
+export function activeJob(): IngestJob | undefined {
+  for (const j of jobs.values()) if (j.status === "running") return j;
+  return undefined;
+}
