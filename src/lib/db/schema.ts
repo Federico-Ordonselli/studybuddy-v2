@@ -3,7 +3,7 @@ import { sqliteTable, integer, text, real, primaryKey } from "drizzle-orm/sqlite
 
 /**
  * Domini di studio. Gerarchia a due livelli: un dominio `macro` (la specializzazione,
- * es. "Meta Front-End Developer") raggruppa N domini `course` (i micro-corsi), via
+ * es. una specializzazione) raggruppa N domini `course` (i micro-corsi), via
  * `parentId`. I documenti stanno sempre sui domini `course` (foglie).
  */
 export const domains = sqliteTable("domains", {

@@ -24,6 +24,13 @@ test("selectWork: salta .txt gemelli, video coperti da srt, file spazzatura", ()
   assert.ok(withWhisper.includes("b.mp4") && !withWhisper.includes("a.mp4"));
 });
 
+test("selectWork: un video è coperto anche da sottotitoli con tag di lingua (x.en.srt)", () => {
+  const files = ["/c/01_m/01_x.en.srt", "/c/01_m/01_x.en.txt", "/c/01_m/01_x.mp4", "/c/01_m/02_y.pt-BR.vtt", "/c/01_m/02_y.mp4", "/c/01_m/03_z.mp4"];
+  const work = C.selectWork(files, true).map((w) => path.basename(w.file));
+  assert.deepEqual(work.filter((f) => f.endsWith(".mp4")), ["03_z.mp4"]); // solo quello senza sottotitoli
+  assert.ok(!work.includes("01_x.en.txt"));
+});
+
 test("fileHashOf include la versione del parser", () => {
   const buf = Buffer.from("ciao");
   assert.notEqual(C.fileHashOf(buf), createHash("sha1").update(buf).digest("hex"));

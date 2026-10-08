@@ -1,6 +1,6 @@
 # StudyBuddy v2
 
-**A local-first AI study companion.** Point it at a downloaded online course (video transcripts, PDFs, HTML readings) and it becomes a personal tutor. It answers Socratically and cites the exact minute of the lecture video. It also generates quizzes and spaced-repetition flashcards, map-reduce summaries, slides, and explorable concept maps. Everything runs on your machine through Ollama, so no data leaves it and there is no per-token bill.
+**A local-first AI study companion.** Drop downloaded online courses (video transcripts, PDFs, HTML readings) into a folder, import them from the app, and each one becomes a personal tutor. It answers Socratically and cites the exact minute of the lecture video. It also generates quizzes and spaced-repetition flashcards, map-reduce summaries, slides, and explorable concept maps. Everything runs on your machine through Ollama, so no data leaves it and there is no per-token bill.
 
 ![Socratic tutor: a citation opens the lecture video at the right minute](docs/screenshots/socratic-tutor.png)
 
@@ -8,8 +8,15 @@
 
 ## Features
 
+### Course library and guided import
+Copy downloaded courses into `Courses/` and the library notices them. **Add course** analyses the folder without touching the database. It tells a specialization (named sub-folders, one course each) from a single course (numbered module folders), counts transcripts, PDFs, HTML and videos, flags videos without subtitles, and compares file hashes with the last import to mark each course *new*, *up to date* or *changed*. You review an editable preview before anything is written: rename, flip course ↔ specialization, group loose courses into a new one, assign **areas**, and pick what to import. Import runs in the background with per-course progress.
+
+The hierarchy is two levels deep: studying a specialization covers all its courses (retrieval, review queue, maps). Areas are layout-only tags that group the library at a glance without mixing content. Re-importing never undoes manual organization.
+
+<img src="docs/screenshots/library.png" alt="Library grouped by area, with specializations and their courses" width="49%"> <img src="docs/screenshots/add-preview.png" alt="Import preview: detected courses, file counts, changed files, grouping and areas" width="49%">
+
 ### Socratic tutor with video-timestamp citations
-Ask a question, even in Italian about English material. The tutor doesn't hand you the answer. It guides you with questions and hints, and it relies **only** on passages retrieved from the course. Every answer lists numbered sources. A transcript citation opens the built-in player at the exact timestamp. Conversations are saved and resumed.
+Ask a question, even in Italian about English material, about one course or a whole specialization. The tutor doesn't hand you the answer. It guides you with questions and hints, and it relies **only** on passages retrieved from the course. Every answer lists numbered sources. A transcript citation opens the built-in player at the exact timestamp. Conversations are saved and resumed.
 
 <img src="docs/screenshots/citations.png" alt="Socratic dialogue with numbered citations and video timestamps" width="640">
 
@@ -57,7 +64,7 @@ Map-reduce summaries over a topic or a whole module. The slides come with SVG il
 - **Hybrid retrieval.** Dense search alone misses exact terms (`useEffect`, `git rebase`). Lexical search alone can't match an Italian question to English material. StudyBuddy runs both: multilingual `qwen3-embedding` on **sqlite-vec** and **BM25** on FTS5. It fuses them with **Reciprocal Rank Fusion**, which merges by rank, so incomparable cosine and BM25 scores never need normalizing.
 - **Real reranker.** `bge-reranker-v2-m3` runs in-process via Transformers.js / ONNX Runtime on CUDA (fp16, ~0.6 s for 20 passages). If CUDA isn't available it falls back to CPU (q8, ~3.4 s); if the model fails to load, it falls back to LLM listwise reranking.
 - **Provider-agnostic.** Every LLM call goes through `generate(task, opts)` / `embed(texts)`. `src/lib/config.ts` maps each task (chat, quiz, grade, summarize, embed, rerank) to a provider and model. Ollama is the default; Anthropic or any OpenAI-compatible endpoint is opt-in **per task**.
-- **Safe for a local app that touches the filesystem.** `src/proxy.ts` only accepts local `Host` headers, which blocks DNS rebinding, and only `application/json` writes, which forces a CORS preflight against CSRF. Client paths go through a home-directory sandbox, and the video endpoint only streams files that were actually ingested.
+- **Safe for a local app that touches the filesystem.** `src/proxy.ts` only accepts local `Host` headers, which blocks DNS rebinding, and only `application/json` writes, which forces a CORS preflight against CSRF. Client paths go through a home-directory sandbox that is checked on the *real* path, so a symlink pointing outside it is skipped and reported. The video endpoint only streams files that were actually ingested.
 
 ## Stack
 
@@ -80,12 +87,12 @@ ollama pull gemma4:12b
 ollama pull qwen3-embedding:0.6b
 
 npm install
-echo "DB_PATH=studybuddy.db" > .env.local   # optional, this is the default
-npm run db:push
-npm run dev                                  # http://localhost:3000
+echo "DB_PATH=studybuddy.db" > .env.local
+DB_PATH=studybuddy.db npx tsx scripts/create-db.ts   # new database with the schema
+npm run dev                                          # http://localhost:3000
 ```
 
-The reranker model downloads into `.models/` on first use.
+The reranker model downloads into `.models/` on first use. The vector and full-text tables (`sqlite-vec`, FTS5) are created by the app, so don't run `drizzle-kit push` on a database that already has data: they aren't part of the Drizzle schema.
 
 **Optional GPU reranking.** `onnxruntime-node` is built against CUDA 12. If your system has a different CUDA version, install the CUDA 12 runtime libraries into a project venv. `npm run dev` adds them to `LD_LIBRARY_PATH` through `scripts/with-cuda.sh`:
 
@@ -96,22 +103,31 @@ python -m venv .venv
 
 **Optional Whisper fallback** for videos without subtitles: `.venv/bin/pip install faster-whisper` (whisper.cpp and openai-whisper are auto-detected too).
 
-## Ingesting a course
+## Adding courses
 
-The expected layout is `course/module/lesson/` with mixed files. Subtitles are the primary source; videos are skipped, but their paths are kept so citations can link to them.
+1. Copy each downloaded course (or a whole specialization) into `Courses/` in the project root. Set `STUDYBUDDY_LIBRARY_DIR` to use another folder inside your home.
+2. Open the app: the library shows a banner with the new folders. Click **Add course**, check the preview, import.
+3. **Check for updates** on the same page re-hashes the files and re-imports only what changed.
+
+The expected layout is `course/module/lesson/` with mixed files. Subtitles are the primary source (`lesson.en.srt` covers `lesson.mp4`). Videos are skipped, but their paths are kept so citations can link to them. Videos without subtitles can be transcribed with Whisper from the preview (slow: minutes per hour of video).
+
+Re-importing is idempotent: unchanged files are skipped by hash, modified files are replaced, and names, specializations and areas you changed by hand are kept.
+
+There is also a CLI, which follows the same rules:
 
 ```bash
 npm run ingest -- "path/to/course" "Course name"
 npm run ingest -- "path/to/course" "Course name" --whisper   # also transcribe videos without subtitles
 ```
 
-Re-ingesting is idempotent: unchanged files are skipped by hash, and modified files are replaced. `POST /api/ingest-folder` ingests a folder of courses as a parent domain with one child per course.
-
 ## Project structure
 
 ```
 src/lib/
   config.ts        model-per-task routing, RAG / reranker / Whisper settings
+  library.ts       library tree, invariants (2 levels: specialization → courses), areas
+  ingestPlan.ts    read-only folder analysis: course vs specialization, file counts, change detection
+  ingestTree.ts    applies an import plan to the library, then ingests course by course
   providers/       ollama | anthropic | openai-compatible | image backends
   rag/             chunking, sqlite-vec + FTS5 store, hybrid search, rerank, course parsers
   tutor/           socratic session, quiz, grading, SM-2 cards
@@ -119,9 +135,17 @@ src/lib/
   conceptmap.ts    map generation and "enter a concept" expansion
   summarize.ts     map-reduce summaries
   slides.ts        slide decks
+src/app/                pages: / (library), /add (import), /study/[id]?mode=tutor|quiz|review|studio
 src/components/mappe/   SVG canvas and editor (framework-free DOM, hosted in React)
 src/app/api/            thin route handlers
 src/proxy.ts            host allowlist + JSON-only writes
+```
+
+## Tests
+
+```bash
+npm test          # node:test via tsx, temporary SQLite database per file, no Ollama needed
+npm run typecheck
 ```
 
 ## Limitations
@@ -130,7 +154,7 @@ src/proxy.ts            host allowlist + JSON-only writes
 - SVG illustrations from a 12B model are simple and sometimes imprecise.
 - Quiz options sometimes reuse the English wording of the source material.
 
-Screenshots show real output generated locally on a purchased front-end course. Video frames, course names and file paths are blurred. No course material is included in this repository.
+Screenshots show real output generated locally on purchased online courses. Video frames, course names and file paths are blurred. No course material is included in this repository.
 
 ## License
 

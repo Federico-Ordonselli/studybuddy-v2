@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { post } from "@/lib/client/api";
+import Markdown from "./Markdown";
 import { S } from "./styles";
 import { mmss, sessionKey, type Citation, type Grade, type Msg, type QuizQuestion } from "./types";
 
@@ -100,7 +101,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
               <div key={i} style={{ ...S.row, justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
                 <div style={{ ...S.bubble, ...(m.role === "user" ? S.user : S.assistant) }}>
                   {m.tag && <div style={S.badge}>{m.tag}</div>}
-                  <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div>
+                  {m.role === "user" ? <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div> : <Markdown text={m.content} />}
                   {m.question?.type === "mcq" && m.question.options && (
                     <div style={S.opts}>
                       {m.question.options.map((opt, k) => (

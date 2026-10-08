@@ -37,6 +37,7 @@
 }
 
 @layer base {
+  html { color-scheme: dark; } /* scrollbar e controlli nativi scuri */
   html, body { height: 100%; }
   body {
     background: var(--color-bg);
@@ -47,6 +48,7 @@
   button { cursor: pointer; }
   button:disabled { opacity: 0.5; cursor: default; }
   ::selection { background: var(--color-accent); color: var(--color-bg); }
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--color-accent); }
 }
 
 .spin {

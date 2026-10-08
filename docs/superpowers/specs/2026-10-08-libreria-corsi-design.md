@@ -102,7 +102,7 @@ Regola generica (in `lib/ingestPlan.ts`, non legata a un corso specifico), appli
 - se la maggioranza non è numerata ⇒ l'elemento è un **macro** e ogni sottocartella con materiale è un suo corso;
 - nessuna sottocartella con materiale ma file diretti ⇒ **corso**.
 
-Esempi: `Meta Front-End Developer/` (8 nomi + 1 `0. Websites…`) ⇒ macro; `generative-ai-…/` (`01_…`, `02_…`, `03_…`) ⇒ corso. Nell'anteprima ogni elemento ha comunque l'interruttore **corso singolo ↔ macro** per correggere l'euristica.
+Esempi: `Specializzazione X/` (8 nomi + 1 `0. Siti utili`) ⇒ macro; `corso-y/` (`01_…`, `02_…`, `03_…`) ⇒ corso. Nell'anteprima ogni elemento ha comunque l'interruttore **corso singolo ↔ macro** per correggere l'euristica.
 
 ### Passi
 

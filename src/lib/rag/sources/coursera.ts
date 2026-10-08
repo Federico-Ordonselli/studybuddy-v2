@@ -43,6 +43,23 @@ export function stem(file: string): string {
   return file.slice(0, file.length - path.extname(file).length);
 }
 
+/** Tag di lingua in coda allo stem dei sottotitoli: "01_x.en", "01_x.pt-BR". */
+const LANG_TAG = /\.[a-z]{2,3}(?:[-_][A-Za-z]{2,4})?$/;
+
+/**
+ * Video senza trascrizione gemella. I sottotitoli scaricati portano spesso la lingua
+ * nel nome (`01_x.en.srt` per `01_x.mp4`): confrontare solo gli stem li dava tutti scoperti.
+ */
+export function uncoveredVideos(files: string[]): Set<string> {
+  const covered = new Set<string>();
+  for (const f of files) {
+    if (classify(f) !== "transcript") continue;
+    covered.add(stem(f));
+    covered.add(stem(f).replace(LANG_TAG, ""));
+  }
+  return new Set(files.filter((f) => classify(f) === "video" && !covered.has(stem(f))));
+}
+
 /** "00:01:23,456" o "00:01:23.456" -> secondi. */
 function tsToSec(ts: string): number {
   const [h, m, s] = ts.replace(",", ".").split(":");
@@ -190,12 +207,13 @@ export function selectWork(files: string[], useWhisper: boolean): { file: string
   // Stem di ogni trascrizione: serve a riconoscere i .txt gemelli e i video già coperti.
   const transcriptStems = new Set<string>();
   for (const f of files) if (classify(f) === "transcript") transcriptStems.add(stem(f));
+  const uncovered = uncoveredVideos(files);
   return files
     .map((file) => ({ file, kind: classify(file) }))
     .filter(({ file, kind }) => {
       if (kind === "skip") return false;
       // Video: solo col fallback Whisper attivo e se manca la trascrizione gemella.
-      if (kind === "video") return useWhisper && !transcriptStems.has(stem(file));
+      if (kind === "video") return useWhisper && uncovered.has(file);
       // .txt gemello di una trascrizione -> ridondante, si tiene l'srt.
       if (kind === "text" && transcriptStems.has(stem(file))) return false;
       return true;
