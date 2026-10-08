@@ -24,7 +24,7 @@ export function realInsideRoot(p: string): string | null {
   const lexical = insideRoot(p);
   if (!lexical) return null;
   let real: string;
-  try { real = fs.realpathSync(lexical); } catch { return lexical; }
+  try { real = fs.realpathSync(/* turbopackIgnore: true */ lexical); } catch { return lexical; }
   const root = realRoot();
   return real === root || real.startsWith(root + path.sep) ? lexical : null;
 }
@@ -32,6 +32,6 @@ export function realInsideRoot(p: string): string | null {
 let cachedRoot: string | undefined;
 function realRoot(): string {
   // la home stessa può essere un link (es. /home → /var/home)
-  if (!cachedRoot) { try { cachedRoot = fs.realpathSync(FS_ROOT); } catch { cachedRoot = FS_ROOT; } }
+  if (!cachedRoot) { try { cachedRoot = fs.realpathSync(/* turbopackIgnore: true */ FS_ROOT); } catch { cachedRoot = FS_ROOT; } }
   return cachedRoot;
 }
