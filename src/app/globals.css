@@ -1,24 +1,54 @@
+@import "tailwindcss";
+
+/* Linguaggio visivo condiviso con learning-vault: nero caldo, ambra, Fraunces per i titoli. */
+@theme {
+  --color-bg: #0A0908;
+  --color-surface: #14110E;
+  --color-surface-2: #1D1A16;
+  --color-border: #2C2620;
+  --color-border-strong: #44392E;
+  --color-fg: #F4F2EC;
+  --color-fg-muted: #C4BCAE;
+  --color-fg-dim: #847C70;
+  --color-accent: #E8B844;
+  --color-accent-soft: #8E6B1C;
+  --color-danger: #E07057;
+  --color-ok: #6EE7A8;
+
+  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+
+/*
+ * Alias dei vecchi token: le viste di studio (stili inline) e l'editor delle mappe
+ * (components/mappe/studio.css) li usano ancora. Si tolgono con l'unione al vault.
+ */
 :root {
-  --bg: #0f1115;
-  --panel: #171a21;
-  --panel-2: #1e222b;
-  --border: #2a2f3a;
-  --text: #e6e8ee;
-  --muted: #98a0b3;
-  --accent: #6ea8fe;
-  --accent-2: #2b6cff;
-  --user: #243049;
+  --bg: var(--color-bg);
+  --panel: var(--color-surface);
+  --panel-2: var(--color-surface-2);
+  --border: var(--color-border);
+  --text: var(--color-fg);
+  --muted: var(--color-fg-muted);
+  --accent: var(--color-accent);
+  --accent-2: var(--color-accent-soft);
+  --user: #2A2318;
 }
-* { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+
+@layer base {
+  html, body { height: 100%; }
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  ::selection { background: var(--color-accent); color: var(--color-bg); }
 }
-button { font: inherit; cursor: pointer; }
-button:disabled { opacity: 0.5; cursor: default; }
+
 .spin {
   width: 14px; height: 14px; border-radius: 50%;
   border: 2px solid var(--muted); border-top-color: transparent;
@@ -26,3 +56,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .slide-img svg, .slide-img img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.tabular { font-variant-numeric: tabular-nums; }
+@keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.fade-up { animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
