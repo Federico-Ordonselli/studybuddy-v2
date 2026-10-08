@@ -10,6 +10,7 @@
     "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "db:schema": "tsx scripts/schema-sql.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts"
   },

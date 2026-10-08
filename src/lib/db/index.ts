@@ -3,6 +3,7 @@ import * as sqliteVec from "sqlite-vec";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import { EMBED_DIM } from "@/lib/config";
+import { SCHEMA_SQL } from "./schemaSql";
 
 const path = process.env.DB_PATH ?? "studybuddy.db";
 
@@ -11,6 +12,17 @@ sqlite.pragma("journal_mode = WAL");
 sqliteVec.load(sqlite);
 
 export const db = drizzle(sqlite, { schema });
+
+/**
+ * DB nuovo (nessuna tabella): crea lo schema Drizzle da `schemaSql.ts`, così il primo
+ * avvio funziona anche dove drizzle-kit non c'è (Docker). Su un DB che ha già tabelle
+ * non fa nulla: le aggiunte successive le fanno le `ensure*Schema()`.
+ */
+export function initSchema() {
+  const n = (sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'").get() as { n: number }).n;
+  if (n > 0) return;
+  sqlite.transaction(() => { for (const stmt of SCHEMA_SQL) sqlite.exec(stmt); })();
+}
 
 /**
  * Aggiorna un DB già esistente alle aggiunte della Libreria (`domains.areas`,
@@ -30,6 +42,7 @@ export function ensureLibrarySchema() {
     PRIMARY KEY (domain_id, source)
   )`);
 }
+initSchema();
 ensureLibrarySchema();
 
 /** Crea la virtual table degli embedding. Idempotente. */
