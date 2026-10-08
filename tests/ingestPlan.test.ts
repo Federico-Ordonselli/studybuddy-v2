@@ -147,3 +147,19 @@ test("analyzePath: una cartella qualunque resta un elemento solo", async () => {
   assert.equal(items.length, 1);
   assert.equal(items[0].kind, "macro");
 });
+
+test("newInLibrary: una cartella-macro con tutti i corsi già importati altrove non è «nuova»", async () => {
+  const l2 = path.join(lib, "..", "libreria-banner");
+  makeTree(l2, {
+    "Spec Gamma/Corso-A/01_m/a.srt": "1\n00:00:01,000 --> 00:00:02,000\na\n",
+    "Spec Gamma/Corso-B/01_m/b.srt": "1\n00:00:01,000 --> 00:00:02,000\nb\n",
+  });
+  const names = async () => (await P.newInLibrary(l2)).map((f) => f.name);
+  assert.deepEqual(await names(), ["Spec Gamma"]);
+  // un corso importato sotto un altro macro: l'altro è ancora da importare
+  L.createCourse("A", path.join(l2, "Spec Gamma", "Corso-A"), L.createMacro("Altrove"));
+  assert.deepEqual(await names(), ["Spec Gamma"]);
+  // anche il secondo, sciolto: niente più da segnalare
+  L.createCourse("B", path.join(l2, "Spec Gamma", "Corso-B"), null);
+  assert.deepEqual(await names(), []);
+});

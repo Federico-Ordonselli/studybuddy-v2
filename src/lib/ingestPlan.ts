@@ -140,7 +140,12 @@ export async function newInLibrary(dir: string): Promise<{ path: string; name: s
   const out: { path: string; name: string }[] = [];
   for (const s of await safeSubdirs(dir)) {
     if (findByPath(s)) continue;
-    if (await hasIngestibleContent(s)) out.push({ path: s, name: path.basename(s) });
+    const kind = await classifyFolder(s);
+    if (!kind) continue;
+    // Macro mai importato come tale ma con tutti i corsi già nel DB (sotto un altro macro o
+    // sciolti): non c'è niente di nuovo, altrimenti il banner lo segnalerebbe per sempre.
+    if (kind === "macro" && (await contentSubdirs(s, false)).every((c) => findByPath(c))) continue;
+    out.push({ path: s, name: path.basename(s) });
   }
   return out;
 }
