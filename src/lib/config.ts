@@ -54,7 +54,8 @@ export const EMBED_DIM = 1024;
  * `device: "cuda"` usa la GPU con `dtype` fp16 (~0.6s per 20 chunk); se CUDA non si
  * carica si ripiega su CPU con `cpuDtype` q8 (~3.4s). Su GPU i pesi q8 sono lenti:
  * molti operatori interi non hanno kernel CUDA e tornano su CPU.
- * Le librerie CUDA 12 richieste da onnxruntime-node le aggiunge `scripts/with-cuda.sh`.
+ * onnxruntime-node 1.30 usa CUDA 13 (lib di sistema, o dell'immagine Docker); le lib
+ * CUDA 12 che aggiunge `scripts/with-cuda.sh` servono a ctranslate2 (Whisper).
  */
 export const reranker = {
   strategy: "cross-encoder" as "cross-encoder" | "llm",
@@ -64,7 +65,7 @@ export const reranker = {
   cpuDtype: "q8" as "q8" | "int8" | "fp16" | "fp32",
   batchSize: 8,   // coppie per forward: limita il picco di memoria
   maxLength: 512, // token per coppia (query+testo); oltre si tronca
-  cacheDir: ".models",
+  cacheDir: process.env.STUDYBUDDY_MODELS_DIR ?? ".models", // in Docker: /app/data/models
 };
 
 /**

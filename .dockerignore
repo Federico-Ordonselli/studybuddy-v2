@@ -1,0 +1,21 @@
+# niente dati, segreti o artefatti locali nel contesto di build
+.git
+node_modules
+.next
+.venv
+.models
+.run
+data
+Courses
+learning-vault
+studio-mappe
+.playwright-mcp
+.claude
+*.db
+*.db-wal
+*.db-shm
+*.db.bak*
+.env
+.env.*
+studybuddy.sh
+docs/screenshots

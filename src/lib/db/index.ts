@@ -19,9 +19,13 @@ export const db = drizzle(sqlite, { schema });
  * non fa nulla: le aggiunte successive le fanno le `ensure*Schema()`.
  */
 export function initSchema() {
-  const n = (sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'").get() as { n: number }).n;
-  if (n > 0) return;
-  sqlite.transaction(() => { for (const stmt of SCHEMA_SQL) sqlite.exec(stmt); })();
+  // Controllo e creazione nella stessa transazione IMMEDIATE: `next build` apre il DB da
+  // più worker in parallelo, e su un file nuovo il check fuori dalla transazione corre.
+  sqlite.transaction(() => {
+    const n = (sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'").get() as { n: number }).n;
+    if (n > 0) return;
+    for (const stmt of SCHEMA_SQL) sqlite.exec(stmt);
+  }).immediate();
 }
 
 /**
