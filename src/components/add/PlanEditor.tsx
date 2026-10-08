@@ -38,6 +38,13 @@ export default function PlanEditor(p: {
     ...p.existingMacros.map((m) => ({ value: `e:${m.id}`, label: m.name })),
     ...plan.macros.filter((m) => m.existingId == null).map((m) => ({ value: `k:${m.key}`, label: `${m.name} (nuovo)` })),
   ];
+  // Macro nuovi senza cartella su disco (da «Raggruppa»): non appartengono a un elemento analizzato.
+  const groups = plan.macros.filter((m) => m.path == null && m.existingId == null);
+  const ungroup = (key: string) => setPlan({
+    ...plan,
+    macros: plan.macros.filter((m) => m.key !== key),
+    courses: plan.courses.map((c) => (c.parent && "macroKey" in c.parent && c.parent.macroKey === key ? { ...c, parent: null } : c)),
+  });
   const included = plan.courses.filter((c) => c.include);
   const looseIncluded = included.filter((c) => c.parent == null);
   const needsWhisper = included.some((c) => c.videosWithoutSubs > 0);
@@ -84,6 +91,24 @@ export default function PlanEditor(p: {
               </button>
             </div>
             {courses.map(row)}
+          </div>
+        );
+      })}
+
+      {groups.map((g) => {
+        const members = plan.courses.filter((c) => c.parent && "macroKey" in c.parent && c.parent.macroKey === g.key);
+        return (
+          <div key={g.key} className="border border-dashed border-border-strong bg-surface rounded-lg p-4 flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+                <span className="text-[10px] uppercase tracking-[0.25em] text-fg-dim">Nuovo macro</span>
+                <input value={g.name} onChange={(e) => updMacro(g.key, { name: e.target.value })} aria-label="Nome del nuovo macro"
+                  className="font-display text-lg bg-transparent border-b border-transparent hover:border-border focus:border-accent outline-none min-w-0" />
+                <AreaInput value={g.areas} onChange={(areas) => updMacro(g.key, { areas })} suggestions={p.areaSuggestions} />
+              </div>
+              <button onClick={() => ungroup(g.key)} className="text-xs text-fg-dim hover:text-fg underline">sciogli</button>
+            </div>
+            <p className="text-xs text-fg-dim">{members.length ? members.map((c) => c.name).join(" · ") : "nessun corso: non verrà creato"}</p>
           </div>
         );
       })}

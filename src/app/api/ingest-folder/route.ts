@@ -13,7 +13,6 @@ export async function POST(req: NextRequest) {
   try {
     const p = parsePlan(plan);
     steps = applyPlan(p);
-    if (!steps.length) return NextResponse.json({ error: "nessun corso selezionato" }, { status: 400 });
     const job = createJob();
     // fire-and-forget: l'ingestione prosegue nel processo, il client fa polling su GET.
     runPlan(steps, { whisper: p.whisper, report: (courses) => { job.courses = courses; } })

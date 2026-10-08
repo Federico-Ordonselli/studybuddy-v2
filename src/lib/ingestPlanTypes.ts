@@ -26,6 +26,10 @@ export interface ItemAnalysis {
   courses: CourseAnalysis[];  // per kind "course": un solo elemento, la cartella stessa
 }
 
+/** Voce della cartella-libreria non analizzata (es. link simbolico verso fuori sandbox). */
+export interface SkippedEntry { name: string; reason: string }
+export interface LibraryAnalysis { items: ItemAnalysis[]; skipped: SkippedEntry[] }
+
 export interface PlanMacro { key: string; existingId?: number; name: string; path: string | null; areas: string[] }
 export type PlanParent = { macroKey: string } | { existingId: number } | null;
 

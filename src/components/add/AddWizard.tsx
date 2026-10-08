@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api, post } from "@/lib/client/api";
+import { ApiError, api, post } from "@/lib/client/api";
 import type { IngestJob } from "@/lib/jobs";
-import { defaultPlan, type IngestPlan, type ItemAnalysis } from "@/lib/ingestPlanTypes";
+import { defaultPlan, type IngestPlan, type ItemAnalysis, type SkippedEntry } from "@/lib/ingestPlanTypes";
 import type { Library } from "@/lib/library";
 import FolderBrowser from "./FolderBrowser";
 import ImportProgress from "./ImportProgress";
@@ -11,11 +11,19 @@ import PlanEditor from "./PlanEditor";
 
 type Phase = "loading" | "edit" | "browse" | "importing";
 
+function importTitle(job: IngestJob | null, lost: boolean) {
+  if (lost) return "Import interrotto";
+  if (!job || job.status === "running") return "Import in corso";
+  const failed = job.status === "error" || job.courses.some((c) => c.status === "error");
+  return failed ? "Import completato con errori" : "Import completato";
+}
+
 /** Aggiungi corso: analisi della cartella-libreria → anteprima modificabile → import con progresso. */
 export default function AddWizard({ libraryDirName }: { libraryDirName: string }) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [source, setSource] = useState<string | null>(null); // null = cartella-libreria
   const [items, setItems] = useState<ItemAnalysis[]>([]);
+  const [skipped, setSkipped] = useState<SkippedEntry[]>([]);
   const [plan, setPlan] = useState<IngestPlan | null>(null);
   const [library, setLibrary] = useState<Library | null>(null);
   const [job, setJob] = useState<IngestJob | null>(null);
@@ -27,9 +35,9 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
   async function analyze(path: string | null) {
     setPhase("loading"); setErr(null); setSource(path);
     try {
-      const r = await post<{ items: ItemAnalysis[] }>("/api/ingest-folder/analyze", path ? { path } : {});
-      setItems(r.items); setPlan(defaultPlan(r.items)); setPhase("edit");
-    } catch (e) { setErr((e as Error).message); setItems([]); setPlan(null); setPhase("edit"); }
+      const r = await post<{ items: ItemAnalysis[]; skipped: SkippedEntry[] }>("/api/ingest-folder/analyze", path ? { path } : {});
+      setItems(r.items); setSkipped(r.skipped ?? []); setPlan(defaultPlan(r.items)); setPhase("edit");
+    } catch (e) { setErr((e as Error).message); setItems([]); setSkipped([]); setPlan(null); setPhase("edit"); }
   }
 
   function poll(id: string) {
@@ -43,11 +51,16 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
     }, 1000);
   }
 
+  /** Un import alla volta: se ce n'è uno in corso si mostra quello. */
+  async function showActive(): Promise<boolean> {
+    const r = await fetch("/api/ingest-folder?active=1").then((r) => r.json());
+    if (!r.job) return false;
+    setJob(r.job); poll(r.job.id);
+    return true;
+  }
+
   useEffect(() => {
-    // Un import alla volta: se ce n'è uno in corso si mostra quello.
-    fetch("/api/ingest-folder?active=1").then((r) => r.json()).then((r) => {
-      if (r.job) { setJob(r.job); poll(r.job.id); } else void analyze(null);
-    }).catch(() => void analyze(null));
+    showActive().then((shown) => { if (!shown) void analyze(null); }).catch(() => void analyze(null));
     api<Library>("GET", "/api/library").then(setLibrary).catch(() => {});
     return () => { if (timer.current) clearInterval(timer.current); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -64,7 +77,11 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
     if (!plan) return;
     setBusy(true); setErr(null);
     try { const r = await post<{ jobId: string }>("/api/ingest-folder", { plan }); poll(r.jobId); }
-    catch (e) { setErr((e as Error).message); }
+    catch (e) {
+      // Partito nel frattempo un altro import (altra scheda): si segue quello.
+      if (e instanceof ApiError && e.status === 409 && (await showActive().catch(() => false))) return;
+      setErr((e as Error).message);
+    }
     finally { setBusy(false); }
   }
 
@@ -74,7 +91,7 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
         <div>
           <div className="text-[10px] uppercase tracking-[0.3em] text-fg-dim mb-2">Aggiungi corso</div>
           <h1 className="font-display text-3xl md:text-4xl tracking-tight leading-none">
-            {phase === "importing" ? "Import in corso" : source ? source.split("/").pop() : `Cartella ${libraryDirName}/`}
+            {phase === "importing" ? importTitle(job, lost) : source ? source.split("/").pop() : `Cartella ${libraryDirName}/`}
           </h1>
           {phase === "edit" && !source && (
             <p className="text-sm text-fg-muted mt-2">Copia i corsi scaricati in <code>{libraryDirName}/</code>: compaiono qui. Scegliere un’altra cartella serve solo se il corso sta altrove.</p>
@@ -90,6 +107,11 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
       </header>
 
       {err && <p className="text-danger text-sm">{err}</p>}
+      {phase === "edit" && skipped.length > 0 && (
+        <ul className="text-xs text-fg-dim border border-border rounded-lg px-4 py-3 flex flex-col gap-1">
+          {skipped.map((s) => <li key={s.name}>⚠ <span className="text-fg-muted">{s.name}</span> ignorata: {s.reason}</li>)}
+        </ul>
+      )}
       {phase === "loading" && <p className="text-fg-dim"><span className="spin" /> analizzo la cartella…</p>}
       {phase === "browse" && <FolderBrowser onAnalyze={(p) => analyze(p)} onCancel={() => setPhase("edit")} />}
       {phase === "edit" && plan && (items.length ? (

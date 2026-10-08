@@ -25,6 +25,7 @@ before(async () => {
   makeTree(lib, {
     "Spec Beta/Corso-a/01_m/a.srt": "1\n00:00:01,000 --> 00:00:02,000\na\n",
     "Spec Beta/Corso-b/01_m/b.srt": "1\n00:00:01,000 --> 00:00:02,000\nb\n",
+    "Solo/01_m/s.srt": "1\n00:00:01,000 --> 00:00:02,000\ns\n",
   });
 });
 
@@ -72,6 +73,66 @@ test("applyPlan: un path che è già un macro non diventa un corso", () => {
   const spec = path.join(lib, "Spec Beta");
   const plan = { macros: [], courses: [{ path: spec, name: "x", areas: [], parent: null, include: true }], whisper: false };
   assert.throws(() => I.applyPlan(I.parsePlan(plan)), L.LibraryError);
+});
+
+const course = (p: string, parent: unknown = null, include = true) =>
+  ({ path: p, name: path.basename(p), areas: [], parent, include, status: "new", changedFiles: 0, videosWithoutSubs: 0, counts: {} });
+
+test("applyPlan: piano senza corsi inclusi ⇒ rifiutato senza scrivere nel DB", () => {
+  const m = L.createMacro("Intatto", ["A"]);
+  const solo = path.join(lib, "Solo");
+  const plan = {
+    macros: [{ key: "x", existingId: m, name: "Cambiato", path: null, areas: ["B"] }, { key: "n", name: "Nuovo", path: null, areas: [] }],
+    courses: [course(solo, { macroKey: "n" }, false)],
+    whisper: false,
+  };
+  assert.throws(() => I.applyPlan(I.parsePlan(plan)), (e: unknown) => e instanceof L.LibraryError && e.status === 400);
+  const d = L.getLibrary().macros.find((x) => x.id === m)!;
+  assert.equal(d.name, "Intatto");
+  assert.deepEqual(d.areas, ["A"]);
+  assert.equal(L.getLibrary().macros.some((x) => x.name === "Nuovo"), false);
+  assert.equal(L.findByPath(solo), undefined);
+});
+
+test("applyPlan: un macro esistente che nessun corso incluso usa non viene sovrascritto", () => {
+  const m = L.createMacro("Vecchio nome", ["Area vecchia"]);
+  const solo = path.join(lib, "Solo");
+  const plan = {
+    macros: [{ key: "x", existingId: m, name: "Scheda vecchia", path: null, areas: ["Altra"] }],
+    courses: [course(solo)],
+    whisper: false,
+  };
+  const steps = I.applyPlan(I.parsePlan(plan));
+  assert.equal(steps.length, 1);
+  const d = L.getLibrary().macros.find((x) => x.id === m)!;
+  assert.equal(d.name, "Vecchio nome");
+  assert.deepEqual(d.areas, ["Area vecchia"]);
+
+  // usato da un corso incluso ⇒ il piano vale
+  const used = { ...plan, courses: [course(solo, { existingId: m })] };
+  I.applyPlan(I.parsePlan(used));
+  assert.equal(L.getLibrary().macros.find((x) => x.id === m)!.name, "Scheda vecchia");
+});
+
+test("applyPlan: existingId di un macro che non è un macro ⇒ errore, niente modifiche", () => {
+  const a = L.findByPath(path.join(lib, "Spec Beta", "Corso-a"))!;
+  const solo = path.join(lib, "Solo");
+  const plan = {
+    macros: [{ key: "x", existingId: a.id, name: "Finto macro", path: null, areas: [] }],
+    courses: [course(solo)], // anche se nessun corso lo usa: oggi rinominerebbe il corso
+    whisper: false,
+  };
+  assert.throws(() => I.applyPlan(I.parsePlan(plan)), L.LibraryError);
+  assert.equal(L.findByPath(path.join(lib, "Spec Beta", "Corso-a"))!.name, a.name);
+});
+
+test("runPlan: il progresso porta il domainId del corso (per «Studia ora»)", async () => {
+  const dir = path.join(lib, "..", "vuoto-run");
+  makeTree(dir, { "01_m/v.html": "<html><body></body></html>" });
+  const id = L.createCourse("Vuoto", dir, null);
+  const courses = await I.runPlan([{ dir, domainId: id, name: "Vuoto" }]);
+  assert.equal(courses[0].status, "done");
+  assert.equal(courses[0].domainId, id);
 });
 
 test("activeJob: c'è un solo job attivo alla volta", () => {

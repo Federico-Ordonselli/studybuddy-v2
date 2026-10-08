@@ -15,6 +15,7 @@ let lib: string;
 before(async () => {
   let dir: string;
   ({ sqlite, dir } = await useTempDb());
+  process.env.STUDYBUDDY_FS_ROOT = dir; // sandbox (lib/fsRoot): le fixture stanno qui sotto
   P = await import("@/lib/ingestPlan");
   T = await import("@/lib/ingestPlanTypes");
   L = await import("@/lib/library");
@@ -50,7 +51,7 @@ test("classifyFolder: parità numerati/non numerati ⇒ corso", async () => {
 });
 
 test("analyzeLibrary: la cartella-libreria non è un macro; ogni elemento è classificato", async () => {
-  const items = await P.analyzeLibrary(lib);
+  const { items } = await P.analyzeLibrary(lib);
   const byName = new Map(items.map((i) => [i.name, i]));
   assert.equal(byName.get("Spec Alfa")?.kind, "macro");
   assert.deepEqual(byName.get("Spec Alfa")?.courses.map((c) => c.name).sort(), ["Corso-due", "Corso-uno"]);
@@ -125,4 +126,41 @@ test("analyzeFolder: una cartella già importata tiene il tipo del DB, non quell
   makeTree(nomi, { "Uno/a.srt": "1\n00:00:01,000 --> 00:00:02,000\na\n", "Due/b.srt": "1\n00:00:01,000 --> 00:00:02,000\nb\n" });
   L.createCourse("Girata a corso", nomi, null);
   assert.equal((await P.analyzeFolder(nomi))?.kind, "course");
+});
+
+test("analyzePath: la cartella-libreria scelta col browser si analizza come libreria, non come macro", async () => {
+  const { items } = await P.analyzePath(lib, { libraryDir: lib });
+  const names = items.map((i) => i.name);
+  assert.ok(names.includes("Spec Alfa") && names.includes("corso-singolo"));
+  assert.equal(items.find((i) => i.path === lib), undefined);
+});
+
+test("analyzePath: una cartella madre della libreria espande la libreria al suo posto", async () => {
+  const parent = path.join(lib, "..");
+  const { items } = await P.analyzePath(parent, { libraryDir: lib });
+  assert.equal(items.find((i) => i.path === lib), undefined); // la libreria non diventa «un macro»
+  assert.ok(items.some((i) => i.path === path.join(lib, "Spec Alfa") && i.kind === "macro"));
+  assert.ok(items.some((i) => i.path === path.join(lib, "corso-singolo") && i.kind === "course"));
+});
+
+test("analyzePath: una cartella qualunque resta un elemento solo", async () => {
+  const { items } = await P.analyzePath(path.join(lib, "Spec Alfa"), { libraryDir: lib });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].kind, "macro");
+});
+
+test("newInLibrary: una cartella-macro con tutti i corsi già importati altrove non è «nuova»", async () => {
+  const l2 = path.join(lib, "..", "libreria-banner");
+  makeTree(l2, {
+    "Spec Gamma/Corso-A/01_m/a.srt": "1\n00:00:01,000 --> 00:00:02,000\na\n",
+    "Spec Gamma/Corso-B/01_m/b.srt": "1\n00:00:01,000 --> 00:00:02,000\nb\n",
+  });
+  const names = async () => (await P.newInLibrary(l2)).map((f) => f.name);
+  assert.deepEqual(await names(), ["Spec Gamma"]);
+  // un corso importato sotto un altro macro: l'altro è ancora da importare
+  L.createCourse("A", path.join(l2, "Spec Gamma", "Corso-A"), L.createMacro("Altrove"));
+  assert.deepEqual(await names(), ["Spec Gamma"]);
+  // anche il secondo, sciolto: niente più da segnalare
+  L.createCourse("B", path.join(l2, "Spec Gamma", "Corso-B"), null);
+  assert.deepEqual(await names(), []);
 });

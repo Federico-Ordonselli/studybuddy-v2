@@ -1,5 +1,5 @@
 import { sqlite } from "@/lib/db";
-import { insideRoot } from "@/lib/fsRoot";
+import { realInsideRoot } from "@/lib/fsRoot";
 import {
   LibraryError, cleanName, normalizeAreas, findByPath, updateDomain, createMacro, createCourse,
 } from "@/lib/library";
@@ -14,6 +14,7 @@ import type { IngestPlan, PlanCourse, PlanMacro, PlanParent } from "@/lib/ingest
  * dominio esistente: nessuna deduzione automatica dalle cartelle.
  */
 export interface CourseProgress {
+  domainId: number;
   name: string;
   macro?: string;
   total: number;
@@ -28,7 +29,7 @@ export interface IngestStep { dir: string; domainId: number; name: string; macro
 
 function safePath(p: unknown): string {
   if (typeof p !== "string" || !p) throw new LibraryError("percorso mancante");
-  const s = insideRoot(p);
+  const s = realInsideRoot(p); // anche i link simbolici devono restare nella sandbox
   if (!s) throw new LibraryError("percorso fuori dalla root consentita", 403);
   return s;
 }
@@ -63,14 +64,19 @@ export function parsePlan(body: unknown): IngestPlan {
 }
 
 export function applyPlan(plan: IngestPlan): IngestStep[] {
+  const included = plan.courses.filter((c) => c.include);
+  if (!included.length) throw new LibraryError("nessun corso selezionato");
   return sqlite.transaction(() => {
-    const included = plan.courses.filter((c) => c.include);
     const used = new Set(included.flatMap((c) => (c.parent && "macroKey" in c.parent ? [c.parent.macroKey] : [])));
+    const usedIds = new Set(included.flatMap((c) => (c.parent && "existingId" in c.parent ? [c.parent.existingId] : [])));
     const byKey = new Map<string, { id: number; name: string }>();
 
     for (const m of plan.macros) {
       if (m.existingId != null) {
-        updateDomain(m.existingId, { name: m.name, areas: m.areas });
+        const kind = (sqlite.prepare("SELECT kind FROM domains WHERE id = ?").get(m.existingId) as { kind: string } | undefined)?.kind;
+        if (kind !== "macro") throw new LibraryError(`"${m.name}" non è un macro esistente`);
+        // Una scheda vecchia porta nome/aree di allora: si applicano solo se il macro serve a questo import.
+        if (used.has(m.key) || usedIds.has(m.existingId)) updateDomain(m.existingId, { name: m.name, areas: m.areas });
         byKey.set(m.key, { id: m.existingId, name: m.name });
         continue;
       }
@@ -107,7 +113,7 @@ export async function runPlan(
   opts: { whisper?: boolean; report?: (courses: CourseProgress[]) => void } = {}
 ): Promise<CourseProgress[]> {
   const courses: CourseProgress[] = steps.map((s) => ({
-    name: s.name, macro: s.macro, total: 0, done: 0, documents: 0, chunks: 0, status: "pending",
+    domainId: s.domainId, name: s.name, macro: s.macro, total: 0, done: 0, documents: 0, chunks: 0, status: "pending",
   }));
   opts.report?.(courses);
   for (let i = 0; i < steps.length; i++) {

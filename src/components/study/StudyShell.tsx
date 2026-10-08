@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Trail } from "@/lib/library";
 import { MODES, type UrlMode } from "./modes";
 import TutorView from "./TutorView";
@@ -19,6 +19,9 @@ export default function StudyShell({ trail, tree, mode }: { trail: Trail; tree: 
   const router = useRouter();
   const [wide, setWide] = useState(false);   // la mappa concettuale usa tutta la larghezza
   const [draft, setDraft] = useState("");    // testo passato dallo Studio al tutor ("chiedi al tutor")
+  // Il Tutor legge il draft solo al montaggio (stato iniziale): una volta mostrato si svuota,
+  // altrimenti ricomparirebbe a ogni rimontaggio (cambio tab, key `${id}-${mode}`).
+  useEffect(() => { if (mode === "tutor" && draft) setDraft(""); }, [mode, draft]);
   const go = (m: UrlMode) => router.push(`/study/${trail.id}?mode=${m}`, { scroll: false });
   const href = (id: number) => `/study/${id}?mode=${mode}`;
 
