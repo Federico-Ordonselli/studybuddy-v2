@@ -157,8 +157,8 @@ export async function newInLibrary(dir: string): Promise<{ path: string; name: s
 
 /**
  * Sottocartelle (non nascoste) di una cartella-libreria. Chi copia i corsi può anche
- * linkarli: un link si segue solo se il percorso reale sta nella sandbox (lib/fsRoot.ts),
- * altrimenti finisce in `skipped` con il motivo, così l'anteprima lo può dire.
+ * linkarli: si segue solo ciò il cui percorso reale sta nella sandbox (lib/fsRoot.ts),
+ * il resto finisce in `skipped` con il motivo, così l'anteprima lo può dire.
  */
 async function libraryEntries(dir: string): Promise<{ dirs: string[]; skipped: SkippedEntry[] }> {
   let entries;
@@ -169,12 +169,13 @@ async function libraryEntries(dir: string): Promise<{ dirs: string[]; skipped: S
   for (const e of entries) {
     if (e.name.startsWith(".")) continue;
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) { dirs.push(full); continue; }
-    if (!e.isSymbolicLink()) continue;
+    if (!e.isDirectory() && !e.isSymbolicLink()) continue;
     const st = await fs.stat(full).catch(() => null);
     if (!st) skipped.push({ name: e.name, reason: "link simbolico rotto" });
     else if (!st.isDirectory()) continue; // link a un file: non è un corso
-    else if (!realInsideRoot(full)) skipped.push({ name: e.name, reason: "link simbolico verso una cartella fuori da quella consentita" });
+    // Anche le cartelle vere: la libreria stessa può essere un link verso fuori sandbox,
+    // e l'import (parsePlan) le rifiuterebbe dopo averle proposte.
+    else if (!realInsideRoot(full)) skipped.push({ name: e.name, reason: "il percorso reale è fuori dalla cartella consentita" });
     else dirs.push(full);
   }
   return { dirs: dirs.sort((a, b) => a.localeCompare(b)), skipped };

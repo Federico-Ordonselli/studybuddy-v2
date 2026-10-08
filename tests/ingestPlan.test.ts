@@ -15,6 +15,7 @@ let lib: string;
 before(async () => {
   let dir: string;
   ({ sqlite, dir } = await useTempDb());
+  process.env.STUDYBUDDY_FS_ROOT = dir; // sandbox (lib/fsRoot): le fixture stanno qui sotto
   P = await import("@/lib/ingestPlan");
   T = await import("@/lib/ingestPlanTypes");
   L = await import("@/lib/library");

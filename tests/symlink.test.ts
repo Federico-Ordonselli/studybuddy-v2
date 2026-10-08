@@ -63,3 +63,11 @@ test("parsePlan: un percorso che è un link verso fuori sandbox ⇒ 403", () => 
   );
   assert.doesNotThrow(() => I.parsePlan({ macros: [], courses: [course(path.join(lib, "dentro"))], whisper: false }));
 });
+
+test("cartella-libreria che è un link verso fuori sandbox: niente elementi importabili, tutto segnalato", async () => {
+  const libLink = path.join(lib, "..", "libreria-link");
+  fs.symlinkSync(fuori, libLink);
+  const { items, skipped } = await P.analyzeLibrary(libLink);
+  assert.deepEqual(items, []); // altrimenti l'anteprima li proporrebbe e l'import darebbe 403
+  assert.ok(skipped.some((s) => s.name === "corso-esterno"));
+});
