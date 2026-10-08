@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 /** Chip delle aree con suggerimenti dalle aree esistenti. Invio o virgola aggiunge. */
 export default function AreaInput({ value, onChange, suggestions }: { value: string[]; onChange: (v: string[]) => void; suggestions: string[] }) {
   const [text, setText] = useState("");
-  const listId = `areas-${suggestions.length}`;
+  const listId = useId(); // un datalist per istanza: con id condivisi vinceva il primo nel DOM
   const add = (raw: string) => {
     const t = raw.trim();
     if (t && !value.some((v) => v.toLowerCase() === t.toLowerCase())) onChange([...value, t]);
