@@ -3,7 +3,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { parse as parseHtmlDom } from "node-html-parser";
-import { db } from "@/lib/db";
+import { db, sqlite } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
 import { indexChunks, deleteDocumentChunks, type ChunkRecord } from "@/lib/rag/store";
 import { chunkText, chunkTranscript, type TranscriptCue } from "@/lib/rag/chunk";
@@ -20,9 +20,14 @@ import { transcribeToSrt, whisperAvailable } from "@/lib/transcribe";
 // cambiato (altrimenti verrebbero saltati perché i byte sono identici). Bump = refresh.
 const PARSER_VERSION = "4";
 
-type Kind = "transcript" | "pdf" | "html" | "video" | "text" | "skip";
+/** Hash con cui si riconosce un file già ingerito (contenuto + versione del parser). */
+export function fileHashOf(buf: Buffer): string {
+  return createHash("sha1").update(PARSER_VERSION).update(buf).digest("hex");
+}
 
-function classify(file: string): Kind {
+export type Kind = "transcript" | "pdf" | "html" | "video" | "text" | "skip";
+
+export function classify(file: string): Kind {
   const ext = path.extname(file).toLowerCase();
   if (ext === ".srt" || ext === ".vtt") return "transcript";
   if (ext === ".pdf") return "pdf";
@@ -33,7 +38,7 @@ function classify(file: string): Kind {
 }
 
 /** Path senza l'ultima estensione: "a/b/01_x.en.srt" -> "a/b/01_x.en". */
-function stem(file: string): string {
+export function stem(file: string): string {
   return file.slice(0, file.length - path.extname(file).length);
 }
 
@@ -114,7 +119,7 @@ export async function parsePdf(data: Uint8Array): Promise<string> {
   return text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-async function walk(dir: string): Promise<string[]> {
+export async function walk(dir: string): Promise<string[]> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const files: string[] = [];
   for (const e of entries) {
@@ -155,12 +160,6 @@ async function recordsFor(file: string, buf: Buffer, kind: Kind): Promise<ChunkR
   }
 }
 
-// Priorità di processamento: le fonti più "ricche" vincono il dedup a parità di
-// contenuto (la trascrizione porta i timestamp, l'html è strutturato).
-const KIND_ORDER: Record<Kind, number> = {
-  transcript: 0, html: 1, pdf: 2, text: 3, video: 9, skip: 9,
-};
-
 /**
  * Indicizza un corso. `courseDir` = root del corso scaricato.
  * Crea un documento per file testuale, con meta gerarchici dedotti dal path.
@@ -173,6 +172,40 @@ const KIND_ORDER: Record<Kind, number> = {
  * (stesso contenuto, ma l'srt ha i timestamp); (2) si scartano i chunk con
  * contenuto identico già visti nel run (es. stessa reading come html e pdf).
  */
+// Priorità di processamento: le fonti più "ricche" vincono il dedup a parità di
+// contenuto (la trascrizione porta i timestamp, l'html è strutturato).
+const KIND_ORDER: Record<Kind, number> = {
+  transcript: 0, html: 1, pdf: 2, text: 3, video: 9, skip: 9,
+};
+
+/**
+ * I file che l'ingest elabora, in ordine di priorità. Condivisa con l'analisi
+ * dell'import (lib/ingestPlan.ts): stessa definizione di "file da ingerire".
+ */
+export function selectWork(files: string[], useWhisper: boolean): { file: string; kind: Kind }[] {
+  // Stem di ogni trascrizione: serve a riconoscere i .txt gemelli e i video già coperti.
+  const transcriptStems = new Set<string>();
+  for (const f of files) if (classify(f) === "transcript") transcriptStems.add(stem(f));
+  return files
+    .map((file) => ({ file, kind: classify(file) }))
+    .filter(({ file, kind }) => {
+      if (kind === "skip") return false;
+      // Video: solo col fallback Whisper attivo e se manca la trascrizione gemella.
+      if (kind === "video") return useWhisper && !transcriptStems.has(stem(file));
+      // .txt gemello di una trascrizione -> ridondante, si tiene l'srt.
+      if (kind === "text" && transcriptStems.has(stem(file))) return false;
+      return true;
+    })
+    .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind]);
+}
+
+function recordIngested(domainId: number, source: string, fileHash: string) {
+  sqlite.prepare(
+    `INSERT INTO ingested_files (domain_id, source, file_hash) VALUES (?, ?, ?)
+     ON CONFLICT(domain_id, source) DO UPDATE SET file_hash = excluded.file_hash`
+  ).run(domainId, source, fileHash);
+}
+
 export interface IngestOpts {
   whisper?: boolean;
   /** Notifica di avanzamento: (file processati, totale, ultimo file). */
@@ -195,17 +228,7 @@ export async function ingestCourse(
     console.warn("[ingestCourse] --whisper richiesto ma nessun backend Whisper disponibile: i video senza trascrizione verranno saltati.");
   }
 
-  const work = files
-    .map((file) => ({ file, kind: classify(file) }))
-    .filter(({ file, kind }) => {
-      if (kind === "skip") return false;
-      // Video: solo col fallback Whisper attivo e se manca la trascrizione gemella.
-      if (kind === "video") return useWhisper && !transcriptStems.has(stem(file));
-      // .txt gemello di una trascrizione -> ridondante, si tiene l'srt.
-      if (kind === "text" && transcriptStems.has(stem(file))) return false;
-      return true;
-    })
-    .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind]);
+  const work = selectWork(files, useWhisper);
 
   // Documenti già presenti per questo dominio: source -> { id, fileHash }.
   const existing = new Map<string, { id: number; fileHash?: string }>();
@@ -239,10 +262,10 @@ export async function ingestCourse(
       console.warn(`[ingestCourse] skip ${path.relative(courseDir, file)}: ${e}`);
       continue;
     }
-    const fileHash = createHash("sha1").update(PARSER_VERSION).update(buf).digest("hex");
+    const fileHash = fileHashOf(buf);
 
     const prev = existing.get(file);
-    if (prev && prev.fileHash === fileHash) { stats.unchanged++; continue; } // invariato
+    if (prev && prev.fileHash === fileHash) { recordIngested(domainId, file, fileHash); stats.unchanged++; continue; } // invariato
 
     if (kind === "video") console.log(`[ingestCourse] trascrivo (whisper): ${path.relative(courseDir, file)} …`);
     let records: ChunkRecord[];
@@ -270,7 +293,9 @@ export async function ingestCourse(
       await db.delete(documents).where(eq(documents.id, prev.id));
       stats.replaced++;
     }
-    if (!fresh.length) continue;
+    // Registrato anche se non produce chunk (l'analisi non lo rivede come "nuovo"),
+    // ma solo dopo un'indicizzazione riuscita: un embed fallito lascia il file "modificato".
+    if (!fresh.length) { recordIngested(domainId, file, fileHash); continue; }
 
     const rel = path.relative(courseDir, file);
     const crumbs = rel.split(path.sep).slice(0, -1); // tutte le cartelle sotto courseDir
@@ -291,6 +316,7 @@ export async function ingestCourse(
       .values({ domainId, title: path.basename(file), source: file, kind: docKind, meta })
       .returning({ id: documents.id });
     await indexChunks(doc.id, fresh);
+    recordIngested(domainId, file, fileHash);
     stats.documents++;
     stats.chunks += fresh.length;
   }
