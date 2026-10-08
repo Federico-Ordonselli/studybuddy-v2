@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api, post } from "@/lib/client/api";
+import { ApiError, api, post } from "@/lib/client/api";
 import type { IngestJob } from "@/lib/jobs";
 import { defaultPlan, type IngestPlan, type ItemAnalysis } from "@/lib/ingestPlanTypes";
 import type { Library } from "@/lib/library";
@@ -50,11 +50,16 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
     }, 1000);
   }
 
+  /** Un import alla volta: se ce n'è uno in corso si mostra quello. */
+  async function showActive(): Promise<boolean> {
+    const r = await fetch("/api/ingest-folder?active=1").then((r) => r.json());
+    if (!r.job) return false;
+    setJob(r.job); poll(r.job.id);
+    return true;
+  }
+
   useEffect(() => {
-    // Un import alla volta: se ce n'è uno in corso si mostra quello.
-    fetch("/api/ingest-folder?active=1").then((r) => r.json()).then((r) => {
-      if (r.job) { setJob(r.job); poll(r.job.id); } else void analyze(null);
-    }).catch(() => void analyze(null));
+    showActive().then((shown) => { if (!shown) void analyze(null); }).catch(() => void analyze(null));
     api<Library>("GET", "/api/library").then(setLibrary).catch(() => {});
     return () => { if (timer.current) clearInterval(timer.current); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -71,7 +76,11 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
     if (!plan) return;
     setBusy(true); setErr(null);
     try { const r = await post<{ jobId: string }>("/api/ingest-folder", { plan }); poll(r.jobId); }
-    catch (e) { setErr((e as Error).message); }
+    catch (e) {
+      // Partito nel frattempo un altro import (altra scheda): si segue quello.
+      if (e instanceof ApiError && e.status === 409 && (await showActive().catch(() => false))) return;
+      setErr((e as Error).message);
+    }
     finally { setBusy(false); }
   }
 
