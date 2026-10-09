@@ -25,3 +25,7 @@ test("noteBody: corpo per POST /api/notes", () => {
   assert.deepEqual(noteBody("t", { kind: "area", slug: "uno" }), { content: "t", domain: "uno", courseId: null });
   assert.deepEqual(noteBody("t", { kind: "course", id: 4 }), { content: "t", domain: null, courseId: 4 });
 });
+
+test("captureTarget: «%» malformato nello slug ⇒ inbox, senza lanciare", () => {
+  assert.deepEqual(captureTarget("/d/%E0", areas, modules), { kind: "inbox" });
+});

@@ -95,3 +95,10 @@ test("listForArea: note del dominio + note dei suoi corsi (anche figli di un mac
   for (const n of [d, f, s]) assert.ok(ids.includes(n.id), n.content);
   for (const n of [o, i]) assert.ok(!ids.includes(n.id), n.content);
 });
+
+test("listInbox senza limite restituisce tutta l'inbox (oltre 50 note); con limite lo rispetta", () => {
+  for (let i = 0; i < 55; i++) N.createNote({ content: `bulk ${i}` });
+  assert.equal(N.listInbox().length, N.countInbox());
+  assert.ok(N.listInbox().length > 50);
+  assert.equal(N.listInbox(2).length, 2);
+});

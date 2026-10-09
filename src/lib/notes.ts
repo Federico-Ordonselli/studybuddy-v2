@@ -99,8 +99,9 @@ export function deleteNote(id: number) {
 
 // --- letture -------------------------------------------------------------------
 
-export function listInbox(limit = 50): NoteView[] {
-  return (sqlite.prepare(`${SELECT} WHERE n.domain IS NULL AND n.course_id IS NULL${ORDER} LIMIT ?`).all(limit) as Row[]).map(view);
+/** Tutta l'inbox; con `limit` solo le prime (SQLite: LIMIT -1 = nessun limite). */
+export function listInbox(limit?: number): NoteView[] {
+  return (sqlite.prepare(`${SELECT} WHERE n.domain IS NULL AND n.course_id IS NULL${ORDER} LIMIT ?`).all(limit ?? -1) as Row[]).map(view);
 }
 
 export function countInbox(): number {

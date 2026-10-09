@@ -16,7 +16,8 @@ export function captureTarget(
   if (study) return { kind: "course", id: Number(study[1]) };
   const d = /^\/d\/([^/]+)/.exec(pathname);
   if (d) {
-    const slug = decodeURIComponent(d[1]);
+    let slug: string;
+    try { slug = decodeURIComponent(d[1]); } catch { return { kind: "inbox" }; } // «%» malformato nell'URL
     return areas.some((a) => a.slug === slug) ? { kind: "area", slug } : { kind: "inbox" };
   }
   for (const a of areas) {

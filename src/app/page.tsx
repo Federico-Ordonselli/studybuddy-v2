@@ -20,7 +20,7 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 export default function HomePage() {
   const due = dueByDomain();
   const recent = recentCourses();
-  const inbox = listInbox(30);
+  const inbox = listInbox();
   const shell = getShellData();
   const name = process.env.STUDYBUDDY_USER_NAME?.trim();
   const now = new Date();
@@ -76,7 +76,7 @@ export default function HomePage() {
       </Block>
 
       {inbox.length > 0 && (
-        <Block title={`Inbox · ${inbox.length}`}>
+        <Block title={`Inbox · ${shell.inboxCount}`}>
           <NoteList notes={inbox} areas={shell.areas} showWhere={false} movable />
         </Block>
       )}
