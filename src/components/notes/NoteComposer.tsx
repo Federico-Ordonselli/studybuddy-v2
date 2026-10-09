@@ -51,13 +51,13 @@ export default function NoteComposer({ areas, courses, initial, autoFocus, onDon
   }
 
   return (
-    <div className="border border-border bg-surface rounded-lg overflow-hidden focus-within:border-border-strong transition-colors shadow-xl">
+    <div className="border border-border bg-surface rounded-lg overflow-hidden focus-within:border-border-strong transition-colors shadow-xl"
+      onKeyDown={(e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); save(); }
+        else if (e.key === "Escape" && onDone) { e.preventDefault(); onDone(); }
+      }}>
       <textarea value={content} onChange={(e) => setContent(e.target.value)} autoFocus={autoFocus} rows={3}
         aria-label="Testo dell'appunto" placeholder="Un pensiero, un link, una domanda per dopo…"
-        onKeyDown={(e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); save(); }
-          else if (e.key === "Escape" && onDone) { e.preventDefault(); onDone(); }
-        }}
         className="w-full bg-transparent px-5 py-4 text-[15px] leading-relaxed outline-none resize-none placeholder:text-fg-dim" />
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t border-border bg-bg/40">
         <div className="flex items-center gap-1 flex-wrap" role="group" aria-label="Destinazione">

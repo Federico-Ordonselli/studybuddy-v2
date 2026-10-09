@@ -1,14 +1,11 @@
-import path from "node:path";
-import { getLibrary } from "@/lib/library";
-import { newInLibrary } from "@/lib/ingestPlan";
-import { LIBRARY_DIR } from "@/lib/libraryDir";
-import LibraryView from "@/components/library/LibraryView";
+import Link from "next/link";
 
-export const dynamic = "force-dynamic";
-
-/** Libreria: legge il DB lato server (niente flash di lista vuota), azioni via /api/library. */
-export default async function LibraryPage() {
-  const library = getLibrary();
-  const { fresh, skipped } = await newInLibrary(LIBRARY_DIR);
-  return <LibraryView library={library} fresh={fresh} skipped={skipped.length} libraryDirName={path.basename(LIBRARY_DIR)} />;
+/** Home dell'hub (contenuto nel Task 6). */
+export default function HomePage() {
+  return (
+    <div className="max-w-3xl w-full mx-auto px-4 md:px-8 py-10">
+      <h1 className="font-display text-4xl">Home</h1>
+      <Link href="/corsi" className="text-accent underline">Vai ai corsi</Link>
+    </div>
+  );
 }

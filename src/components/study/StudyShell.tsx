@@ -29,7 +29,7 @@ export default function StudyShell({ trail, tree, mode }: { trail: Trail; tree: 
     <div className="flex-1 min-h-0 flex flex-col w-full mx-auto px-4" style={{ maxWidth: mode === "studio" && wide ? 1600 : 900 }}>
       <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-border">
         <nav className="flex items-center gap-2 text-sm min-w-0">
-          <Link href="/" className="text-fg-dim hover:text-fg">Libreria</Link>
+          <Link href="/corsi" className="text-fg-dim hover:text-fg">Corsi</Link>
           {trail.macro && (<><span className="text-fg-dim">›</span>
             <Link href={href(trail.macro.id)} className="text-fg-muted hover:text-fg truncate">{trail.macro.name}</Link></>)}
           <span className="text-fg-dim">›</span>

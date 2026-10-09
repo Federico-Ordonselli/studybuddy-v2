@@ -94,13 +94,13 @@ export default function LibraryView({ library, fresh, skipped, libraryDirName }:
               className="bg-surface-2 border border-border rounded-md px-3 py-1.5 text-sm w-44" />
             <NewMacroButton library={library} />
             <Link href="/settings" className="border border-border rounded-md px-3 py-1.5 text-sm hover:border-border-strong">Domini</Link>
-            <Link href="/add" className="bg-accent text-bg rounded-md px-3 py-1.5 text-sm font-medium">+ Aggiungi corso</Link>
+            <Link href="/corsi/add" className="bg-accent text-bg rounded-md px-3 py-1.5 text-sm font-medium">+ Aggiungi corso</Link>
           </div>
         )}
       </header>
 
       {(fresh.length > 0 || skipped > 0) && (
-        <Link href="/add" className="block mb-8 border border-accent-soft bg-surface rounded-lg px-4 py-3 text-sm hover:border-accent transition-colors">
+        <Link href="/corsi/add" className="block mb-8 border border-accent-soft bg-surface rounded-lg px-4 py-3 text-sm hover:border-accent transition-colors">
           {fresh.length > 0 && <>
             <b className="text-accent">{fresh.length} {fresh.length === 1 ? "nuovo corso trovato" : "nuovi corsi trovati"}</b>{" "}
             in {libraryDirName}/: {fresh.map((f) => f.name).join(", ")}
@@ -118,7 +118,7 @@ export default function LibraryView({ library, fresh, skipped, libraryDirName }:
       {empty ? (
         <div className="border border-dashed border-border rounded-lg px-8 py-14 text-center">
           <p className="text-fg-muted mb-4">Nessun corso ancora. Copia un corso scaricato in <code>{libraryDirName}/</code> oppure scegli una cartella.</p>
-          <Link href="/add" className="bg-accent text-bg rounded-md px-4 py-2 font-medium">+ Aggiungi corso</Link>
+          <Link href="/corsi/add" className="bg-accent text-bg rounded-md px-4 py-2 font-medium">+ Aggiungi corso</Link>
         </div>
       ) : sections.length === 0 ? (
         <p className="text-fg-dim">Nessun risultato per “{q}”.</p>
