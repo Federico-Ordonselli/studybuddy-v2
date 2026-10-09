@@ -17,9 +17,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="h-dvh flex flex-col">
           <header className="h-12 shrink-0 border-b border-border px-4 md:px-8 flex items-center justify-between">
             <Link href="/" className="font-display text-xl tracking-tight">StudyBuddy</Link>
-            <Link href="/add" className="text-[11px] uppercase tracking-[0.25em] text-fg-dim hover:text-fg transition-colors">
-              + Aggiungi corso
-            </Link>
+            <nav className="flex items-center gap-5">
+              <Link href="/add" className="text-[11px] uppercase tracking-[0.25em] text-fg-dim hover:text-fg transition-colors">
+                + Aggiungi corso
+              </Link>
+              <Link href="/settings" className="text-[11px] uppercase tracking-[0.25em] text-fg-dim hover:text-fg transition-colors">
+                Impostazioni
+              </Link>
+            </nav>
           </header>
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">{children}</div>
         </div>
