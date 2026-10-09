@@ -54,7 +54,7 @@ export default function Sidebar({ data, pathname, collapsed, onToggle, onCapture
             <Item key={a.slug} href={`/d/${a.slug}`} symbol={a.symbol} label={a.name} active={on(`/d/${a.slug}`)} collapsed={collapsed} />
           ))}
           {!data.areas.length && !collapsed && (
-            <Link href="/settings" className="px-3 py-1 text-xs text-fg-dim hover:text-fg">+ crea un dominio</Link>
+            <Link href="/settings" className="block px-3 py-1 text-xs text-fg-dim hover:text-fg">+ crea un dominio</Link>
           )}
         </Section>
         <Section label="Sistema" collapsed={collapsed}>
