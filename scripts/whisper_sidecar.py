@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Sidecar faster-whisper: trascrive un video e stampa SRT su stdout.
+"""Sidecar faster-whisper: trascrive un video o un file audio e stampa SRT su stdout.
 
-Uso:  whisper_sidecar.py <video> <model> [language]
+Uso:  whisper_sidecar.py <video|audio> <model> [language]
 Env:  WHISPER_DEVICE (auto|cuda|cpu), WHISPER_COMPUTE (auto|float16|int8|...)
 
 faster-whisper usa CTranslate2 (CPU o CUDA): sulla 4080 va in GPU con `auto`.
