@@ -1,6 +1,6 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -105,4 +105,44 @@ test("parseArgs: --from di default da DB_PATH, argomenti obbligatori e sconosciu
   assert.throws(() => parseArgs(["--vault", "v", "--target", "t.db"], {}), /DB_PATH/);
   assert.throws(() => parseArgs(["--vault", "v", "--target", "t.db", "--boh"], { DB_PATH: "s.db" }), /sconosciuto/);
   assert.throws(() => parseArgs(["--vault", "--target", "t.db"], { DB_PATH: "s.db" }), /vuole un valore/);
+});
+
+test("SIGINT: exit 130, niente file di lavoro, niente target, originali intatti", async () => {
+  const before = originals();
+  // sorgente grosso (~200 MB): il backup dura abbastanza da poter interrompere a metà, senza sleep nel codice di produzione
+  const big = path.join(work, "grosso.db");
+  const bdb = new Database(big);
+  bdb.pragma("journal_mode = WAL");
+  for (const sql of SCHEMA_SQL) bdb.exec(sql);
+  bdb.exec("CREATE TABLE ballast (b BLOB)");
+  const ins = bdb.prepare("INSERT INTO ballast VALUES (randomblob(1048576))");
+  bdb.transaction(() => { for (let i = 0; i < 200; i++) ins.run(); })();
+  bdb.close();
+  const fresh = path.join(work, "sigint", "nuovo.db");
+  const dir = path.dirname(fresh);
+  const tmpDirs = () => new Set(fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith("sb-vault-")));
+  const tmpBefore = tmpDirs();
+  try {
+    // node diretto con il loader tsx: il wrapper `tsx` non inoltra in modo affidabile il segnale al figlio
+    const child = spawn(process.execPath, ["--import", "tsx", "scripts/import-vault.ts", "--vault", sv.dir, "--from", big, "--target", fresh], { env: baseEnv, stdio: "ignore" });
+    const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((res) =>
+      child.on("exit", (code, signal) => res({ code, signal })));
+    const deadline = Date.now() + 15000;
+    let seen = false;
+    while (Date.now() < deadline && child.exitCode === null) {
+      if (fs.existsSync(dir) && fs.readdirSync(dir).some((f) => f.includes(".partial-"))) { seen = true; break; }
+      await new Promise((r) => setTimeout(r, 2));
+    }
+    if (child.exitCode === null) child.kill("SIGINT");
+    const { code, signal } = await exited;
+    assert.ok(seen, "il file di lavoro non è mai comparso");
+    assert.equal(signal, null);
+    assert.equal(code, 130);
+    assert.deepEqual(fs.existsSync(dir) ? fs.readdirSync(dir) : [], []);
+    assert.equal(fs.existsSync(fresh), false);
+    assert.deepEqual([...tmpDirs()].filter((d) => !tmpBefore.has(d)), []);
+    assert.deepEqual(originals(), before);
+  } finally {
+    for (const f of [big, `${big}-wal`, `${big}-shm`]) fs.rmSync(f, { force: true });
+  }
 });

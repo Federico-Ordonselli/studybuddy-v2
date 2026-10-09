@@ -54,6 +54,31 @@ async function main() {
   const work = `${args.target}.partial-${process.pid}`;
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sb-vault-"));
   let sqlite: Database.Database | undefined;
+  // Pulizia unica per `finally` e segnali. Non tocca mai il target. Chiude solo una
+  // connessione che punta al file di lavoro (`sqlite` è azzerato se non lo è).
+  const cleanup = () => {
+    try { sqlite?.close(); } catch { /* già chiuso */ }
+    sqlite = undefined;
+    for (const f of [work, `${work}-wal`, `${work}-shm`]) fs.rmSync(f, { force: true });
+    fs.rmSync(tmp, { recursive: true, force: true });
+  };
+  // Il backup online gira in un thread: se si pulisce a metà, riscrive il file di lavoro dopo la
+  // rimozione. Il segnale quindi aspetta che finisca (poi cleanup).
+  let backing: Promise<unknown> | undefined;
+  let interrupted = false;
+  // Dopo un segnale il flusso principale si ferma al prossimo punto asincrono: ci pensa il gestore a uscire.
+  const stopIfInterrupted = async () => { if (interrupted) await new Promise<never>(() => {}); };
+  const onSignal = (sig: NodeJS.Signals, code: number) => async () => {
+    interrupted = true;
+    await backing?.catch(() => {});
+    cleanup();
+    console.error(`\nInterrotto (${sig}): file di lavoro e copie temporanee rimossi, niente scritto.`);
+    process.exit(code);
+  };
+  const onInt = onSignal("SIGINT", 130);
+  const onTerm = onSignal("SIGTERM", 143);
+  process.once("SIGINT", onInt);
+  process.once("SIGTERM", onTerm);
   try {
     // 1. vault: copia del .db + WAL, lettura della copia; domini dal codice del vault
     const vault = readVault(snapshotVaultDb(args.vault, tmp));
@@ -61,13 +86,23 @@ async function main() {
 
     // 2. StudyBuddy: backup online (coerente anche col WAL) da una connessione in sola lettura
     const src = new Database(args.from, { readonly: true, fileMustExist: true });
-    try { await src.backup(work); } finally { src.close(); }
+    try { await (backing = src.backup(work)); } finally { src.close(); }
+    await stopIfInterrupted();
 
     // 3. il file di lavoro diventa il DB dell'app: l'import di @/lib/db esegue ensureHubSchema()
     process.env.DB_PATH = work;
     ({ sqlite } = await import("@/lib/db"));
+    // Se qualcosa ha caricato @/lib/db prima di DB_PATH, il modulo è in cache sul DB sbagliato
+    // (magari quello reale): non scrivere e non chiudere quella connessione (il close farebbe
+    // un checkpoint su un file che non è nostro), quindi la si "dimentica" prima di lanciare.
+    if (path.resolve(sqlite.name) !== path.resolve(work)) {
+      const aperto = sqlite.name;
+      sqlite = undefined;
+      throw new Error(`@/lib/db è già aperto su ${aperto}, non sul file di lavoro: interrotto senza scrivere`);
+    }
     const { planImport, applyImport } = await import("@/lib/vaultImport/plan");
     const { formatReport } = await import("@/lib/vaultImport/report");
+    await stopIfInterrupted();
 
     const plan = planImport(vault, domains, { skip: args.skip });
     if (plan.errors.length) {
@@ -86,9 +121,9 @@ async function main() {
       console.log(`\nDry-run: niente scritto. Per creare ${args.target} riesegui con --apply.`);
     }
   } finally {
-    sqlite?.close();
-    for (const f of [work, `${work}-wal`, `${work}-shm`]) fs.rmSync(f, { force: true });
-    fs.rmSync(tmp, { recursive: true, force: true });
+    process.removeListener("SIGINT", onInt);
+    process.removeListener("SIGTERM", onTerm);
+    cleanup();
   }
 }
 
