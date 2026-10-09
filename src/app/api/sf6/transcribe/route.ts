@@ -20,17 +20,17 @@ export async function POST(req: NextRequest) {
     const paths = sf6Paths();
     if (typeof body.url === "string" && body.url.trim()) {
       const url = body.url;
-      return exclusive(() => transcribeSource({ url, language, forceWhisper }));
+      return exclusive(() => transcribeSource({ url, language, forceWhisper }, req.signal));
     }
     if (body.vod_filename != null) {
       const file = resolveMedia(paths.vods, body.vod_filename, "File non trovato nella cartella dei VOD.");
-      return exclusive(() => transcribeSource({ file, language }));
+      return exclusive(() => transcribeSource({ file, language }, req.signal));
     }
     if (body.upload_id != null) {
       const file = resolveMedia(paths.uploads, body.upload_id, "Upload non trovato (potrebbe essere scaduto).");
       return exclusive(async () => {
         try {
-          return await transcribeSource({ file, language });
+          return await transcribeSource({ file, language }, req.signal);
         } finally {
           fs.rmSync(file, { force: true });
         }

@@ -36,7 +36,7 @@ function mimeFor(file: string): string {
 /** Un file già sotto i 24 MB. */
 export async function transcribeFile(
   audio: string,
-  opts: { apiKey: string; language?: string; url?: string; model?: string },
+  opts: { apiKey: string; language?: string; url?: string; model?: string; signal?: AbortSignal },
 ): Promise<GroqResult> {
   const size = fs.statSync(audio).size;
   if (size > MAX_BYTES) throw new Error(`file audio troppo grande per Groq (${(size / 1024 / 1024).toFixed(1)} MB > 24 MB)`);
@@ -49,7 +49,7 @@ export async function transcribeFile(
     method: "POST",
     headers: { Authorization: `Bearer ${opts.apiKey}` },
     body: form,
-    signal: AbortSignal.timeout(5 * 60_000),
+    signal: opts.signal ? AbortSignal.any([AbortSignal.timeout(5 * 60_000), opts.signal]) : AbortSignal.timeout(5 * 60_000),
   });
   if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 400)}`);
   const data = (await res.json()) as { text?: string; language?: string; duration?: number };
@@ -75,12 +75,12 @@ export async function transcribeChunks(paths: string[], fn: (p: string) => Promi
   };
 }
 
-export async function transcribeWithGroq(file: string, opts: { language?: string } = {}): Promise<GroqResult> {
+export async function transcribeWithGroq(file: string, opts: { language?: string; signal?: AbortSignal } = {}): Promise<GroqResult> {
   const apiKey = groqKey();
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "sb-groq-"));
   try {
-    const chunks = await chunkAudio(await normalizeAudio(file, work), work);
-    return await transcribeChunks(chunks, (p) => transcribeFile(p, { apiKey, language: opts.language }));
+    const chunks = await chunkAudio(await normalizeAudio(file, work, opts.signal), work, undefined, opts.signal);
+    return await transcribeChunks(chunks, (p) => transcribeFile(p, { apiKey, language: opts.language, signal: opts.signal }));
   } finally {
     fs.rmSync(work, { recursive: true, force: true });
   }

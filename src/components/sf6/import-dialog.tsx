@@ -262,7 +262,7 @@ export function ImportDialog({
     if (target.mode !== "character") return;
     const it = items[idx];
     if (it.type !== "combo" || !it.notation) return;
-    await fetch("/api/sf6/combos", {
+    const res = await fetch("/api/sf6/combos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -273,6 +273,10 @@ export function ImportDialog({
         status: "learning",
       }),
     });
+    if (!res.ok) {
+      setError(`Errore ${res.status}: impossibile aggiungere la combo alla library.`);
+      return;
+    }
     setAccepted((a) => {
       const next = [...a];
       next[idx] = false;

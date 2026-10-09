@@ -76,12 +76,12 @@ export function whisperAvailable(): boolean {
 const TIMEOUT_MS = 2 * 3600_000; // un VOD di ore su CPU
 
 /** SRT del backend locale; lancia se non c'è un backend o se l'output è vuoto. */
-async function localSrt(media: string, language = cfg.language): Promise<string> {
+async function localSrt(media: string, language = cfg.language, signal?: AbortSignal): Promise<string> {
   const backend = pickBackend();
   if (!backend) throw new Error("nessun backend Whisper locale (faster-whisper, whisper.cpp o openai-whisper)");
-  const srt = backend === "faster-whisper" ? await fasterWhisper(media, language)
-    : backend === "whisper.cpp" ? await whisperCpp(media, language)
-    : await openaiWhisper(media, language);
+  const srt = backend === "faster-whisper" ? await fasterWhisper(media, language, signal)
+    : backend === "whisper.cpp" ? await whisperCpp(media, language, signal)
+    : await openaiWhisper(media, language, signal);
   if (!srt) throw new Error(`trascrizione vuota (${backend})`);
   return srt;
 }
@@ -109,9 +109,9 @@ export function transcribeBackend(env: NodeJS.ProcessEnv = process.env): Transcr
 export interface Transcript { text: string; language: string | null; durationSec: number | null; backend: TranscribeBackend }
 
 /** Testo di un file audio o video, col backend configurato. */
-export async function transcribeMedia(file: string, opts: { language?: string } = {}): Promise<Transcript> {
+export async function transcribeMedia(file: string, opts: { language?: string; signal?: AbortSignal } = {}): Promise<Transcript> {
   if (transcribeBackend() === "groq") return { ...(await transcribeWithGroq(file, opts)), backend: "groq" };
-  const cues = parseSubtitles(await localSrt(file, opts.language ?? cfg.language));
+  const cues = parseSubtitles(await localSrt(file, opts.language ?? cfg.language, opts.signal));
   return {
     text: cues.map((c) => c.text).join(" ").replace(/\s+/g, " ").trim(),
     language: opts.language ?? cfg.language ?? null,
@@ -120,19 +120,19 @@ export async function transcribeMedia(file: string, opts: { language?: string } 
   };
 }
 
-async function fasterWhisper(media: string, language?: string): Promise<string | null> {
-  const r = await runOk(pythonBin(), [SIDECAR, media, cfg.model, language ?? ""], { timeoutMs: TIMEOUT_MS, env: whisperEnv() });
+async function fasterWhisper(media: string, language?: string, signal?: AbortSignal): Promise<string | null> {
+  const r = await runOk(pythonBin(), [SIDECAR, media, cfg.model, language ?? ""], { timeoutMs: TIMEOUT_MS, env: whisperEnv(), signal });
   return r.stdout.includes("-->") ? r.stdout : null;
 }
 
-async function whisperCpp(media: string, language?: string): Promise<string | null> {
+async function whisperCpp(media: string, language?: string, signal?: AbortSignal): Promise<string | null> {
   // whisper.cpp vuole WAV 16kHz mono: estraiamo l'audio con ffmpeg.
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sb-whisper-"));
   try {
     const wav = path.join(tmp, "audio.wav");
-    await runOk("ffmpeg", ["-y", "-i", media, "-ar", "16000", "-ac", "1", "-f", "wav", wav], { timeoutMs: TIMEOUT_MS });
+    await runOk("ffmpeg", ["-y", "-i", media, "-ar", "16000", "-ac", "1", "-f", "wav", wav], { timeoutMs: TIMEOUT_MS, signal });
     const outBase = path.join(tmp, "out");
-    await runOk(cfg.cppBinary, ["-m", cfg.cppModel, "-f", wav, "-osrt", "-of", outBase, ...(language ? ["-l", language] : [])], { timeoutMs: TIMEOUT_MS });
+    await runOk(cfg.cppBinary, ["-m", cfg.cppModel, "-f", wav, "-osrt", "-of", outBase, ...(language ? ["-l", language] : [])], { timeoutMs: TIMEOUT_MS, signal });
     const srt = `${outBase}.srt`;
     return fs.existsSync(srt) ? fs.readFileSync(srt, "utf8") : null;
   } finally {
@@ -140,11 +140,11 @@ async function whisperCpp(media: string, language?: string): Promise<string | nu
   }
 }
 
-async function openaiWhisper(media: string, language?: string): Promise<string | null> {
+async function openaiWhisper(media: string, language?: string, signal?: AbortSignal): Promise<string | null> {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sb-whisper-"));
   try {
     const args = ["--model", cfg.model, "--output_format", "srt", "--output_dir", tmp, ...(language ? ["--language", language] : []), media];
-    await runOk("whisper", args, { timeoutMs: TIMEOUT_MS });
+    await runOk("whisper", args, { timeoutMs: TIMEOUT_MS, signal });
     const srt = path.join(tmp, path.basename(media).replace(/\.[^.]+$/, ".srt"));
     return fs.existsSync(srt) ? fs.readFileSync(srt, "utf8") : null;
   } finally {

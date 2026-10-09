@@ -77,3 +77,17 @@ test("vods: cartella e file", async () => {
   assert.equal(r.dir, vods);
   assert.deepEqual(r.files.map((f: any) => f.filename), ["match.mkv"]);
 });
+
+test("transcribe: richiesta già abortita ⇒ errore e l'upload viene cancellato", async () => {
+  const up = path.join(process.env.STUDYBUDDY_UPLOAD_DIR!, "abort1234.mp3");
+  fs.writeFileSync(up, "non audio");
+  const ac = new AbortController();
+  ac.abort();
+  const req = new NextRequest(url("/api/sf6/transcribe"), {
+    method: "POST", body: JSON.stringify({ upload_id: "abort1234.mp3" }),
+    headers: { "content-type": "application/json" }, signal: ac.signal,
+  });
+  const res = await tr.POST(req);
+  assert.ok(res.status >= 400);
+  assert.equal(fs.existsSync(up), false);
+});

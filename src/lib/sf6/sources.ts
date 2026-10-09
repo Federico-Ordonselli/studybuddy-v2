@@ -22,14 +22,14 @@ export function assertHttpUrl(url: string): string {
   return u;
 }
 
-export async function downloadAudio(url: string, workDir: string): Promise<{ audioPath: string; title: string }> {
+export async function downloadAudio(url: string, workDir: string, signal?: AbortSignal): Promise<{ audioPath: string; title: string }> {
   await runOk(venvBin("yt-dlp"), [
     "--extract-audio", "--audio-format", "mp3", "--audio-quality", "32K",
     "--postprocessor-args", "ffmpeg:-ac 1 -ar 16000",
     "--write-info-json", "--js-runtimes", "node", "--remote-components", "ejs:github",
     "--output", path.join(workDir, "audio.%(ext)s"), "--socket-timeout", "30", "--no-playlist",
     assertHttpUrl(url),
-  ], { timeoutMs: 30 * 60_000 });
+  ], { timeoutMs: 30 * 60_000, signal });
   const mp3 = fs.readdirSync(workDir).find((f) => f.endsWith(".mp3"));
   if (!mp3) throw new Error("yt-dlp non ha prodotto un file mp3: il video potrebbe essere privato, georestricted o richiedere login");
   let title = "(senza titolo)";
@@ -44,12 +44,12 @@ function fromTranscript(t: Transcript, title: string): SourceTranscript {
   return { transcript: t.text, title, language: t.language ?? "auto", source: t.backend === "groq" ? "whisper-groq" : "whisper-local" };
 }
 
-export async function transcribeSource(input: { url?: string; file?: string; language?: string; forceWhisper?: boolean }): Promise<SourceTranscript> {
+export async function transcribeSource(input: { url?: string; file?: string; language?: string; forceWhisper?: boolean }, signal?: AbortSignal): Promise<SourceTranscript> {
   if (input.url) {
     const url = assertHttpUrl(input.url);
     if (!input.forceWhisper && isYoutubeUrl(url)) {
       try {
-        const s = await fetchYoutubeTranscript(url);
+        const s = await fetchYoutubeTranscript(url, signal);
         return { transcript: s.transcript, title: s.title, language: s.language, source: "subs" };
       } catch (e) {
         console.log(`[sf6] sottotitoli non disponibili, si passa a Whisper: ${e instanceof Error ? e.message : e}`);
@@ -57,27 +57,30 @@ export async function transcribeSource(input: { url?: string; file?: string; lan
     }
     const work = fs.mkdtempSync(path.join(os.tmpdir(), "sb-sf6-"));
     try {
-      const dl = await downloadAudio(url, work);
-      return fromTranscript(await transcribeMedia(dl.audioPath, { language: input.language }), dl.title);
+      const dl = await downloadAudio(url, work, signal);
+      return fromTranscript(await transcribeMedia(dl.audioPath, { language: input.language, signal }), dl.title);
     } finally {
       fs.rmSync(work, { recursive: true, force: true });
     }
   }
   if (input.file) {
-    return fromTranscript(await transcribeMedia(input.file, { language: input.language }), path.basename(input.file, path.extname(input.file)));
+    return fromTranscript(await transcribeMedia(input.file, { language: input.language, signal }), path.basename(input.file, path.extname(input.file)));
   }
   throw new LibraryError("Specifica url, vod_filename o upload_id.");
 }
 
-let busy = false;
+let busySince: number | null = null;
 
 /** Esegue `fn` se non c'è già una trascrizione in corso (stesso processo Next), altrimenti 409. */
 export async function exclusive<T>(fn: () => Promise<T>): Promise<T> {
-  if (busy) throw new LibraryError("c'è già una trascrizione in corso: riprova quando finisce", 409);
-  busy = true;
+  if (busySince !== null) {
+    const min = Math.max(1, Math.round((Date.now() - busySince) / 60_000));
+    throw new LibraryError(`c'è già una trascrizione in corso (da ${min} min): riprova quando finisce`, 409);
+  }
+  busySince = Date.now();
   try {
     return await fn();
   } finally {
-    busy = false;
+    busySince = null;
   }
 }

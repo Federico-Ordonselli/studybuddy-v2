@@ -48,11 +48,28 @@ export function resolveMedia(dir: string, name: unknown, notFound: string): stri
   return full;
 }
 
+const UPLOAD_TTL_MS = 24 * 3600_000;
+
+/** Upload abbandonati (mai trascritti): via quelli più vecchi di 24 ore. Best effort, non lancia. */
+async function pruneOldUploads(dir: string): Promise<void> {
+  try {
+    const limit = Date.now() - UPLOAD_TTL_MS;
+    for (const e of await fs.promises.readdir(dir, { withFileTypes: true })) {
+      if (!e.isFile()) continue;
+      const full = path.join(dir, e.name);
+      try {
+        if ((await fs.promises.stat(full)).mtimeMs < limit) await fs.promises.rm(full, { force: true });
+      } catch { /* sparito nel frattempo */ }
+    }
+  } catch { /* cartella illeggibile: si salta la pulizia */ }
+}
+
 export async function saveUpload(file: File, dir = sf6Paths().uploads, max = MAX_UPLOAD_BYTES): Promise<{ upload_id: string; filename: string; size_mb: number }> {
   if (file.size > max) throw new LibraryError(`File troppo grande (${mb(file.size)} MB > ${mb(max)} MB).`, 413);
   const ext = path.extname(file.name).toLowerCase();
   if (!MEDIA_EXTENSIONS.has(ext)) throw new LibraryError(`Estensione non supportata (${ext || "nessuna"}). Audio o video: mp3, m4a, mp4, mkv, webm, …`);
   await fs.promises.mkdir(dir, { recursive: true });
+  await pruneOldUploads(dir);
   const id = `${randomBytes(8).toString("hex")}${ext}`;
   const full = path.join(dir, id);
   try {

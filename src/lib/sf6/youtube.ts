@@ -32,7 +32,7 @@ type FetchResult = {
  * - yt-dlp may exit non-zero due to format warnings while subtitles were saved fine,
  *   so we decide success based on whether a .vtt file is present, not on exit code.
  */
-export async function fetchYoutubeTranscript(url: string): Promise<FetchResult> {
+export async function fetchYoutubeTranscript(url: string, signal?: AbortSignal): Promise<FetchResult> {
   if (!isYoutubeUrl(url)) {
     throw new Error("URL non valido. Solo link YouTube sono supportati.");
   }
@@ -53,7 +53,7 @@ export async function fetchYoutubeTranscript(url: string): Promise<FetchResult> 
       "--output", path.join(workDir, "video.%(ext)s"),
       "--socket-timeout", "30",
       url,
-    ], { timeoutMs: 60_000 });
+    ], { timeoutMs: 60_000, signal });
 
     const files = await fs.readdir(workDir);
     const vttFile = files.find((f) => f.endsWith(".vtt"));

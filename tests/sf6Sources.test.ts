@@ -75,3 +75,22 @@ test("exclusive: una trascrizione alla volta, la seconda ⇒ 409; lo slot si lib
   await assert.rejects(exclusive(async () => { throw new Error("boom"); }), /boom/);
   assert.equal(await exclusive(async () => "c"), "c");
 });
+
+test("exclusive: il 409 dice da quanto è in corso la trascrizione", async () => {
+  const slow = exclusive(() => new Promise<string>((r) => setTimeout(() => r("a"), 30)));
+  await assert.rejects(exclusive(async () => "b"), (e: unknown) => e instanceof LibraryError && e.status === 409 && /in corso \(da /.test(e.message));
+  await slow;
+});
+
+test("saveUpload: cancella gli upload più vecchi di 24 ore, lascia i recenti", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sb-old-"));
+  const old = path.join(dir, "vecchio.mp3");
+  const fresh = path.join(dir, "recente.mp3");
+  fs.writeFileSync(old, "x");
+  fs.writeFileSync(fresh, "x");
+  const twoDays = new Date(Date.now() - 48 * 3600_000);
+  fs.utimesSync(old, twoDays, twoDays);
+  await saveUpload(new File([new Uint8Array([1, 2, 3])], "a.mp3"), dir);
+  assert.equal(fs.existsSync(old), false);
+  assert.equal(fs.existsSync(fresh), true);
+});

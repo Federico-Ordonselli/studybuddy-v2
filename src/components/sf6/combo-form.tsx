@@ -65,6 +65,15 @@ export function ComboForm({
       setError("La notation è obbligatoria.");
       return;
     }
+    const isCount = (v: string) => { const n = Number(v); return Number.isInteger(n) && n >= 0; };
+    if (values.damage.trim() && !isCount(values.damage)) {
+      setError("Danno non valido.");
+      return;
+    }
+    if (values.driveCost.trim() && !isCount(values.driveCost)) {
+      setError("Costo drive non valido.");
+      return;
+    }
     setSaving(true);
 
     const payload = {
@@ -72,8 +81,8 @@ export function ComboForm({
       notation: values.notation.trim(),
       situation: values.situation.trim() || null,
       status: values.status,
-      damage: values.damage ? Number(values.damage) : null,
-      drive_cost: values.driveCost ? Number(values.driveCost) : null,
+      damage: values.damage.trim() ? Number(values.damage) : null,
+      drive_cost: values.driveCost.trim() ? Number(values.driveCost) : null,
       notes: values.notes.trim() || null,
     };
 

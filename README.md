@@ -183,7 +183,7 @@ src/components/shell/   sidebar, mobile drawer, quick capture shortcut
 src/components/mappe/   SVG canvas and editor (framework-free DOM, hosted in React)
 src/components/sf6/    SF6 module UI: combo and tips lists, notation renderer, import dialog
 src/app/api/            thin route handlers
-src/proxy.ts            host allowlist + JSON-only writes
+src/proxy.ts            host allowlist + JSON-only writes (except the SF6 multipart upload, which checks host and Origin itself)
 ```
 
 ## Tests
