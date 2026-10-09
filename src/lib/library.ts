@@ -1,15 +1,12 @@
 import { sqlite } from "@/lib/db";
+import { LibraryError } from "@/lib/errors";
 
 /**
  * Libreria: lettura dei domini per la UI e organizzazione manuale (rinomina, aree,
  * sposta in macro). Gerarchia a 2 livelli: macro → corsi. Le aree sono solo layout.
  * Ogni mutazione valida gli invarianti e lancia `LibraryError` (status HTTP incluso).
  */
-export class LibraryError extends Error {
-  constructor(message: string, readonly status = 400) {
-    super(message);
-  }
-}
+export { LibraryError };
 
 export interface CourseNode { id: number; name: string; path: string | null; areas: string[]; docs: number; due: number }
 export interface MacroNode { id: number; name: string; path: string | null; areas: string[]; docs: number; due: number; courses: CourseNode[] }
