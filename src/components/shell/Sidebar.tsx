@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ShellData } from "@/lib/home";
+import { MODULES } from "@/lib/modules";
 
 function Badge({ n }: { n: number }) {
   return n > 0 ? <span className="ml-auto text-[10px] tabular bg-surface-2 border border-border rounded-full px-1.5 text-fg-muted">{n}</span> : null;
@@ -35,6 +36,7 @@ export default function Sidebar({ data, pathname, collapsed, onToggle, onCapture
   data: ShellData; pathname: string; collapsed: boolean; onToggle?: () => void; onCapture: () => void;
 }) {
   const on = (p: string) => pathname === p || pathname.startsWith(`${p}/`);
+  const moduleOn = (m: string | null) => !!m && Object.hasOwn(MODULES, m) && on(MODULES[m].href);
   return (
     <aside className={`h-full shrink-0 border-r border-border bg-surface flex flex-col ${collapsed ? "w-14" : "w-60"}`}>
       <div className={`flex items-center border-b border-border ${collapsed ? "justify-center py-4" : "justify-between px-5 pt-6 pb-4"}`}>
@@ -51,7 +53,7 @@ export default function Sidebar({ data, pathname, collapsed, onToggle, onCapture
         </Section>
         <Section label="Domini" collapsed={collapsed}>
           {data.areas.map((a) => (
-            <Item key={a.slug} href={`/d/${a.slug}`} symbol={a.symbol} label={a.name} active={on(`/d/${a.slug}`)} collapsed={collapsed} />
+            <Item key={a.slug} href={`/d/${a.slug}`} symbol={a.symbol} label={a.name} active={on(`/d/${a.slug}`) || moduleOn(a.module)} collapsed={collapsed} />
           ))}
           {!data.areas.length && !collapsed && (
             <Link href="/settings" className="block px-3 py-1 text-xs text-fg-dim hover:text-fg">+ crea un dominio</Link>
