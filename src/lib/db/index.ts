@@ -76,13 +76,15 @@ function ensureColumn(table: string, column: string, type: string) {
 }
 
 /**
- * Hub su un DB esistente: crea le tabelle `areas` e `notes` e la colonna `sessions.updated_at`
+ * Hub su un DB esistente: crea le tabelle `areas`, `notes`, `sf6_combos` e `sf6_tips` e la colonna `sessions.updated_at`
  * con lo stesso SQL di un DB nuovo, e converte una volta i nomi liberi di `domains.areas` in slug.
  * Idempotente. Caso comune (tutto già fatto): solo letture, nessun lock di scrittura.
  */
 export function ensureHubSchema() {
   ensureTable("areas");
   ensureTable("notes");
+  ensureTable("sf6_combos");
+  ensureTable("sf6_tips");
   ensureColumn("sessions", "updated_at", "integer");
   const cols = sqlite.prepare("PRAGMA table_info(domains)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "areas")) return;

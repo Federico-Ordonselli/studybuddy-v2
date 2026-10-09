@@ -114,3 +114,32 @@ export const conceptMaps = sqliteTable("concept_maps", {
   doc: text("doc", { mode: "json" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
+
+/**
+ * Modulo SF6 (codice in F5, da `learning-vault@439b105`): combo e consigli per personaggio,
+ * con le colonne del vault. Le tabelle nascono in F4 perché l'import del vault le popola.
+ * `character_slug` è una stringa: il roster sta nel codice del modulo.
+ */
+export const sf6Combos = sqliteTable("sf6_combos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterSlug: text("character_slug").notNull(),
+  notation: text("notation").notNull(),
+  situation: text("situation"),
+  status: text("status").notNull().default("learning"), // learning | practicing | consolidated
+  damage: integer("damage"),
+  driveCost: integer("drive_cost"),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const sf6Tips = sqliteTable("sf6_tips", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterSlug: text("character_slug").notNull(),
+  type: text("type").notNull(), // combo | tech | strategy | matchup | general
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  notation: text("notation"),
+  sourceTitle: text("source_title"),
+  sourceUrl: text("source_url"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
