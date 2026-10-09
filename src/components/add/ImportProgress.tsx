@@ -8,7 +8,7 @@ export default function ImportProgress({ job, lost }: { job: IngestJob | null; l
     return (
       <div className="border border-danger rounded-lg p-4 text-sm">
         L’import si è interrotto (server riavviato?). Rilancialo: riparte dai file mancanti, quelli già fatti vengono saltati.
-        <div className="mt-3"><Link href="/add" className="text-accent underline">Ricomincia</Link></div>
+        <div className="mt-3"><Link href="/corsi/add" className="text-accent underline">Ricomincia</Link></div>
       </div>
     );
   }
@@ -36,7 +36,7 @@ export default function ImportProgress({ job, lost }: { job: IngestJob | null; l
       {done && (
         <div className="flex gap-3 mt-2">
           {first && <Link href={`/study/${first.domainId}`} className="bg-accent text-bg rounded-md px-4 py-2 font-medium">Studia ora</Link>}
-          <Link href="/" className={first ? "border border-border rounded-md px-4 py-2 hover:border-border-strong" : "bg-accent text-bg rounded-md px-4 py-2 font-medium"}>Vai alla libreria</Link>
+          <Link href="/corsi" className={first ? "border border-border rounded-md px-4 py-2 hover:border-border-strong" : "bg-accent text-bg rounded-md px-4 py-2 font-medium"}>Vai alla libreria</Link>
         </div>
       )}
     </div>

@@ -8,6 +8,8 @@ import { MODES, type UrlMode } from "./modes";
 import TutorView from "./TutorView";
 import ReviewView from "./ReviewView";
 import StudioView from "./StudioView";
+import NotesPanel from "./NotesPanel";
+import type { NoteView } from "@/lib/notes";
 
 export interface StudyTree {
   macros: { id: number; name: string; courses: { id: number; name: string }[] }[];
@@ -15,7 +17,7 @@ export interface StudyTree {
 }
 
 /** Barra dell'area studio (breadcrumb, cambio corso, modalità) + la vista della modalità. */
-export default function StudyShell({ trail, tree, mode }: { trail: Trail; tree: StudyTree; mode: UrlMode }) {
+export default function StudyShell({ trail, tree, mode, notes }: { trail: Trail; tree: StudyTree; mode: UrlMode; notes: NoteView[] }) {
   const router = useRouter();
   const [wide, setWide] = useState(false);   // la mappa concettuale usa tutta la larghezza
   const [draft, setDraft] = useState("");    // testo passato dallo Studio al tutor ("chiedi al tutor")
@@ -29,7 +31,7 @@ export default function StudyShell({ trail, tree, mode }: { trail: Trail; tree: 
     <div className="flex-1 min-h-0 flex flex-col w-full mx-auto px-4" style={{ maxWidth: mode === "studio" && wide ? 1600 : 900 }}>
       <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-border">
         <nav className="flex items-center gap-2 text-sm min-w-0">
-          <Link href="/" className="text-fg-dim hover:text-fg">Libreria</Link>
+          <Link href="/corsi" className="text-fg-dim hover:text-fg">Corsi</Link>
           {trail.macro && (<><span className="text-fg-dim">›</span>
             <Link href={href(trail.macro.id)} className="text-fg-muted hover:text-fg truncate">{trail.macro.name}</Link></>)}
           <span className="text-fg-dim">›</span>
@@ -51,13 +53,16 @@ export default function StudyShell({ trail, tree, mode }: { trail: Trail; tree: 
             </div>
           </details>
         </nav>
-        <div className="flex bg-surface-2 border border-border rounded-md overflow-hidden text-sm">
-          {MODES.map((m) => (
-            <button key={m.key} onClick={() => go(m.key)}
-              className={`px-3.5 py-1.5 ${mode === m.key ? "bg-accent text-bg font-medium" : "text-fg-muted hover:text-fg"}`}>
-              {m.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <NotesPanel notes={notes} />
+          <div className="flex bg-surface-2 border border-border rounded-md overflow-hidden text-sm">
+            {MODES.map((m) => (
+              <button key={m.key} onClick={() => go(m.key)}
+                className={`px-3.5 py-1.5 ${mode === m.key ? "bg-accent text-bg font-medium" : "text-fg-muted hover:text-fg"}`}>
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

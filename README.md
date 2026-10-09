@@ -11,7 +11,7 @@
 ### Course library and guided import
 Copy downloaded courses into `Courses/` and the library notices them. **Add course** analyses the folder without touching the database. It tells a specialization (named sub-folders, one course each) from a single course (numbered module folders), counts transcripts, PDFs, HTML and videos, flags videos without subtitles, and compares file hashes with the last import to mark each course *new*, *up to date* or *changed*. You review an editable preview before anything is written: rename, flip course ↔ specialization, group loose courses into a new one, assign **domains**, and pick what to import. Import runs in the background with per-course progress.
 
-Domains group your courses in the library; create, rename, reorder and delete them in **Settings**, which also shows whether the database, Ollama, the GPU reranker and Whisper are working.
+Domains group your courses in the library; create, rename, reorder and delete them in **Settings**, which also shows whether the database, Ollama, the GPU reranker and Whisper are working. A personal home shows what's due today, the courses you were studying and your inbox. Press **n** anywhere to jot a note: it lands on the course you're studying, the domain you're browsing, or the inbox, and you can move it later.
 
 The hierarchy is two levels deep: studying a specialization covers all its courses (retrieval, review queue, maps). Domains are organization-only: they group the library at a glance without mixing content. Re-importing never undoes manual organization.
 
@@ -144,6 +144,8 @@ src/lib/
   config.ts        model-per-task routing, RAG / reranker / Whisper settings
   library.ts       library tree, invariants (2 levels: specialization → courses), domains
   areas.ts         domains (create, rename, reorder, delete) and their invariants
+  notes.ts         notes: inbox, domain or course
+  home.ts          home ("today") and sidebar data
   ingestPlan.ts    read-only folder analysis: course vs specialization, file counts, change detection
   ingestTree.ts    applies an import plan to the library, then ingests course by course
   providers/       ollama | anthropic | openai-compatible | image backends
@@ -153,7 +155,8 @@ src/lib/
   conceptmap.ts    map generation and "enter a concept" expansion
   summarize.ts     map-reduce summaries
   slides.ts        slide decks
-src/app/                pages: / (library), /add (import), /study/[id]?mode=tutor|quiz|review|studio
+src/app/                pages: / (home), /corsi (library), /corsi/add (import), /d/[slug] (domain), /study/[id]?mode=tutor|quiz|review|studio, /settings
+src/components/shell/   sidebar, mobile drawer, quick capture shortcut
 src/components/mappe/   SVG canvas and editor (framework-free DOM, hosted in React)
 src/app/api/            thin route handlers
 src/proxy.ts            host allowlist + JSON-only writes

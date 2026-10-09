@@ -1,9 +1,6 @@
-import path from "node:path";
-import { LIBRARY_DIR } from "@/lib/libraryDir";
-import AddWizard from "@/components/add/AddWizard";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default function AddPage() {
-  return <AddWizard libraryDirName={path.basename(LIBRARY_DIR)} />;
+/** Vecchio indirizzo del wizard di import (link e segnalibri): ora sta sotto /corsi. */
+export default function AddRedirect() {
+  redirect("/corsi/add");
 }

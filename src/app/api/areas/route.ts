@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createArea, deleteArea, listAreas, reorderAreas, updateArea } from "@/lib/areas";
-import { LibraryError } from "@/lib/errors";
+import { handle } from "@/lib/http";
 
 export const runtime = "nodejs";
 
 /** Domini dell'hub (thin wrapper su lib/areas.ts). */
-function handle(fn: () => unknown) {
-  try {
-    return NextResponse.json(fn() ?? { ok: true });
-  } catch (e) {
-    if (e instanceof LibraryError) return NextResponse.json({ error: e.message }, { status: e.status });
-    throw e;
-  }
-}
-
 export async function GET() {
   return NextResponse.json(listAreas());
 }

@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LibraryError, createMacro, deleteMacro, getLibrary, updateDomain } from "@/lib/library";
+import { createMacro, deleteMacro, getLibrary, updateDomain } from "@/lib/library";
+import { handle } from "@/lib/http";
 
 export const runtime = "nodejs";
 
 /** Organizzazione manuale della Libreria (thin wrapper su lib/library.ts). */
-function handle(fn: () => unknown) {
-  try {
-    return NextResponse.json(fn() ?? { ok: true });
-  } catch (e) {
-    if (e instanceof LibraryError) return NextResponse.json({ error: e.message }, { status: e.status });
-    throw e;
-  }
-}
-
 export async function GET() {
   return NextResponse.json(getLibrary());
 }

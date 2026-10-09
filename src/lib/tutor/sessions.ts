@@ -65,5 +65,5 @@ export function loadSession(sessionId: number): SessionRow | null {
 }
 
 export function saveState(sessionId: number, state: SocraticState) {
-  db.update(sessions).set({ state }).where(eq(sessions.id, sessionId)).run();
+  db.update(sessions).set({ state, updatedAt: new Date() }).where(eq(sessions.id, sessionId)).run();
 }

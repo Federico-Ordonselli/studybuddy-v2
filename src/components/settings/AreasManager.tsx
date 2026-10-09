@@ -24,6 +24,7 @@ function Row({ a, first, last, busy, onMove, run }: {
         <input value={symbol} onChange={(e) => setSymbol(e.target.value)} aria-label="Simbolo" className={`${input} w-12 text-center`} />
         <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Nome" className={`${input} flex-1 min-w-40 font-display`} />
         <span className="text-xs text-fg-dim tabular">{a.courses} {a.courses === 1 ? "corso" : "corsi"}</span>
+        {a.notes > 0 && <span className="text-xs text-fg-dim tabular">{a.notes} {a.notes === 1 ? "nota" : "note"}</span>}
         <button disabled={busy || first} onClick={() => onMove(-1)} className="text-fg-dim hover:text-fg px-1" aria-label={`Sposta su ${a.name}`}>↑</button>
         <button disabled={busy || last} onClick={() => onMove(1)} className="text-fg-dim hover:text-fg px-1" aria-label={`Sposta giù ${a.name}`}>↓</button>
       </div>
@@ -41,8 +42,12 @@ function Row({ a, first, last, busy, onMove, run }: {
             onClick={() => run(() => api("PATCH", "/api/areas", { slug: a.slug, name, symbol, tagline, module: module || null }))}>
             Salva
           </button>
-          <button disabled={busy || a.courses > 0} className="text-danger"
-            title={a.courses > 0 ? `Usato da ${a.courses} ${a.courses === 1 ? "corso" : "corsi"}: toglilo prima dai corsi` : undefined}
+          <button disabled={busy || a.courses > 0 || a.notes > 0} className="text-danger"
+            title={a.courses > 0
+              ? `Usato da ${a.courses} ${a.courses === 1 ? "corso" : "corsi"}: toglilo prima dai corsi`
+              : a.notes > 0
+                ? `Contiene ${a.notes} ${a.notes === 1 ? "nota: spostala o eliminala" : "note: spostale o eliminale"} prima`
+                : undefined}
             onClick={() => confirm(`Eliminare il dominio "${a.name}"?`) && run(() => api("DELETE", "/api/areas", { slug: a.slug }))}>
             Elimina
           </button>

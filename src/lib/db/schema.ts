@@ -33,6 +33,18 @@ export const areas = sqliteTable("areas", {
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
+/**
+ * Note della quick capture. Al più uno tra `domain` (slug di `areas`) e `courseId`
+ * (`domains.id`, anche un macro); nessuno dei due = inbox. Niente FK: valida lib/notes.ts.
+ */
+export const notes = sqliteTable("notes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  content: text("content").notNull(),
+  domain: text("domain"),
+  courseId: integer("course_id"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 /** Materiale ingerito: PDF, trascrizione, HTML, video. */
 export const documents = sqliteTable("documents", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -86,6 +98,7 @@ export const sessions = sqliteTable("sessions", {
   mode: text("mode").notNull().default("socratic"), // socratic | quiz | review
   state: text("state", { mode: "json" }),           // stato serializzato della macchina a stati
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()), // ultimo turno salvato (home: «ultimi corsi studiati»)
 });
 
 /**
