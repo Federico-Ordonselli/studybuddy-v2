@@ -109,14 +109,14 @@ test("parseArgs: --from di default da DB_PATH, argomenti obbligatori e sconosciu
 
 test("SIGINT: exit 130, niente file di lavoro, niente target, originali intatti", async () => {
   const before = originals();
-  // sorgente grosso (~200 MB): il backup dura abbastanza da poter interrompere a metà, senza sleep nel codice di produzione
+  // sorgente da ~32 MB: il backup (100 pagine per passo) dura abbastanza da poter interrompere
+  // a metà, senza sleep nel codice di produzione. Journal DELETE: niente WAL grosso su tmpfs.
   const big = path.join(work, "grosso.db");
   const bdb = new Database(big);
-  bdb.pragma("journal_mode = WAL");
   for (const sql of SCHEMA_SQL) bdb.exec(sql);
   bdb.exec("CREATE TABLE ballast (b BLOB)");
-  const ins = bdb.prepare("INSERT INTO ballast VALUES (randomblob(1048576))");
-  bdb.transaction(() => { for (let i = 0; i < 200; i++) ins.run(); })();
+  const ins = bdb.prepare("INSERT INTO ballast VALUES (zeroblob(1048576))");
+  bdb.transaction(() => { for (let i = 0; i < 32; i++) ins.run(); })();
   bdb.close();
   const fresh = path.join(work, "sigint", "nuovo.db");
   const dir = path.dirname(fresh);
