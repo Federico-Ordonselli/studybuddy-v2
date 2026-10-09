@@ -6,7 +6,7 @@ import { api } from "@/lib/client/api";
 import type { Library } from "@/lib/library";
 import AreaInput from "./AreaInput";
 
-/** Menu "⋯" di una card: rinomina, aree, sposta in macro / rendi sciolto, elimina macro. */
+/** Menu "⋯" di una card: rinomina, domini, sposta in macro / rendi sciolto, elimina macro. */
 export default function DomainMenu(p: {
   id: number; kind: "macro" | "course"; name: string; areas: string[]; parentId: number | null; library: Library;
 }) {
@@ -24,7 +24,7 @@ export default function DomainMenu(p: {
     finally { setBusy(false); }
   }
   const patch = (body: Record<string, unknown>) => run(() => api("PATCH", "/api/library", { id: p.id, ...body }));
-  const showAreas = p.kind === "macro" || p.parentId == null; // le aree valgono per macro e corsi sciolti
+  const showAreas = p.kind === "macro" || p.parentId == null; // i domini valgono per macro e corsi sciolti
 
   return (
     <div className="relative">
@@ -40,9 +40,9 @@ export default function DomainMenu(p: {
           </label>
           {showAreas && (
             <div className="flex flex-col gap-1">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-fg-dim">Aree</span>
-              <AreaInput value={areas} onChange={setAreas} suggestions={p.library.areas} />
-              <button disabled={busy} onClick={() => patch({ areas })} className="self-end text-accent">Salva aree</button>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-fg-dim">Domini</span>
+              <AreaInput value={areas} onChange={setAreas} areas={p.library.areas} />
+              <button disabled={busy} onClick={() => patch({ areas })} className="self-end text-accent">Salva domini</button>
             </div>
           )}
           {p.kind === "course" && (

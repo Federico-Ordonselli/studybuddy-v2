@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AreaInput from "@/components/library/AreaInput";
+import type { Area } from "@/lib/areas";
 import { groupIntoNewMacro, type IngestPlan, type ItemAnalysis, type PlanCourse, type PlanParent } from "@/lib/ingestPlanTypes";
 
 const STATUS: Record<PlanCourse["status"], string> = { new: "nuovo", upToDate: "aggiornato", changed: "" };
@@ -21,7 +22,7 @@ export default function PlanEditor(p: {
   plan: IngestPlan;
   setPlan: (plan: IngestPlan) => void;
   existingMacros: { id: number; name: string }[];
-  areaSuggestions: string[];
+  areas: Area[];
   onToggleKind: (itemPath: string, as: "macro" | "course") => void;
   onImport: () => void;
   busy: boolean;
@@ -64,7 +65,7 @@ export default function PlanEditor(p: {
         <option value="">nessun macro</option>
         {parentOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      {c.parent == null && <AreaInput value={c.areas} onChange={(areas) => updCourse(c.path, { areas })} suggestions={p.areaSuggestions} />}
+      {c.parent == null && <AreaInput value={c.areas} onChange={(areas) => updCourse(c.path, { areas })} areas={p.areas} />}
     </div>
   );
 
@@ -81,7 +82,7 @@ export default function PlanEditor(p: {
                   <span className="text-[10px] uppercase tracking-[0.25em] text-fg-dim">Macro</span>
                   <input value={macro.name} onChange={(e) => updMacro(macro.key, { name: e.target.value })}
                     className="font-display text-lg bg-transparent border-b border-transparent hover:border-border focus:border-accent outline-none min-w-0" />
-                  <AreaInput value={macro.areas} onChange={(areas) => updMacro(macro.key, { areas })} suggestions={p.areaSuggestions} />
+                  <AreaInput value={macro.areas} onChange={(areas) => updMacro(macro.key, { areas })} areas={p.areas} />
                 </div>
               ) : (
                 <span className="text-[10px] uppercase tracking-[0.25em] text-fg-dim">Corso singolo</span>
@@ -104,7 +105,7 @@ export default function PlanEditor(p: {
                 <span className="text-[10px] uppercase tracking-[0.25em] text-fg-dim">Nuovo macro</span>
                 <input value={g.name} onChange={(e) => updMacro(g.key, { name: e.target.value })} aria-label="Nome del nuovo macro"
                   className="font-display text-lg bg-transparent border-b border-transparent hover:border-border focus:border-accent outline-none min-w-0" />
-                <AreaInput value={g.areas} onChange={(areas) => updMacro(g.key, { areas })} suggestions={p.areaSuggestions} />
+                <AreaInput value={g.areas} onChange={(areas) => updMacro(g.key, { areas })} areas={p.areas} />
               </div>
               <button onClick={() => ungroup(g.key)} className="text-xs text-fg-dim hover:text-fg underline">sciogli</button>
             </div>
