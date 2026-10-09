@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getLibrary, getTrail } from "@/lib/library";
 import StudyShell, { type StudyTree } from "@/components/study/StudyShell";
+import { listForCourse } from "@/lib/notes";
 import { parseMode } from "@/components/study/modes";
 
 export const dynamic = "force-dynamic";
@@ -22,5 +23,5 @@ export default async function StudyPage({
     macros: lib.macros.map((m) => ({ id: m.id, name: m.name, courses: m.courses.map(({ id, name }) => ({ id, name })) })),
     loose: lib.loose.map(({ id, name }) => ({ id, name })),
   };
-  return <StudyShell key={trail.id} trail={trail} tree={tree} mode={parseMode(mode)} />;
+  return <StudyShell key={trail.id} trail={trail} tree={tree} mode={parseMode(mode)} notes={listForCourse(trail.id)} />;
 }

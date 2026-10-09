@@ -124,3 +124,9 @@ test("elimina con note: rifiutato (dice quante), listAreas conta le note; sposta
   A.deleteArea(a.slug);
   assert.equal(A.listAreas().some((x) => x.slug === a.slug), false);
 });
+
+test("findArea: trovato o undefined", () => {
+  const a = A.createArea({ name: "Da cercare" });
+  assert.equal(A.findArea(a.slug)?.name, "Da cercare");
+  assert.equal(A.findArea("non-esiste"), undefined);
+});

@@ -32,6 +32,11 @@ function get(slug: string): Area {
   return a;
 }
 
+/** Il dominio con questo slug, o undefined (pagine: notFound). */
+export function findArea(slug: string): Area | undefined {
+  return sqlite.prepare(`SELECT ${COLS} FROM areas a WHERE a.slug = ?`).get(slug) as Area | undefined;
+}
+
 // --- validazione ---------------------------------------------------------------
 
 function cleanName(v: unknown): string {
