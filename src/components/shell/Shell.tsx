@@ -41,6 +41,17 @@ export default function Shell({ data, children }: { data: ShellData; children: R
     return () => { window.removeEventListener("keydown", onKey); window.removeEventListener(CAPTURE_EVENT, onOpen); };
   }, []);
 
+  // Esc chiude il pannello appunto o il drawer da qualsiasi punto (non solo dal campo di testo)
+  useEffect(() => {
+    if (!capture && !drawer) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (capture) setCapture(false); else setDrawer(false);
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [capture, drawer]);
+
   const openCapture = () => { setDrawer(false); setCapture(true); };
 
   return (

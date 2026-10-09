@@ -15,7 +15,8 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // dati letti a ogni richiesta (le pagine sono dinamiche): router.refresh() aggiorna anche i badge
+  // I dati della shell si rileggono a ogni richiesta e a ogni router.refresh(), NON a ogni navigazione client
+  // (il layout condiviso non viene rifetchato): chi cambia carte o note deve chiamare router.refresh().
   return (
     <html lang="it">
       <body>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { post } from "@/lib/client/api";
 import { S } from "./styles";
@@ -7,6 +8,7 @@ import type { ReviewCard, ReviewResult } from "./types";
 
 /** Ripasso SM-2: coda delle carte in scadenza (figli inclusi se è un macro) + generazione carte. */
 export default function ReviewView({ domainId }: { domainId: number }) {
+  const router = useRouter();
   const [due, setDue] = useState(0);
   const [card, setCard] = useState<ReviewCard | null>(null);
   const [answer, setAnswer] = useState("");
@@ -24,12 +26,13 @@ export default function ReviewView({ domainId }: { domainId: number }) {
     if (!domainId || !genTopic.trim() || busy) return;
     setBusy(true);
     try {
-      await fetch("/api/cards", {
+      const res = await fetch("/api/cards", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domainId, topic: genTopic.trim(), n: 5 }),
       });
       setGenTopic("");
       await loadDue(domainId);
+      if (res.ok) router.refresh(); // aggiorna i badge della sidebar
     } finally { setBusy(false); }
   }
 
@@ -39,6 +42,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
     try {
       const r = await post<ReviewResult>("/api/review", { cardId: card.id, answer: answer.trim(), domainId });
       setResult(r); setDue(r.remaining);
+      router.refresh(); // aggiorna i badge della sidebar
     } catch (e) {
       setResult({ grade: { quality: 0, correct: false, feedback: `Errore: ${e}` }, expected: "", intervalDays: 0, dueAt: 0, remaining: due });
     } finally { setBusy(false); }
