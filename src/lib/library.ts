@@ -1,16 +1,18 @@
 import { sqlite } from "@/lib/db";
 import { LibraryError } from "@/lib/errors";
+import { assertAreasExist, listAreas, type AreaInfo } from "@/lib/areas";
+import { SLUG_RE } from "@/lib/slug";
 
 /**
  * Libreria: lettura dei domini per la UI e organizzazione manuale (rinomina, aree,
- * sposta in macro). Gerarchia a 2 livelli: macro → corsi. Le aree sono solo layout.
+ * sposta in macro). Gerarchia a 2 livelli: macro → corsi. I domini (`areas`, slug) sono solo organizzazione.
  * Ogni mutazione valida gli invarianti e lancia `LibraryError` (status HTTP incluso).
  */
 export { LibraryError };
 
 export interface CourseNode { id: number; name: string; path: string | null; areas: string[]; docs: number; due: number }
 export interface MacroNode { id: number; name: string; path: string | null; areas: string[]; docs: number; due: number; courses: CourseNode[] }
-export interface Library { macros: MacroNode[]; loose: CourseNode[]; areas: string[] }
+export interface Library { macros: MacroNode[]; loose: CourseNode[]; areas: AreaInfo[] }
 export interface Trail {
   id: number;
   name: string;
@@ -56,8 +58,7 @@ export function getLibrary(): Library {
   const macroIds = new Set(macros.map((m) => m.id));
   // genitore sparito o non-macro: il corso si mostra sciolto invece di sparire
   const loose = all.filter((r) => r.kind !== "macro" && (r.parentId == null || !macroIds.has(r.parentId))).map(course);
-  const areas = [...new Set([...macros, ...loose].flatMap((x) => x.areas))].sort((a, b) => a.localeCompare(b));
-  return { macros, loose, areas };
+  return { macros, loose, areas: listAreas() };
 }
 
 export function getTrail(id: number): Trail | null {
@@ -80,19 +81,27 @@ export function cleanName(name: unknown): string {
   return n;
 }
 
-/** Stringhe non vuote, max 40 caratteri, dedup case-insensitive, max 10 aree. */
+/**
+ * Slug dei domini di un corso/macro: formato [a-z0-9-], dedup, max 10. Puro (lo usa
+ * anche parsePlan, che non tocca il DB): che esistano lo controllano le mutazioni.
+ */
 export function normalizeAreas(areas: unknown): string[] {
-  if (!Array.isArray(areas)) throw new LibraryError("aree non valide");
+  if (!Array.isArray(areas)) throw new LibraryError("domini non validi");
   const out: string[] = [];
-  const seen = new Set<string>();
   for (const a of areas) {
-    if (typeof a !== "string") continue;
-    const t = a.trim().replace(/\s+/g, " ");
-    if (!t || t.length > 40 || seen.has(t.toLowerCase())) continue;
-    seen.add(t.toLowerCase());
-    out.push(t);
+    if (typeof a !== "string") throw new LibraryError("domini non validi");
+    const s = a.trim();
+    if (!SLUG_RE.test(s)) throw new LibraryError(`dominio non valido: «${s}» (serve lo slug)`);
+    if (!out.includes(s)) out.push(s);
   }
   return out.slice(0, 10);
+}
+
+/** Domini da salvare su un corso/macro: formato valido ed esistenti. */
+function knownAreas(areas: unknown): string[] {
+  const slugs = normalizeAreas(areas);
+  assertAreasExist(slugs);
+  return slugs;
 }
 
 interface DomainRow { id: number; kind: string; parentId: number | null }
@@ -124,7 +133,7 @@ export function updateDomain(id: number, patch: { name?: unknown; areas?: unknow
   const sets: string[] = [];
   const vals: unknown[] = [];
   if (patch.name !== undefined) { sets.push("name = ?"); vals.push(cleanName(patch.name)); }
-  if (patch.areas !== undefined) { sets.push("areas = ?"); vals.push(JSON.stringify(normalizeAreas(patch.areas))); }
+  if (patch.areas !== undefined) { sets.push("areas = ?"); vals.push(JSON.stringify(knownAreas(patch.areas))); }
   if (patch.parentId !== undefined) {
     const pid = patch.parentId === null ? null : Number(patch.parentId);
     if (pid !== null && !Number.isInteger(pid)) throw new LibraryError("parentId non valido");
@@ -138,7 +147,7 @@ export function updateDomain(id: number, patch: { name?: unknown; areas?: unknow
 
 export function createMacro(name: unknown, areas: unknown = [], courseIds: unknown = [], path: string | null = null): number {
   const n = cleanName(name);
-  const a = normalizeAreas(areas);
+  const a = knownAreas(areas);
   if (!Array.isArray(courseIds)) throw new LibraryError("courseIds non valido");
   return sqlite.transaction(() => {
     const id = Number(
@@ -158,7 +167,7 @@ export function createCourse(name: unknown, path: string, parentId: number | nul
   checkParent("course", parentId);
   return Number(
     sqlite.prepare("INSERT INTO domains (name, kind, parent_id, path, areas, created_at) VALUES (?, 'course', ?, ?, ?, ?)")
-      .run(cleanName(name), parentId, path, JSON.stringify(normalizeAreas(areas)), nowSec()).lastInsertRowid
+      .run(cleanName(name), parentId, path, JSON.stringify(knownAreas(areas)), nowSec()).lastInsertRowid
   );
 }
 

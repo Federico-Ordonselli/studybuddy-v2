@@ -78,7 +78,8 @@ test("analyzeFolder con as: forza macro su un corso singolo", async () => {
 
 test("stato: aggiornato dopo la registrazione degli hash, poi modificato", async () => {
   const dir = path.join(lib, "Corso dell'Arte è");
-  const id = L.createCourse("Arte", dir, null, ["Arte"]);
+  (await import("@/lib/areas")).createArea({ name: "Arte" });
+  const id = L.createCourse("Arte", dir, null, ["arte"]);
   for (const w of C.selectWork(await C.walk(dir), false)) {
     sqlite.prepare("INSERT INTO ingested_files (domain_id, source, file_hash) VALUES (?, ?, ?)").run(id, w.file, C.fileHashOf(fs.readFileSync(w.file)));
   }
@@ -86,7 +87,7 @@ test("stato: aggiornato dopo la registrazione degli hash, poi modificato", async
   assert.equal(c.status, "upToDate");
   assert.equal(c.existingId, id);
   assert.equal(c.name, "Arte");            // nome dal DB, non dalla cartella
-  assert.deepEqual(c.areas, ["Arte"]);
+  assert.deepEqual(c.areas, ["arte"]);
   fs.writeFileSync(path.join(dir, "01_m/z.srt"), "1\n00:00:01,000 --> 00:00:02,000\nmodificato\n");
   c = (await P.analyzeFolder(dir))!.courses[0];
   assert.equal(c.status, "changed");

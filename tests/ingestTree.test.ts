@@ -21,6 +21,8 @@ before(async () => {
   T = await import("@/lib/ingestPlanTypes");
   L = await import("@/lib/library");
   J = await import("@/lib/jobs");
+  const A = await import("@/lib/areas");
+  for (const name of ["Web", "A", "B", "Area vecchia", "Altra"]) A.createArea({ name });
   lib = path.join(dir, "libreria");
   makeTree(lib, {
     "Spec Beta/Corso-a/01_m/a.srt": "1\n00:00:01,000 --> 00:00:02,000\na\n",
@@ -49,7 +51,7 @@ test("applyPlan: crea macro + corsi; re-import dopo spostamento manuale non disf
 
   // organizzazione manuale
   const altro = L.createMacro("Altro");
-  L.updateDomain(a.id, { parentId: altro, name: "Rinominato", areas: ["Web"] });
+  L.updateDomain(a.id, { parentId: altro, name: "Rinominato", areas: ["web"] });
 
   // re-analisi + piano proposto + applicazione
   const again = T.defaultPlan([(await P.analyzeFolder(spec))!]);
@@ -58,7 +60,7 @@ test("applyPlan: crea macro + corsi; re-import dopo spostamento manuale non disf
   const a2 = L.findByPath(path.join(spec, "Corso-a"))!;
   assert.equal(a2.parentId, altro);
   assert.equal(a2.name, "Rinominato");
-  assert.deepEqual(a2.areas, ["Web"]);
+  assert.deepEqual(a2.areas, ["web"]);
 });
 
 test("applyPlan: macroKey sconosciuta ⇒ errore e nessuna modifica", () => {
@@ -79,26 +81,26 @@ const course = (p: string, parent: unknown = null, include = true) =>
   ({ path: p, name: path.basename(p), areas: [], parent, include, status: "new", changedFiles: 0, videosWithoutSubs: 0, counts: {} });
 
 test("applyPlan: piano senza corsi inclusi ⇒ rifiutato senza scrivere nel DB", () => {
-  const m = L.createMacro("Intatto", ["A"]);
+  const m = L.createMacro("Intatto", ["a"]);
   const solo = path.join(lib, "Solo");
   const plan = {
-    macros: [{ key: "x", existingId: m, name: "Cambiato", path: null, areas: ["B"] }, { key: "n", name: "Nuovo", path: null, areas: [] }],
+    macros: [{ key: "x", existingId: m, name: "Cambiato", path: null, areas: ["b"] }, { key: "n", name: "Nuovo", path: null, areas: [] }],
     courses: [course(solo, { macroKey: "n" }, false)],
     whisper: false,
   };
   assert.throws(() => I.applyPlan(I.parsePlan(plan)), (e: unknown) => e instanceof L.LibraryError && e.status === 400);
   const d = L.getLibrary().macros.find((x) => x.id === m)!;
   assert.equal(d.name, "Intatto");
-  assert.deepEqual(d.areas, ["A"]);
+  assert.deepEqual(d.areas, ["a"]);
   assert.equal(L.getLibrary().macros.some((x) => x.name === "Nuovo"), false);
   assert.equal(L.findByPath(solo), undefined);
 });
 
 test("applyPlan: un macro esistente che nessun corso incluso usa non viene sovrascritto", () => {
-  const m = L.createMacro("Vecchio nome", ["Area vecchia"]);
+  const m = L.createMacro("Vecchio nome", ["area-vecchia"]);
   const solo = path.join(lib, "Solo");
   const plan = {
-    macros: [{ key: "x", existingId: m, name: "Scheda vecchia", path: null, areas: ["Altra"] }],
+    macros: [{ key: "x", existingId: m, name: "Scheda vecchia", path: null, areas: ["altra"] }],
     courses: [course(solo)],
     whisper: false,
   };
@@ -106,7 +108,7 @@ test("applyPlan: un macro esistente che nessun corso incluso usa non viene sovra
   assert.equal(steps.length, 1);
   const d = L.getLibrary().macros.find((x) => x.id === m)!;
   assert.equal(d.name, "Vecchio nome");
-  assert.deepEqual(d.areas, ["Area vecchia"]);
+  assert.deepEqual(d.areas, ["area-vecchia"]);
 
   // usato da un corso incluso ⇒ il piano vale
   const used = { ...plan, courses: [course(solo, { existingId: m })] };
@@ -141,4 +143,17 @@ test("activeJob: c'è un solo job attivo alla volta", () => {
   assert.equal(J.activeJob()?.id, j.id);
   j.status = "done";
   assert.equal(J.activeJob(), undefined);
+});
+
+test("applyPlan: slug sconosciuto nel piano (dominio eliminato nel frattempo) ⇒ errore, niente scritto", () => {
+  const solo = path.join(lib, "Solo");
+  const before = L.findByPath(solo);
+  const plan = { macros: [], courses: [{ ...course(solo), areas: ["eliminato-ieri"] }], whisper: false };
+  assert.throws(() => I.applyPlan(I.parsePlan(plan)), (e: unknown) => e instanceof L.LibraryError && /eliminato-ieri/.test((e as Error).message));
+  assert.deepEqual(L.findByPath(solo), before);
+});
+
+test("parsePlan: un nome al posto di uno slug ⇒ errore leggibile", () => {
+  const plan = { macros: [], courses: [{ ...course(path.join(lib, "Solo")), areas: ["Sviluppo Web"] }], whisper: false };
+  assert.throws(() => I.parsePlan(plan), (e: unknown) => e instanceof L.LibraryError && e.status === 400);
 });
