@@ -1,15 +1,15 @@
 "use client";
 
 import { useId, useState } from "react";
-import { api } from "@/lib/client/api";
-import type { Area } from "@/lib/areas";
+import { api, ApiError } from "@/lib/client/api";
+import type { Area, AreaInfo } from "@/lib/areas";
 
 /**
  * Chip dei domini di un corso/macro. `value` sono slug; si mostrano simbolo e nome.
  * Invio o virgola: un nome esistente (a meno delle maiuscole) aggiunge quel dominio,
  * un nome nuovo lo crea (POST /api/areas). L'uscita dal campo aggiunge solo domini esistenti.
  */
-export default function AreaInput({ value, onChange, areas }: { value: string[]; onChange: (v: string[]) => void; areas: Area[] }) {
+export default function AreaInput({ value, onChange, areas, onCreated }: { value: string[]; onChange: (v: string[]) => void; areas: Area[]; onCreated?: (a: Area) => void }) {
   const [text, setText] = useState("");
   const [created, setCreated] = useState<Area[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -29,9 +29,16 @@ export default function AreaInput({ value, onChange, areas }: { value: string[];
       try {
         a = (await api<{ area: Area }>("POST", "/api/areas", { name: t })).area;
         setCreated((c) => [...c, a!]);
+        onCreated?.(a);
       } catch (e) {
-        setErr((e as Error).message);
-        return;
+        // creato altrove (un'altra riga, un'altra scheda): lo si ritrova per nome
+        const existing = e instanceof ApiError && e.status === 409
+          ? (await api<AreaInfo[]>("GET", "/api/areas").catch(() => [])).find((x) => x.name.toLowerCase() === t.toLowerCase())
+          : undefined;
+        if (!existing) { setErr((e as Error).message); return; }
+        a = existing;
+        setCreated((c) => [...c, a!]);
+        onCreated?.(a);
       }
     }
     if (!value.includes(a.slug)) onChange([...value, a.slug]);

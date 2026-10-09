@@ -8,8 +8,8 @@ import { MODULES } from "@/lib/modules";
 
 const input = "bg-surface-2 border border-border rounded px-2 py-1 text-sm";
 
-function Row({ a, first, last, onMove, run }: {
-  a: AreaInfo; first: boolean; last: boolean; onMove: (dir: -1 | 1) => void; run: (fn: () => Promise<unknown>) => Promise<boolean>;
+function Row({ a, first, last, busy, onMove, run }: {
+  a: AreaInfo; busy: boolean; first: boolean; last: boolean; onMove: (dir: -1 | 1) => void; run: (fn: () => Promise<unknown>) => Promise<boolean>;
 }) {
   const [name, setName] = useState(a.name);
   const [symbol, setSymbol] = useState(a.symbol);
@@ -24,8 +24,8 @@ function Row({ a, first, last, onMove, run }: {
         <input value={symbol} onChange={(e) => setSymbol(e.target.value)} aria-label="Simbolo" className={`${input} w-12 text-center`} />
         <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Nome" className={`${input} flex-1 min-w-40 font-display`} />
         <span className="text-xs text-fg-dim tabular">{a.courses} {a.courses === 1 ? "corso" : "corsi"}</span>
-        <button disabled={first} onClick={() => onMove(-1)} className="text-fg-dim hover:text-fg px-1" aria-label={`Sposta su ${a.name}`}>↑</button>
-        <button disabled={last} onClick={() => onMove(1)} className="text-fg-dim hover:text-fg px-1" aria-label={`Sposta giù ${a.name}`}>↓</button>
+        <button disabled={busy || first} onClick={() => onMove(-1)} className="text-fg-dim hover:text-fg px-1" aria-label={`Sposta su ${a.name}`}>↑</button>
+        <button disabled={busy || last} onClick={() => onMove(1)} className="text-fg-dim hover:text-fg px-1" aria-label={`Sposta giù ${a.name}`}>↓</button>
       </div>
       <input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="Tagline (facoltativa)" aria-label="Tagline" className={input} />
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -37,12 +37,13 @@ function Row({ a, first, last, onMove, run }: {
               {modules.map(([k, m]) => <option key={k} value={k}>{m.title}</option>)}
             </select>
           )}
-          <button disabled={!dirty} className="text-accent"
+          <button disabled={busy || !dirty} className="text-accent"
             onClick={() => run(() => api("PATCH", "/api/areas", { slug: a.slug, name, symbol, tagline, module: module || null }))}>
             Salva
           </button>
-          <button className="text-danger"
-            onClick={() => confirm(`Eliminare il dominio "${a.name}"? Nessun corso viene toccato.`) && run(() => api("DELETE", "/api/areas", { slug: a.slug }))}>
+          <button disabled={busy || a.courses > 0} className="text-danger"
+            title={a.courses > 0 ? `Usato da ${a.courses} ${a.courses === 1 ? "corso" : "corsi"}: toglilo prima dai corsi` : undefined}
+            onClick={() => confirm(`Eliminare il dominio "${a.name}"?`) && run(() => api("DELETE", "/api/areas", { slug: a.slug }))}>
             Elimina
           </button>
         </div>
@@ -86,7 +87,7 @@ export default function AreasManager({ areas }: { areas: AreaInfo[] }) {
       <ul className="flex flex-col gap-2">
         {areas.map((a, i) => (
           // key con i campi: dopo router.refresh() la riga riparte dai valori salvati
-          <Row key={`${a.slug}:${a.name}:${a.symbol}:${a.tagline}:${a.module}`} a={a} first={i === 0} last={i === areas.length - 1}
+          <Row key={`${a.slug}:${a.name}:${a.symbol}:${a.tagline}:${a.module}`} a={a} first={i === 0} last={i === areas.length - 1} busy={busy}
             onMove={(dir) => move(i, dir)} run={run} />
         ))}
       </ul>
