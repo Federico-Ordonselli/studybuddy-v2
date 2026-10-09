@@ -3,6 +3,7 @@ import * as sqliteVec from "sqlite-vec";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import { EMBED_DIM } from "@/lib/config";
+import { SCHEMA_SQL } from "./schemaSql";
 
 const path = process.env.DB_PATH ?? "studybuddy.db";
 
@@ -13,9 +14,26 @@ sqliteVec.load(sqlite);
 export const db = drizzle(sqlite, { schema });
 
 /**
+ * DB nuovo (nessuna tabella): crea lo schema Drizzle da `schemaSql.ts`, così il primo
+ * avvio funziona anche dove drizzle-kit non c'è (Docker). Su un DB che ha già tabelle
+ * non fa nulla: le aggiunte successive le fanno le `ensure*Schema()`.
+ */
+export function initSchema() {
+  const tables = () => (sqlite.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type = 'table'").get() as { n: number }).n;
+  // Caso comune (DB con tabelle): una lettura, nessun lock di scrittura.
+  if (tables() > 0) return;
+  // DB vuoto: ricontrollo e creazione nella stessa transazione IMMEDIATE, perché `next build`
+  // apre il DB da più worker in parallelo e su un file nuovo il primo check corre.
+  sqlite.transaction(() => {
+    if (tables() > 0) return;
+    for (const stmt of SCHEMA_SQL) sqlite.exec(stmt);
+  }).immediate();
+}
+
+/**
  * Aggiorna un DB già esistente alle aggiunte della Libreria (`domains.areas`,
  * `ingested_files`) senza `db:push`, che non conosce vec_chunks/chunks_fts.
- * Idempotente; su un DB vuoto non fa nulla (lo schema lo crea drizzle).
+ * Idempotente; su un DB nuovo non serve (lo schema completo lo crea `initSchema()`).
  */
 export function ensureLibrarySchema() {
   const cols = sqlite.prepare("PRAGMA table_info(domains)").all() as { name: string }[];
@@ -30,6 +48,7 @@ export function ensureLibrarySchema() {
     PRIMARY KEY (domain_id, source)
   )`);
 }
+initSchema();
 ensureLibrarySchema();
 
 /** Crea la virtual table degli embedding. Idempotente. */

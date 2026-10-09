@@ -1,0 +1,33 @@
+# StudyBuddy in Docker con GPU. Ollama gira sull'host (network_mode: host).
+#   mkdir -p data && cp .env.example .env   # imposta COURSES_DIR
+#   docker compose up -d --build            → http://localhost:3000
+# Senza GPU: docker compose -f docker-compose.yml -f compose.cpu.yaml up -d --build
+services:
+  studybuddy:
+    build: .
+    image: studybuddy:local
+    container_name: studybuddy
+    restart: unless-stopped
+    user: "${STUDYBUDDY_UID:-1000}:${STUDYBUDDY_GID:-1000}"
+    network_mode: host
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_PATH: /app/data/studybuddy.db
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
+      # i corsi stanno allo stesso percorso dell'host: i percorsi già nel DB restano validi
+      STUDYBUDDY_LIBRARY_DIR: ${COURSES_DIR:?imposta COURSES_DIR in .env (percorso assoluto della cartella dei corsi)}
+      STUDYBUDDY_FS_ROOT: ${COURSES_DIR}
+      HOST: ${STUDYBUDDY_HOST:-127.0.0.1}
+      PORT: ${STUDYBUDDY_PORT:-3000}
+    volumes:
+      - ./data:/app/data
+      - ${COURSES_DIR}:${COURSES_DIR}:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -1,0 +1,4 @@
+# Override senza GPU: reranker e Whisper ripiegano da soli su CPU.
+services:
+  studybuddy:
+    deploy: !reset {}

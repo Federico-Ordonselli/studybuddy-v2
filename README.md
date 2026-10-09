@@ -88,20 +88,35 @@ ollama pull qwen3-embedding:0.6b
 
 npm install
 echo "DB_PATH=studybuddy.db" > .env.local
-DB_PATH=studybuddy.db npx tsx scripts/create-db.ts   # new database with the schema
-npm run dev                                          # http://localhost:3000
+npm run dev                                          # http://localhost:3000 (a new database is created on first start)
 ```
 
 The reranker model downloads into `.models/` on first use. The vector and full-text tables (`sqlite-vec`, FTS5) are created by the app, so don't run `drizzle-kit push` on a database that already has data: they aren't part of the Drizzle schema.
 
-**Optional GPU reranking.** `onnxruntime-node` is built against CUDA 12. If your system has a different CUDA version, install the CUDA 12 runtime libraries into a project venv. `npm run dev` adds them to `LD_LIBRARY_PATH` through `scripts/with-cuda.sh`:
+**GPU reranking** uses `onnxruntime-node` 1.30, which runs on the system CUDA 13 libraries. Without a usable GPU it falls back to CPU.
+
+**Optional Whisper fallback** for videos without subtitles: `.venv/bin/pip install faster-whisper`, plus the CUDA 12 libraries for GPU transcription (whisper.cpp and openai-whisper are auto-detected too):
 
 ```bash
 python -m venv .venv
-.venv/bin/pip install nvidia-cublas-cu12 nvidia-cuda-runtime-cu12 nvidia-cufft-cu12
+.venv/bin/pip install faster-whisper nvidia-cublas-cu12 nvidia-cudnn-cu12
 ```
 
-**Optional Whisper fallback** for videos without subtitles: `.venv/bin/pip install faster-whisper` (whisper.cpp and openai-whisper are auto-detected too).
+The CUDA 12 libraries in `.venv` are added to `LD_LIBRARY_PATH` of the Whisper subprocess only (`src/lib/transcribe.ts`), never of the Node process: the reranker keeps using the system CUDA 13 and cuDNN. Without them Whisper falls back to CPU; the reranker still uses the GPU.
+
+## Run with Docker (GPU)
+
+Requirements: Docker with the NVIDIA Container Toolkit, and [Ollama](https://ollama.com) running on the host with the models in `src/lib/config.ts` pulled.
+
+```bash
+mkdir -p data
+cp .env.example .env        # set COURSES_DIR to the absolute path of your courses folder
+docker compose up -d --build
+```
+
+Open http://localhost:3000. Courses are mounted read-only at the same path as on the host; the database and model caches live in `./data`. Check the setup at http://localhost:3000/api/health (`?warm=1` loads the reranker, runs one test inference and reports `cuda` or `cpu`). Set `STUDYBUDDY_PORT` / `STUDYBUDDY_HOST` in `.env` to change the port or bind address.
+
+No GPU: `docker compose -f docker-compose.yml -f compose.cpu.yaml up -d --build` (reranker and Whisper fall back to CPU).
 
 ## Adding courses
 

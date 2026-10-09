@@ -1,7 +1,9 @@
 import { ollama as cfg } from "@/lib/config";
 import type { LLMProvider, GenerateOptions } from "./types";
 
-const BASE = () => process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
+/** URL di Ollama (letto a ogni chiamata: i test e Docker lo cambiano via env). */
+export const ollamaBaseUrl = () => process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
+const BASE = ollamaBaseUrl;
 
 export const ollamaProvider: LLMProvider = {
   name: "ollama",

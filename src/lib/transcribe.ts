@@ -20,12 +20,34 @@ function pythonBin(): string {
   return fs.existsSync(venv) ? venv : "python3";
 }
 
+/**
+ * Env dei processi Python di Whisper: le lib CUDA 12 + cuDNN 9 dei pacchetti pip
+ * `nvidia-*-cu12` della .venv in testa a LD_LIBRARY_PATH. Solo nel processo figlio:
+ * Node (onnxruntime-node, reranker) usa CUDA 13 di sistema e con queste lib davanti
+ * caricherebbe il `libcudnn.so.9` sbagliato. Senza .venv l'env resta quello di prima.
+ */
+export function whisperEnv(
+  root = path.resolve(/* turbopackIgnore: true */ process.cwd()),
+  base: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const ls = (dir: string) => { try { return fs.readdirSync(dir).sort(); } catch { return []; } };
+  const venvLib = path.join(root, ".venv", "lib");
+  const libs = ls(venvLib)
+    .filter((py) => py.startsWith("python"))
+    .flatMap((py) => {
+      const nvidia = path.join(venvLib, py, "site-packages", "nvidia");
+      return ls(nvidia).map((pkg) => path.join(nvidia, pkg, "lib")).filter((d) => fs.existsSync(d));
+    });
+  if (!libs.length) return base;
+  return { ...base, LD_LIBRARY_PATH: [...libs, base.LD_LIBRARY_PATH].filter(Boolean).join(":") };
+}
+
 function has(bin: string): boolean {
   return spawnSync("sh", ["-c", `command -v ${bin}`], { stdio: "ignore" }).status === 0;
 }
 
 function hasFasterWhisper(): boolean {
-  return spawnSync(pythonBin(), ["-c", "import faster_whisper"], { stdio: "ignore" }).status === 0;
+  return spawnSync(pythonBin(), ["-c", "import faster_whisper"], { stdio: "ignore", env: whisperEnv() }).status === 0;
 }
 
 type Backend = "faster-whisper" | "whisper.cpp" | "openai-whisper";
@@ -62,7 +84,7 @@ export function transcribeToSrt(video: string): string | null {
 
 function fasterWhisper(video: string): string | null {
   const args = [SIDECAR, video, cfg.model, cfg.language ?? ""];
-  const r = spawnSync(pythonBin(), args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync(pythonBin(), args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: whisperEnv() });
   if (r.status !== 0) throw new Error(r.stderr?.trim() || `exit ${r.status}`);
   return r.stdout?.includes("-->") ? r.stdout : null;
 }

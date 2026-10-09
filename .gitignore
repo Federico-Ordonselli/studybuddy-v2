@@ -11,6 +11,9 @@ out/
 *.db-wal
 *.db-shm
 
+# dati del container (DB, modelli, backup): mai nel repo
+data/
+
 # runtime del launcher (pid + log)
 .run/
 
