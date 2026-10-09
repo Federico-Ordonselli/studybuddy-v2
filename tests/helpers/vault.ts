@@ -61,6 +61,25 @@ export function makeFakeVault(opts: {
   return { dir, files: [file, `${file}-wal`, `${file}-shm`], close: () => db.close() };
 }
 
+/**
+ * Copia di un vault finto «fermo» (app spenta): stessi file, dati ancora nel WAL e nessuna
+ * connessione viva. Il vault finto vivo tiene aperta la connessione, e SQLite fa il
+ * checkpoint solo alla chiusura dell'ultima: senza questa copia il test sull'originale non
+ * discriminerebbe.
+ */
+export function stoppedVaultCopy(liveDir: string): { dir: string; files: string[] } {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sb-stopped-"));
+  fs.mkdirSync(path.join(dir, "src", "lib"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "data"));
+  fs.copyFileSync(path.join(liveDir, "src", "lib", "domains.ts"), path.join(dir, "src", "lib", "domains.ts"));
+  const rels = ["data/vault.db", "data/vault.db-wal", "data/vault.db-shm"];
+  for (const rel of rels) {
+    const src = path.join(liveDir, rel);
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, rel));
+  }
+  return { dir, files: rels.map((rel) => path.join(dir, rel)) };
+}
+
 /** sha256 di ogni file, «assente» se non c'è: per controllare che gli originali non cambino. */
 export function fingerprint(files: string[]): string[] {
   return files.map((f) => (fs.existsSync(f) ? crypto.createHash("sha256").update(fs.readFileSync(f)).digest("hex") : "assente"));

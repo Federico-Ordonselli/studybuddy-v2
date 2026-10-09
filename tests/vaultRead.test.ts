@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { makeFakeVault, fingerprint } from "./helpers/vault";
+import { makeFakeVault, fingerprint, stoppedVaultCopy } from "./helpers/vault";
 import { loadVaultDomains, readVault, snapshotVaultDb, vaultDbPath } from "@/lib/vaultImport/read";
 
 const v = makeFakeVault({
@@ -38,9 +38,18 @@ test("snapshot + readVault: note, sf6 e solo le CHIAVI delle impostazioni", () =
 });
 
 test("l'originale non cambia (né .db, né -wal, né -shm)", () => {
-  const before = fingerprint(v.files);
-  readVault(snapshotVaultDb(v.dir, tmp()));
-  assert.deepEqual(fingerprint(v.files), before);
+  const s = stoppedVaultCopy(v.dir);
+  const before = fingerprint(s.files);
+  const data = readVault(snapshotVaultDb(s.dir, tmp()));
+  assert.equal(data.notes.length, 2, "la lettura deve vedere le note (sono nel WAL)");
+  assert.deepEqual(fingerprint(s.files), before);
+});
+
+test("controllo: aprire l'originale lo modifica (il test sopra discrimina)", () => {
+  const s = stoppedVaultCopy(v.dir);
+  const before = fingerprint(s.files);
+  readVault(vaultDbPath(s.dir));
+  assert.notDeepEqual(fingerprint(s.files), before);
 });
 
 test("vault senza tabelle sf6: combo e tip vuoti", () => {
