@@ -43,3 +43,11 @@ test("sessione salvata prima delle citazioni: si carica e si continua", () => {
   assert.equal(next.length, 4);
   assert.deepEqual(S.forModel(next).map((m) => m.content), ["a", "b", "c", "d"]);
 });
+
+test("saveState aggiorna sessions.updated_at (per gli «ultimi corsi studiati» della home)", async () => {
+  const s = await S.getOrCreateSession("socratic");
+  sqlite.prepare("UPDATE sessions SET updated_at = 1 WHERE id = ?").run(s.id);
+  S.saveState(s.id, { history: [] });
+  const { updated_at } = sqlite.prepare("SELECT updated_at FROM sessions WHERE id = ?").get(s.id) as { updated_at: number };
+  assert.ok(updated_at > 1_700_000_000, `updated_at = ${updated_at}`);
+});

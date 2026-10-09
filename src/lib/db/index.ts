@@ -52,17 +52,38 @@ export function ensureLibrarySchema() {
 /** Array JSON valido di `domains.areas`, altrimenti `'[]'` (json_each lancia su JSON malformato). */
 const SAFE_AREAS = "CASE WHEN json_valid(d.areas) AND json_type(d.areas) = 'array' THEN d.areas ELSE '[]' END";
 
-/**
- * Domini dell'hub (tabella `areas`) su un DB esistente: crea la tabella con lo stesso
- * SQL di un DB nuovo e converte una volta i nomi liberi di `domains.areas` in slug.
- * Idempotente. Caso comune (tutto già fatto): due letture, nessun lock di scrittura.
- */
-export function ensureHubSchema() {
-  const ddl = SCHEMA_SQL.find((s) => s.startsWith("CREATE TABLE `areas`"));
-  if (!ddl) throw new Error("schemaSql.ts non ha la tabella areas: npm run db:schema");
-  if (!sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'areas'").get()) {
+/** Crea una tabella dello schema Drizzle che manca su un DB esistente, con lo stesso SQL di un DB nuovo. */
+function ensureTable(name: string) {
+  const ddl = SCHEMA_SQL.find((s) => s.startsWith(`CREATE TABLE \`${name}\``));
+  if (!ddl) throw new Error(`schemaSql.ts non ha la tabella ${name}: npm run db:schema`);
+  if (!sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name)) {
     sqlite.exec(ddl.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS"));
   }
+}
+
+/**
+ * Colonna aggiunta allo schema dopo la creazione della tabella. L'ALTER sta in una
+ * transazione IMMEDIATE con ricontrollo: con i worker paralleli di `next build` un
+ * secondo ALTER fallirebbe con «duplicate column». Tabella assente: niente da fare.
+ */
+function ensureColumn(table: string, column: string, type: string) {
+  const has = () => (sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]);
+  const cols = has();
+  if (!cols.length || cols.some((c) => c.name === column)) return;
+  sqlite.transaction(() => {
+    if (!has().some((c) => c.name === column)) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  }).immediate();
+}
+
+/**
+ * Hub su un DB esistente: crea le tabelle `areas` e `notes` e la colonna `sessions.updated_at`
+ * con lo stesso SQL di un DB nuovo, e converte una volta i nomi liberi di `domains.areas` in slug.
+ * Idempotente. Caso comune (tutto già fatto): solo letture, nessun lock di scrittura.
+ */
+export function ensureHubSchema() {
+  ensureTable("areas");
+  ensureTable("notes");
+  ensureColumn("sessions", "updated_at", "integer");
   const cols = sqlite.prepare("PRAGMA table_info(domains)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "areas")) return;
   // valori di domains.areas che non sono slug esistenti (né stringhe valide da convertire)
