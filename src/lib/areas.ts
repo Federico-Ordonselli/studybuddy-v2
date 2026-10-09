@@ -8,19 +8,20 @@ import { slugify, uniqueSlug } from "@/lib/slug";
  * slug. Ogni mutazione valida gli invarianti e lancia `LibraryError` con lo status HTTP.
  */
 export interface Area { slug: string; name: string; tagline: string; symbol: string; module: string | null; position: number }
-export interface AreaInfo extends Area { courses: number }
+export interface AreaInfo extends Area { courses: number; notes: number }
 
 const COLS = "a.slug, a.name, a.tagline, a.symbol, a.module, a.position";
 // json_each lancia su JSON malformato: le righe rotte contano come nessun dominio
-const SAFE_AREAS = "CASE WHEN json_valid(d.areas) AND json_type(d.areas) = 'array' THEN d.areas ELSE '[]' END";
+export const SAFE_AREAS = "CASE WHEN json_valid(d.areas) AND json_type(d.areas) = 'array' THEN d.areas ELSE '[]' END";
 // righe in cui la UI mostra/modifica i domini: macro e corsi sciolti (genitore assente o non macro)
-const VISIBLE = "(d.kind = 'macro' OR d.parent_id IS NULL OR d.parent_id NOT IN (SELECT id FROM domains WHERE kind = 'macro'))";
+export const VISIBLE = "(d.kind = 'macro' OR d.parent_id IS NULL OR d.parent_id NOT IN (SELECT id FROM domains WHERE kind = 'macro'))";
 const nowSec = () => Math.floor(Date.now() / 1000);
 
 export function listAreas(): AreaInfo[] {
   return sqlite.prepare(
     `SELECT ${COLS},
-            (SELECT count(*) FROM domains d, json_each(${SAFE_AREAS}) j WHERE ${VISIBLE} AND j.value = a.slug) AS courses
+            (SELECT count(*) FROM domains d, json_each(${SAFE_AREAS}) j WHERE ${VISIBLE} AND j.value = a.slug) AS courses,
+            (SELECT count(*) FROM notes n WHERE n.domain = a.slug) AS notes
      FROM areas a ORDER BY a.position, a.name COLLATE NOCASE`
   ).all() as AreaInfo[];
 }
@@ -124,8 +125,7 @@ export function reorderAreas(slugs: unknown) {
 }
 
 /**
- * Si elimina solo un dominio senza corsi visibili (le note arriveranno in F3 con lo stesso
- * controllo). Sulle righe nascoste (corsi dentro un macro) lo slug viene tolto da sé.
+ * Si elimina solo un dominio senza corsi visibili né note. Sulle righe nascoste (corsi dentro un macro) lo slug viene tolto da sé.
  */
 export function deleteArea(slug: string) {
   get(slug);
@@ -134,6 +134,8 @@ export function deleteArea(slug: string) {
       `SELECT count(*) AS n FROM domains d, json_each(${SAFE_AREAS}) j WHERE ${VISIBLE} AND j.value = ?`
     ).get(slug) as { n: number };
     if (n > 0) throw new LibraryError(`${n} ${n === 1 ? "corso usa" : "corsi usano"} questo dominio: toglilo prima dai corsi`, 409);
+    const { m } = sqlite.prepare("SELECT count(*) AS m FROM notes WHERE domain = ?").get(slug) as { m: number };
+    if (m > 0) throw new LibraryError(`${m} ${m === 1 ? "nota è" : "note sono"} in questo dominio: spostale o eliminale prima`, 409);
     const hidden = sqlite.prepare(
       `SELECT d.id, d.areas FROM domains d, json_each(${SAFE_AREAS}) j WHERE j.value = ?`
     ).all(slug) as { id: number; areas: string }[];

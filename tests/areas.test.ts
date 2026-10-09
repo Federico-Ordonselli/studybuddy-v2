@@ -111,3 +111,16 @@ test("dominio usato solo da un corso dentro un macro: non conta, si elimina e vi
   assert.deepEqual(JSON.parse(f.areas), ["altro"]);
   assert.throws(() => A.deleteArea(y.slug), isErr(409));
 });
+
+test("elimina con note: rifiutato (dice quante), listAreas conta le note; spostate le note riesce", async () => {
+  const N = await import("@/lib/notes");
+  const a = A.createArea({ name: "Con note" });
+  const n1 = N.createNote({ content: "uno", domain: a.slug });
+  N.createNote({ content: "due", domain: a.slug });
+  assert.equal(A.listAreas().find((x) => x.slug === a.slug)?.notes, 2);
+  assert.throws(() => A.deleteArea(a.slug), (e: unknown) => isErr(409)(e) && /2 note/.test((e as Error).message));
+  N.moveNote(n1.id, {});
+  sqlite.prepare("UPDATE notes SET domain = NULL WHERE domain = ?").run(a.slug);
+  A.deleteArea(a.slug);
+  assert.equal(A.listAreas().some((x) => x.slug === a.slug), false);
+});

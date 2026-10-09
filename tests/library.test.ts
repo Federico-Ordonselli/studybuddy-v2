@@ -88,3 +88,12 @@ test("deleteMacro bloccato se il macro ha carte/mappe/sessioni proprie; vietato 
 test("id inesistente → LibraryError 404", () => {
   assert.throws(() => L.updateDomain(424242, { name: "x" }), (e: unknown) => e instanceof L.LibraryError && e.status === 404);
 });
+
+test("deleteMacro: le note sul macro finiscono nell'inbox invece di restare orfane", async () => {
+  const N = await import("@/lib/notes");
+  const m = L.createMacro("Macro con nota");
+  const n = N.createNote({ content: "sul macro", courseId: m });
+  L.deleteMacro(m);
+  const row = sqlite.prepare("SELECT course_id, domain FROM notes WHERE id = ?").get(n.id) as { course_id: number | null; domain: string | null };
+  assert.deepEqual(row, { course_id: null, domain: null });
+});

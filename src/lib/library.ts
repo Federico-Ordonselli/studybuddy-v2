@@ -183,6 +183,8 @@ export function deleteMacro(id: number) {
   if (own.n > 0) throw new LibraryError("questo macro ha carte, mappe o sessioni di studio proprie: non lo elimino", 409);
   sqlite.transaction(() => {
     sqlite.prepare("UPDATE domains SET parent_id = NULL WHERE parent_id = ?").run(id);
+    // le note sul macro non restano agganciate a una riga che non c'è più: tornano nell'inbox
+    sqlite.prepare("UPDATE notes SET course_id = NULL WHERE course_id = ?").run(id);
     sqlite.prepare("DELETE FROM domains WHERE id = ?").run(id);
   })();
 }
