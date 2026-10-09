@@ -9,9 +9,11 @@
 ## Features
 
 ### Course library and guided import
-Copy downloaded courses into `Courses/` and the library notices them. **Add course** analyses the folder without touching the database. It tells a specialization (named sub-folders, one course each) from a single course (numbered module folders), counts transcripts, PDFs, HTML and videos, flags videos without subtitles, and compares file hashes with the last import to mark each course *new*, *up to date* or *changed*. You review an editable preview before anything is written: rename, flip course ↔ specialization, group loose courses into a new one, assign **areas**, and pick what to import. Import runs in the background with per-course progress.
+Copy downloaded courses into `Courses/` and the library notices them. **Add course** analyses the folder without touching the database. It tells a specialization (named sub-folders, one course each) from a single course (numbered module folders), counts transcripts, PDFs, HTML and videos, flags videos without subtitles, and compares file hashes with the last import to mark each course *new*, *up to date* or *changed*. You review an editable preview before anything is written: rename, flip course ↔ specialization, group loose courses into a new one, assign **domains**, and pick what to import. Import runs in the background with per-course progress.
 
-The hierarchy is two levels deep: studying a specialization covers all its courses (retrieval, review queue, maps). Areas are layout-only tags that group the library at a glance without mixing content. Re-importing never undoes manual organization.
+Domains group your courses in the library; create, rename, reorder and delete them in **Settings**, which also shows whether the database, Ollama, the GPU reranker and Whisper are working.
+
+The hierarchy is two levels deep: studying a specialization covers all its courses (retrieval, review queue, maps). Domains are organization-only: they group the library at a glance without mixing content. Re-importing never undoes manual organization.
 
 <img src="docs/screenshots/library.png" alt="Library grouped by area, with specializations and their courses" width="49%"> <img src="docs/screenshots/add-preview.png" alt="Import preview: detected courses, file counts, changed files, grouping and areas" width="49%">
 
@@ -126,7 +128,7 @@ No GPU: `docker compose -f docker-compose.yml -f compose.cpu.yaml up -d --build`
 
 The expected layout is `course/module/lesson/` with mixed files. Subtitles are the primary source (`lesson.en.srt` covers `lesson.mp4`). Videos are skipped, but their paths are kept so citations can link to them. Videos without subtitles can be transcribed with Whisper from the preview (slow: minutes per hour of video).
 
-Re-importing is idempotent: unchanged files are skipped by hash, modified files are replaced, and names, specializations and areas you changed by hand are kept.
+Re-importing is idempotent: unchanged files are skipped by hash, modified files are replaced, and names, specializations and domains you changed by hand are kept.
 
 There is also a CLI, which follows the same rules:
 
@@ -140,7 +142,8 @@ npm run ingest -- "path/to/course" "Course name" --whisper   # also transcribe v
 ```
 src/lib/
   config.ts        model-per-task routing, RAG / reranker / Whisper settings
-  library.ts       library tree, invariants (2 levels: specialization → courses), areas
+  library.ts       library tree, invariants (2 levels: specialization → courses), domains
+  areas.ts         domains (create, rename, reorder, delete) and their invariants
   ingestPlan.ts    read-only folder analysis: course vs specialization, file counts, change detection
   ingestTree.ts    applies an import plan to the library, then ingests course by course
   providers/       ollama | anthropic | openai-compatible | image backends
