@@ -1,4 +1,3 @@
-import { sqlite } from "@/lib/db";
 import { ollamaBaseUrl } from "@/lib/providers/ollama";
 import { rerankerState, warmReranker, type RerankerState } from "@/lib/rag/reranker";
 import { whisperAvailable } from "@/lib/transcribe";
@@ -13,8 +12,10 @@ export interface Health {
 
 const msg = (e: unknown) => (e instanceof Error ? (e.cause instanceof Error ? e.cause.message : e.message) : String(e));
 
-function checkDb(): Health["db"] {
+// Import dinamico: "@/lib/db" apre il DB all'import e, se fallisce, deve diventare db.ok:false (503), non un 500.
+async function checkDb(): Promise<Health["db"]> {
   try {
+    const { sqlite } = await import("@/lib/db");
     sqlite.prepare("SELECT count(*) FROM domains").get();
     return { ok: true };
   } catch (e) {
@@ -41,7 +42,7 @@ async function checkOllama(): Promise<Health["ollama"]> {
 /** Stato dei pezzi che servono all'app. `warm` carica il reranker (GPU o CPU) e fa un'inferenza di prova prima di rispondere. */
 export async function getHealth(opts: { warm?: boolean } = {}): Promise<Health> {
   if (opts.warm) await warmReranker().catch(() => {}); // l'errore resta in rerankerState()
-  const db = checkDb();
+  const db = await checkDb();
   const ollama = await checkOllama();
   return { ok: db.ok && ollama.ok, db, ollama, reranker: rerankerState(), whisper: { available: whisperOnce() } };
 }

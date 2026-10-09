@@ -9,7 +9,7 @@ import type { PreTrainedTokenizer, PreTrainedModel } from "@huggingface/transfor
  * Il modello si carica una sola volta come singleton, lazy, al primo rerank:
  * su GPU (fp16) se disponibile, altrimenti su CPU (q8). Vedi `config.reranker`.
  */
-let modelPromise: Promise<{ tokenizer: PreTrainedTokenizer; model: PreTrainedModel }> | null = null;
+let modelPromise: Promise<Loaded> | null = null;
 
 export type RerankerState = "idle" | "loading" | "cuda" | "cpu" | "error";
 let state: RerankerState = "idle";
@@ -18,16 +18,21 @@ let state: RerankerState = "idle";
 export const rerankerState = (): RerankerState => state;
 
 /**
- * Carica il modello e fa un'inferenza di prova (per /api/health?warm=1): così `cuda`
- * vuol dire che un forward pass è davvero girato sulla GPU, non solo che il modello
- * si è caricato. Se l'inferenza fallisce lo stato diventa `error`.
+ * Carica il modello per /api/health?warm=1. Il caricamento include già un'inferenza di
+ * prova (vedi `load`): `cuda` vuol dire che un forward pass è davvero girato sulla GPU.
  */
 export async function warmReranker(): Promise<void> {
   await load();
+}
+
+type Loaded = { tokenizer: PreTrainedTokenizer; model: PreTrainedModel };
+
+/** Forward pass minimo: un modello che si carica ma non gira (es. cuDNN sbagliato) fallisce qui. */
+async function probe({ tokenizer, model }: Loaded) {
   try {
-    await scoreCrossEncoder("warm", ["warm"]);
+    await infer(tokenizer, model, "warm", ["warm"]);
   } catch (e) {
-    state = "error";
+    await model.dispose().catch(() => {});
     throw e;
   }
 }
@@ -42,6 +47,7 @@ function load() {
       if (cfg.device === "cuda") {
         try {
           const model = await AutoModelForSequenceClassification.from_pretrained(cfg.model, { dtype: cfg.dtype, device: "cuda" });
+          await probe({ tokenizer, model });
           console.log(`[reranker] ${cfg.model} su CUDA (${cfg.dtype})`);
           state = "cuda";
           return { tokenizer, model };
@@ -50,11 +56,12 @@ function load() {
         }
       }
       const model = await AutoModelForSequenceClassification.from_pretrained(cfg.model, { dtype: cfg.cpuDtype, device: "cpu" });
+      await probe({ tokenizer, model });
       console.log(`[reranker] ${cfg.model} su CPU (${cfg.cpuDtype})`);
       state = "cpu";
       return { tokenizer, model };
     })();
-    // un caricamento fallito non deve restare in cache: il prossimo rerank riprova
+    // un caricamento (o un'inferenza di prova) fallito non resta in cache: il prossimo rerank riprova
     modelPromise.catch(() => { modelPromise = null; state = "error"; });
   }
   return modelPromise;
@@ -64,6 +71,10 @@ function load() {
 export async function scoreCrossEncoder(query: string, texts: string[]): Promise<number[]> {
   if (!texts.length) return [];
   const { tokenizer, model } = await load();
+  return infer(tokenizer, model, query, texts);
+}
+
+async function infer(tokenizer: PreTrainedTokenizer, model: PreTrainedModel, query: string, texts: string[]): Promise<number[]> {
   const scores: number[] = [];
   for (let i = 0; i < texts.length; i += cfg.batchSize) {
     const batch = texts.slice(i, i + cfg.batchSize);
