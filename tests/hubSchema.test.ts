@@ -33,7 +33,7 @@ test("conversione: nomi → slug, Web/web uniti, C/C++ separati, accenti tolti",
   const bySlug = Object.fromEntries(rows.map((r) => [r.slug, r.name]));
   assert.deepEqual(Object.keys(bySlug).sort(), ["c", "c-2", "societa", "web"]);
   assert.equal(bySlug.societa, "Società");
-  assert.match(bySlug.web, /^web$/i);
+  assert.equal(bySlug.web, "Web");
   assert.deepEqual(rows.map((r) => r.position), [0, 1, 2, 3]);
   assert.deepEqual(areasOf(sqlite, "uno"), ["web", "societa"]);
   assert.deepEqual(areasOf(sqlite, "due"), ["web"]);

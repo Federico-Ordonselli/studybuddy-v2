@@ -95,3 +95,19 @@ test("listAreas: conta i corsi anche con domains.areas malformato", () => {
   sqlite.prepare("INSERT INTO domains (name, kind, areas) VALUES ('rotto', 'course', 'non json')").run();
   assert.ok(A.listAreas().length > 0);
 });
+
+test("dominio usato solo da un corso dentro un macro: non conta, si elimina e viene tolto dal figlio", () => {
+  const x = A.createArea({ name: "Solo nel macro" });
+  const y = A.createArea({ name: "Su corso sciolto" });
+  const m = sqlite.prepare("INSERT INTO domains (name, kind, areas) VALUES ('macroX', 'macro', '[]')").run();
+  sqlite.prepare("INSERT INTO domains (name, kind, parent_id, areas) VALUES ('figlio', 'course', ?, ?)")
+    .run(m.lastInsertRowid, JSON.stringify([x.slug, "altro"]));
+  course("sciolto", [y.slug]);
+  const courses = (s: string) => A.listAreas().find((a) => a.slug === s)?.courses;
+  assert.equal(courses(x.slug), 0);
+  assert.equal(courses(y.slug), 1);
+  A.deleteArea(x.slug);
+  const f = sqlite.prepare("SELECT areas FROM domains WHERE name = 'figlio'").get() as { areas: string };
+  assert.deepEqual(JSON.parse(f.areas), ["altro"]);
+  assert.throws(() => A.deleteArea(y.slug), isErr(409));
+});

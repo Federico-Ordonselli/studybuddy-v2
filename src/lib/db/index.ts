@@ -83,7 +83,9 @@ function convertAreaNames() {
   const existing = sqlite.prepare("SELECT slug, name FROM areas").all() as { slug: string; name: string }[];
   const known = new Set(existing.map((a) => a.slug));
   const taken = new Set(known);
-  const byName = new Map(existing.map((a) => [a.name.toLowerCase(), a.slug]));
+  const clean = (v: string) => v.trim().replace(/\s+/g, " ");
+  const key = (v: string) => clean(v).toLowerCase();
+  const byName = new Map(existing.map((a) => [key(a.name), a.slug]));
 
   const rows = (sqlite.prepare("SELECT id, areas FROM domains").all() as { id: number; areas: string | null }[]).flatMap((r) => {
     try {
@@ -94,21 +96,34 @@ function convertAreaNames() {
     }
   });
 
-  const names = [...new Set(rows.flatMap((r) => r.list).filter((v) => !known.has(v)))].sort((a, b) => a.localeCompare(b));
+  // per ogni nome (a meno di maiuscole/spazi) vince la variante usata da più righe;
+  // a parità quella che ordina prima con le maiuscole davanti ("Web" batte "web")
+  const groups = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    for (const v of new Set(r.list.filter((x) => !known.has(x)).map(clean))) {
+      if (byName.has(key(v))) continue;
+      const g = groups.get(key(v)) ?? new Map<string, number>();
+      g.set(v, (g.get(v) ?? 0) + 1);
+      groups.set(key(v), g);
+    }
+  }
+  const chosen = [...groups.values()].map((g) =>
+    [...g.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "it", { caseFirst: "upper" }))[0][0]
+  ).sort((a, b) => a.localeCompare(b, "it", { sensitivity: "base" }) || a.localeCompare(b));
+
   let pos = (sqlite.prepare("SELECT coalesce(max(position) + 1, 0) AS p FROM areas").get() as { p: number }).p;
   const insert = sqlite.prepare("INSERT INTO areas (slug, name, position, created_at) VALUES (?, ?, ?, ?)");
   const now = Math.floor(Date.now() / 1000);
-  for (const name of names) {
-    if (byName.has(name.toLowerCase())) continue;
+  for (const name of chosen) {
     const slug = uniqueSlug(slugify(name), taken);
     taken.add(slug);
-    byName.set(name.toLowerCase(), slug);
-    insert.run(slug, name.trim(), pos++, now);
+    byName.set(key(name), slug);
+    insert.run(slug, name, pos++, now);
   }
 
   const update = sqlite.prepare("UPDATE domains SET areas = ? WHERE id = ?");
   for (const r of rows) {
-    const next = [...new Set(r.list.map((v) => (known.has(v) ? v : byName.get(v.toLowerCase())!)))];
+    const next = [...new Set(r.list.map((v) => (known.has(v) ? v : byName.get(key(v))!)))];
     const json = JSON.stringify(next);
     if (json !== r.areas) update.run(json, r.id);
   }

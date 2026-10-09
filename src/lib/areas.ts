@@ -13,12 +13,14 @@ export interface AreaInfo extends Area { courses: number }
 const COLS = "a.slug, a.name, a.tagline, a.symbol, a.module, a.position";
 // json_each lancia su JSON malformato: le righe rotte contano come nessun dominio
 const SAFE_AREAS = "CASE WHEN json_valid(d.areas) AND json_type(d.areas) = 'array' THEN d.areas ELSE '[]' END";
+// righe in cui la UI mostra/modifica i domini: macro e corsi sciolti (genitore assente o non macro)
+const VISIBLE = "(d.kind = 'macro' OR d.parent_id IS NULL OR d.parent_id NOT IN (SELECT id FROM domains WHERE kind = 'macro'))";
 const nowSec = () => Math.floor(Date.now() / 1000);
 
 export function listAreas(): AreaInfo[] {
   return sqlite.prepare(
     `SELECT ${COLS},
-            (SELECT count(*) FROM domains d, json_each(${SAFE_AREAS}) j WHERE j.value = a.slug) AS courses
+            (SELECT count(*) FROM domains d, json_each(${SAFE_AREAS}) j WHERE ${VISIBLE} AND j.value = a.slug) AS courses
      FROM areas a ORDER BY a.position, a.name COLLATE NOCASE`
   ).all() as AreaInfo[];
 }
@@ -121,12 +123,22 @@ export function reorderAreas(slugs: unknown) {
   sqlite.transaction(() => (slugs as string[]).forEach((s, i) => set.run(i, s)))();
 }
 
-/** Si elimina solo un dominio senza corsi (le note arriveranno in F3 con lo stesso controllo). */
+/**
+ * Si elimina solo un dominio senza corsi visibili (le note arriveranno in F3 con lo stesso
+ * controllo). Sulle righe nascoste (corsi dentro un macro) lo slug viene tolto da sé.
+ */
 export function deleteArea(slug: string) {
   get(slug);
-  const { n } = sqlite.prepare(
-    `SELECT count(*) AS n FROM domains d, json_each(${SAFE_AREAS}) j WHERE j.value = ?`
-  ).get(slug) as { n: number };
-  if (n > 0) throw new LibraryError(`${n} ${n === 1 ? "corso usa" : "corsi usano"} questo dominio: toglilo prima dai corsi`, 409);
-  sqlite.prepare("DELETE FROM areas WHERE slug = ?").run(slug);
+  sqlite.transaction(() => {
+    const { n } = sqlite.prepare(
+      `SELECT count(*) AS n FROM domains d, json_each(${SAFE_AREAS}) j WHERE ${VISIBLE} AND j.value = ?`
+    ).get(slug) as { n: number };
+    if (n > 0) throw new LibraryError(`${n} ${n === 1 ? "corso usa" : "corsi usano"} questo dominio: toglilo prima dai corsi`, 409);
+    const hidden = sqlite.prepare(
+      `SELECT d.id, d.areas FROM domains d, json_each(${SAFE_AREAS}) j WHERE j.value = ?`
+    ).all(slug) as { id: number; areas: string }[];
+    const set = sqlite.prepare("UPDATE domains SET areas = ? WHERE id = ?");
+    for (const r of hidden) set.run(JSON.stringify((JSON.parse(r.areas) as unknown[]).filter((v) => v !== slug)), r.id);
+    sqlite.prepare("DELETE FROM areas WHERE slug = ?").run(slug);
+  })();
 }
