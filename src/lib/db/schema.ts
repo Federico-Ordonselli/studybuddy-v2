@@ -13,8 +13,23 @@ export const domains = sqliteTable("domains", {
   parentId: integer("parent_id"),                   // macro → micro (self-ref, no FK per evitare cicli)
   kind: text("kind").notNull().default("course"),   // macro | course
   path: text("path"),                               // cartella sorgente su disco
-  // Aree (tag) della Libreria: SOLO layout, nessun effetto su retrieval/ripasso/mappe.
+  // Slug dei domini (tabella `areas`) a cui appartiene: SOLO organizzazione, nessun effetto su retrieval/ripasso/mappe.
   areas: text("areas", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+/**
+ * Domini dell'hub («Domini» in UI): raggruppano corsi e, da F3, note. `domains.areas`
+ * contiene i loro slug. `slug` non cambia dopo la creazione (rinominare cambia `name`).
+ * `module` = nome di un modulo registrato in lib/modules.ts, o null.
+ */
+export const areas = sqliteTable("areas", {
+  slug: text("slug").primaryKey(),
+  name: text("name").notNull(),
+  tagline: text("tagline").notNull().default(""),
+  symbol: text("symbol").notNull().default("·"),
+  module: text("module"),
+  position: integer("position").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 

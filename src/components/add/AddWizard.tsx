@@ -121,7 +121,7 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
       {phase === "edit" && plan && (items.length ? (
         <PlanEditor items={items} plan={plan} setPlan={setPlan} busy={busy}
           existingMacros={(library?.macros ?? []).map(({ id, name }) => ({ id, name }))}
-          areaSuggestions={library?.areas ?? []} onToggleKind={toggleKind} onImport={startImport} />
+          areas={library?.areas ?? []} onToggleKind={toggleKind} onImport={startImport} />
       ) : (
         <p className="text-fg-dim">Nessun corso trovato{source ? " in questa cartella" : ` in ${libraryDirName}/`}.</p>
       ))}

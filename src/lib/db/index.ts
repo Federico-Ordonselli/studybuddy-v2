@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import { EMBED_DIM } from "@/lib/config";
 import { SCHEMA_SQL } from "./schemaSql";
+import { slugify, uniqueSlug } from "@/lib/slug";
 
 const path = process.env.DB_PATH ?? "studybuddy.db";
 
@@ -48,8 +49,89 @@ export function ensureLibrarySchema() {
     PRIMARY KEY (domain_id, source)
   )`);
 }
+/** Array JSON valido di `domains.areas`, altrimenti `'[]'` (json_each lancia su JSON malformato). */
+const SAFE_AREAS = "CASE WHEN json_valid(d.areas) AND json_type(d.areas) = 'array' THEN d.areas ELSE '[]' END";
+
+/**
+ * Domini dell'hub (tabella `areas`) su un DB esistente: crea la tabella con lo stesso
+ * SQL di un DB nuovo e converte una volta i nomi liberi di `domains.areas` in slug.
+ * Idempotente. Caso comune (tutto già fatto): due letture, nessun lock di scrittura.
+ */
+export function ensureHubSchema() {
+  const ddl = SCHEMA_SQL.find((s) => s.startsWith("CREATE TABLE `areas`"));
+  if (!ddl) throw new Error("schemaSql.ts non ha la tabella areas: npm run db:schema");
+  if (!sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'areas'").get()) {
+    sqlite.exec(ddl.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS"));
+  }
+  const cols = sqlite.prepare("PRAGMA table_info(domains)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "areas")) return;
+  // valori di domains.areas che non sono slug esistenti (né stringhe valide da convertire)
+  const pending = () => (sqlite.prepare(
+    `SELECT count(*) AS n FROM domains d, json_each(${SAFE_AREAS}) j
+     WHERE j.type <> 'text' OR j.value NOT IN (SELECT slug FROM areas)`
+  ).get() as { n: number }).n;
+  if (!pending()) return;
+  sqlite.transaction(() => { if (pending()) convertAreaNames(); }).immediate();
+}
+
+/**
+ * Nomi liberi → righe di `areas` (slug dal nome, posizione in ordine alfabetico) e
+ * `domains.areas` riscritto con gli slug. Nomi uguali a meno delle maiuscole = un dominio.
+ * Le righe con JSON non valido o non-array restano com'erano.
+ */
+function convertAreaNames() {
+  const existing = sqlite.prepare("SELECT slug, name FROM areas").all() as { slug: string; name: string }[];
+  const known = new Set(existing.map((a) => a.slug));
+  const taken = new Set(known);
+  const clean = (v: string) => v.trim().replace(/\s+/g, " ");
+  const key = (v: string) => clean(v).toLowerCase();
+  const byName = new Map(existing.map((a) => [key(a.name), a.slug]));
+
+  const rows = (sqlite.prepare("SELECT id, areas FROM domains").all() as { id: number; areas: string | null }[]).flatMap((r) => {
+    try {
+      const a: unknown = JSON.parse(r.areas ?? "");
+      return Array.isArray(a) ? [{ ...r, list: a.filter((x): x is string => typeof x === "string" && x.trim() !== "") }] : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // per ogni nome (a meno di maiuscole/spazi) vince la variante usata da più righe;
+  // a parità quella che ordina prima con le maiuscole davanti ("Web" batte "web")
+  const groups = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    for (const v of new Set(r.list.filter((x) => !known.has(x)).map(clean))) {
+      if (byName.has(key(v))) continue;
+      const g = groups.get(key(v)) ?? new Map<string, number>();
+      g.set(v, (g.get(v) ?? 0) + 1);
+      groups.set(key(v), g);
+    }
+  }
+  const chosen = [...groups.values()].map((g) =>
+    [...g.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "it", { caseFirst: "upper" }))[0][0]
+  ).sort((a, b) => a.localeCompare(b, "it", { sensitivity: "base" }) || a.localeCompare(b));
+
+  let pos = (sqlite.prepare("SELECT coalesce(max(position) + 1, 0) AS p FROM areas").get() as { p: number }).p;
+  const insert = sqlite.prepare("INSERT INTO areas (slug, name, position, created_at) VALUES (?, ?, ?, ?)");
+  const now = Math.floor(Date.now() / 1000);
+  for (const name of chosen) {
+    const slug = uniqueSlug(slugify(name), taken);
+    taken.add(slug);
+    byName.set(key(name), slug);
+    insert.run(slug, name, pos++, now);
+  }
+
+  const update = sqlite.prepare("UPDATE domains SET areas = ? WHERE id = ?");
+  for (const r of rows) {
+    const next = [...new Set(r.list.map((v) => (known.has(v) ? v : byName.get(key(v))!)))];
+    const json = JSON.stringify(next);
+    if (json !== r.areas) update.run(json, r.id);
+  }
+}
+
 initSchema();
 ensureLibrarySchema();
+ensureHubSchema();
 
 /** Crea la virtual table degli embedding. Idempotente. */
 export function initVectorStore() {

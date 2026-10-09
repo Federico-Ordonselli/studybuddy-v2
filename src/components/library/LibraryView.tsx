@@ -7,7 +7,7 @@ import DomainMenu from "./DomainMenu";
 import NewMacroButton from "./NewMacroButton";
 
 type Entry = { type: "macro"; m: MacroNode } | { type: "course"; c: CourseNode };
-const NONE = "Senza area";
+const NONE = ""; // chiave della sezione «Senza dominio» (nessuno slug è vuoto)
 
 function Due({ n }: { n: number }) {
   return n > 0 ? <span className="text-accent tabular">{n} {n === 1 ? "carta" : "carte"} da ripassare</span> : null;
@@ -71,7 +71,14 @@ export default function LibraryView({ library, fresh, skipped, libraryDirName }:
       const areas = e.type === "macro" ? e.m.areas : e.c.areas;
       for (const a of areas.length ? areas : [NONE]) by.set(a, [...(by.get(a) ?? []), e]);
     }
-    return [...by.entries()].sort(([a], [b]) => (a === NONE ? 1 : b === NONE ? -1 : a.localeCompare(b)));
+    const area = new Map(library.areas.map((a) => [a.slug, a]));
+    const rank = (slug: string) => (slug === NONE ? Infinity : area.get(slug)?.position ?? Number.MAX_SAFE_INTEGER);
+    return [...by.entries()]
+      .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+      .map(([slug, list]) => {
+        const a = area.get(slug);
+        return { key: slug || "none", title: slug === NONE ? "Senza dominio" : a ? `${a.symbol} ${a.name}` : slug, tagline: a?.tagline ?? "", entries: list };
+      });
   }, [library, q]);
 
   return (
@@ -86,6 +93,7 @@ export default function LibraryView({ library, fresh, skipped, libraryDirName }:
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtra…"
               className="bg-surface-2 border border-border rounded-md px-3 py-1.5 text-sm w-44" />
             <NewMacroButton library={library} />
+            <Link href="/settings" className="border border-border rounded-md px-3 py-1.5 text-sm hover:border-border-strong">Domini</Link>
             <Link href="/add" className="bg-accent text-bg rounded-md px-3 py-1.5 text-sm font-medium">+ Aggiungi corso</Link>
           </div>
         )}
@@ -115,11 +123,12 @@ export default function LibraryView({ library, fresh, skipped, libraryDirName }:
       ) : sections.length === 0 ? (
         <p className="text-fg-dim">Nessun risultato per “{q}”.</p>
       ) : (
-        sections.map(([area, entries]) => (
-          <section key={area} className="mb-10">
-            <h2 className="text-xs uppercase tracking-[0.3em] text-fg-dim mb-3">{area}</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {entries.map((e) => e.type === "macro"
+        sections.map((s) => (
+          <section key={s.key} className="mb-10">
+            <h2 className="text-xs uppercase tracking-[0.3em] text-fg-dim mb-1">{s.title}</h2>
+            {s.tagline && <p className="text-xs text-fg-dim mb-3">{s.tagline}</p>}
+            <div className={`grid gap-3 sm:grid-cols-2 ${s.tagline ? "" : "mt-2"}`}>
+              {s.entries.map((e) => e.type === "macro"
                 ? <MacroCard key={`m${e.m.id}`} m={e.m} library={library} />
                 : <CourseCard key={`c${e.c.id}`} c={e.c} library={library} />)}
             </div>

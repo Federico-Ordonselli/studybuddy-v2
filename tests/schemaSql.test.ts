@@ -18,7 +18,7 @@ test("DB nuovo: initSchema crea le tabelle; una seconda chiamata non fa nulla", 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sb-schema-"));
   process.env.DB_PATH = path.join(dir, "nuovo.db");
   const { sqlite, initSchema } = await import("@/lib/db");
-  for (const t of ["domains", "documents", "chunks", "cards", "sessions", "concept_maps", "ingested_files"]) {
+  for (const t of ["domains", "areas", "documents", "chunks", "cards", "sessions", "concept_maps", "ingested_files"]) {
     assert.ok(tables(sqlite).includes(t), t);
   }
   sqlite.prepare("INSERT INTO domains (name, kind) VALUES ('x', 'course')").run();
