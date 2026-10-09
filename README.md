@@ -43,6 +43,10 @@ Map-reduce summaries over a topic or a whole module. The slides come with SVG il
 
 <img src="docs/screenshots/summary.png" alt="Structured summary" width="49%"> <img src="docs/screenshots/slides.png" alt="Generated slide with SVG illustration" width="49%">
 
+### Street Fighter 6 module
+
+Link a domain to the **Street Fighter 6** module in Settings and it gets a roster page, a combo list per character (notation rendered as button chips, status learning → practicing → consolidated) and tips per character or on the game's fundamentals. Tips come from guides: paste a transcript, give a YouTube/Twitch URL, pick a VOD from `data/vods/` or upload a file. YouTube subtitles are used when available; otherwise the audio is transcribed with Whisper — locally by default, or with Groq if you set `TRANSCRIBE_BACKEND=groq` and `GROQ_API_KEY` in `.env`. The local LLM then extracts an overview, combos and tips for you to review before saving.
+
 ## How it works
 
 ```
@@ -116,7 +120,7 @@ cp .env.example .env        # set COURSES_DIR to the absolute path of your cours
 docker compose up -d --build
 ```
 
-Open http://localhost:3000. Courses are mounted read-only at the same path as on the host; the database and model caches live in `./data`. Check the setup at http://localhost:3000/api/health (`?warm=1` loads the reranker, runs one test inference and reports `cuda` or `cpu`). Set `STUDYBUDDY_PORT` / `STUDYBUDDY_HOST` in `.env` to change the port or bind address.
+Open http://localhost:3000. Courses are mounted read-only at the same path as on the host; the database and model caches live in `./data`. Check the setup at http://localhost:3000/api/health (`?warm=1` loads the reranker, runs one test inference and reports `cuda` or `cpu`). Set `STUDYBUDDY_PORT` / `STUDYBUDDY_HOST` in `.env` to change the port or bind address. Video files for the SF6 module go in `data/vods/`.
 
 No GPU: `docker compose -f docker-compose.yml -f compose.cpu.yaml up -d --build` (reranker and Whisper fall back to CPU).
 
@@ -171,9 +175,13 @@ src/lib/
   conceptmap.ts    map generation and "enter a concept" expansion
   summarize.ts     map-reduce summaries
   slides.ts        slide decks
+  sf6/             Street Fighter 6 module: roster, notation, combos/tips store, extraction, transcript sources
+  proc.ts          async child processes
+  groq.ts          optional Groq Whisper client
 src/app/                pages: / (home), /corsi (library), /corsi/add (import), /d/[slug] (domain), /study/[id]?mode=tutor|quiz|review|studio, /settings
 src/components/shell/   sidebar, mobile drawer, quick capture shortcut
 src/components/mappe/   SVG canvas and editor (framework-free DOM, hosted in React)
+src/components/sf6/    SF6 module UI: combo and tips lists, notation renderer, import dialog
 src/app/api/            thin route handlers
 src/proxy.ts            host allowlist + JSON-only writes
 ```
