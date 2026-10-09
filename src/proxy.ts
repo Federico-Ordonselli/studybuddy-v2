@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { hostAllowed } from "@/lib/requestGuard";
 
 /**
  * Difese minime per un'app locale che espone il filesystem (browser cartelle,
@@ -10,18 +11,11 @@ import { NextRequest, NextResponse } from "next/server";
  *    STUDYBUDDY_ALLOWED_HOSTS (es. "192.168.1.10,studybuddy.lan") per l'uso in LAN.
  * 2. JSON-only sulle scritture (CSRF): con `Content-Type: text/plain` un POST
  *    cross-site è "simple" (niente preflight) e `req.json()` lo parserebbe lo stesso.
+ * 3. Eccezione: `/api/sf6/upload` (multipart) è fuori dal matcher, perché Next bufferizza in
+ *    memoria il corpo delle richieste che passano dal proxy e lo tronca oltre
+ *    `proxyClientMaxBodySize` (10 MB). La route fa da sé gli stessi controlli
+ *    (`uploadRejection` in lib/requestGuard.ts).
  */
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
-const EXTRA_HOSTS = new Set(
-  (process.env.STUDYBUDDY_ALLOWED_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean)
-);
-
-function hostAllowed(hostHeader: string | null): boolean {
-  if (!hostHeader) return false;
-  const host = hostHeader.toLowerCase().replace(/:\d+$/, ""); // toglie la porta ([::1]:3000 → [::1])
-  return LOCAL_HOSTS.has(host) || EXTRA_HOSTS.has(host);
-}
-
 export function proxy(req: NextRequest) {
   if (!hostAllowed(req.headers.get("host"))) {
     return NextResponse.json({ error: "host non consentito" }, { status: 403 });
@@ -37,4 +31,4 @@ export function proxy(req: NextRequest) {
 
 // Anche le pagine: la Libreria e l'area studio sono Server Component che rendono
 // nomi e percorsi dei corsi nell'HTML. Esclusi solo gli asset statici di Next.
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|api/sf6/upload$).*)"] };

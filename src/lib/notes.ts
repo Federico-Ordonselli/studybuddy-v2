@@ -125,3 +125,11 @@ export function listForArea(slug: string): NoteView[] {
         OR n.course_id IN (SELECT id FROM domains WHERE parent_id IN (SELECT id FROM tagged))${ORDER}`
   ).all(slug, slug) as Row[]).map(view);
 }
+
+/** Note dei domini collegati a un modulo (pagina del modulo), le più recenti per prime. */
+export function notesForModule(module: string, limit = 5): NoteView[] {
+  const slugs = (sqlite.prepare("SELECT slug FROM areas WHERE module = ?").all(module) as { slug: string }[]).map((r) => r.slug);
+  const byId = new Map<number, NoteView>();
+  for (const s of slugs) for (const n of listForArea(s)) byId.set(n.id, n);
+  return [...byId.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id).slice(0, limit);
+}

@@ -4,6 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { whisperEnv } from "@/lib/transcribe";
+import { parseSubtitles } from "@/lib/subtitles";
+import { useTempDb } from "./helpers/db";
 
 // NODE_ENV è obbligatoria nel tipo di Next: qui conta solo il contenuto
 const asEnv = (o: Record<string, string>) => o as unknown as NodeJS.ProcessEnv;
@@ -29,4 +31,13 @@ test("whisperEnv: senza .venv l'env resta quello di prima", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "sb-novenv-"));
   const base = asEnv({ LD_LIBRARY_PATH: "/x", PATH: "/usr/bin" });
   assert.deepEqual(whisperEnv(root, base), base);
+});
+
+test("parseSubtitles: spostato in lib/subtitles, coursera lo ri-esporta", async () => {
+  const srt = "1\n00:00:01,000 --> 00:00:02,500\nCiao <b>mondo</b>\n\n2\n00:00:03,000 --> 00:00:04,000\nsecondo\n";
+  assert.deepEqual(parseSubtitles(srt), [{ startSec: 1, endSec: 2.5, text: "Ciao mondo" }, { startSec: 3, endSec: 4, text: "secondo" }]);
+  // coursera.ts apre il DB all'import: prima un DB temporaneo, mai lo studybuddy.db della radice
+  await useTempDb();
+  const { parseSubtitles: fromCoursera } = await import("@/lib/rag/sources/coursera");
+  assert.equal(fromCoursera, parseSubtitles);
 });

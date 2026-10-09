@@ -24,7 +24,7 @@ export const ollamaProvider: LLMProvider = {
         // modelli reasoning: thinking off di default (vedi config.ollama), opt-in per chiamata.
         think: opts.think ?? cfg.think,
         options: {
-          num_ctx: cfg.numCtx,
+          num_ctx: opts.numCtx ?? cfg.numCtx,
           temperature: opts.temperature ?? 0.7,
           num_predict: opts.maxTokens ?? 1024,
         },

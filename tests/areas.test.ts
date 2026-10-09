@@ -42,8 +42,8 @@ test("simbolo e tagline: limiti", () => {
   assert.throws(() => A.createArea({ name: "S4", tagline: "t".repeat(141) }), isErr(400));
 });
 
-test("module: solo moduli registrati (registro vuoto in F2)", () => {
-  assert.throws(() => A.createArea({ name: "Con modulo", module: "sf6" }), isErr(400));
+test("module: solo moduli registrati", () => {
+  assert.throws(() => A.createArea({ name: "Con modulo", module: "inesistente" }), isErr(400));
   assert.equal(A.validateModule(null), null);
   assert.equal(A.validateModule(""), null);
   assert.equal(A.validateModule("x", { x: { title: "X", href: "/x" } }), "x");
