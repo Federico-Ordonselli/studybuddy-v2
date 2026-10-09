@@ -137,6 +137,21 @@ npm run ingest -- "path/to/course" "Course name"
 npm run ingest -- "path/to/course" "Course name" --whisper   # also transcribe videos without subtitles
 ```
 
+## Migrating from learning-vault
+
+StudyBuddy absorbs learning-vault, the earlier personal hub: its domains, notes and Street Fighter 6 data move into a **new** database. Nothing is modified in place. The script reads a copy of the vault database, including its WAL, and makes an online backup of yours.
+
+```bash
+npm run import-vault -- --vault ~/learning-vault --target data/studybuddy.db            # dry run: prints the plan, writes nothing
+npm run import-vault -- --vault ~/learning-vault --target data/studybuddy.db --apply    # creates data/studybuddy.db
+```
+
+- A vault domain with the same slug or name as one of your domains is merged into it: symbol and tagline come from the vault, the name stays yours.
+- `--skip <slug>` leaves a domain out, and its notes go to the inbox.
+- The vault's settings are not copied. A Groq key, if you had one, belongs in `.env` as `GROQ_API_KEY`.
+- The database source defaults to `DB_PATH` from `.env.local` (`--from` to override).
+- `data/studybuddy.db` is what Docker uses.
+
 ## Project structure
 
 ```
@@ -146,6 +161,7 @@ src/lib/
   areas.ts         domains (create, rename, reorder, delete) and their invariants
   notes.ts         notes: inbox, domain or course
   home.ts          home ("today") and sidebar data
+  vaultImport/     learning-vault import: read a WAL-safe copy, plan (merge/new/skip), apply with count checks
   ingestPlan.ts    read-only folder analysis: course vs specialization, file counts, change detection
   ingestTree.ts    applies an import plan to the library, then ingests course by course
   providers/       ollama | anthropic | openai-compatible | image backends
