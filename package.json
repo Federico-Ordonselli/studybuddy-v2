@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts",
+    "import-vault": "tsx --env-file-if-exists=.env.local scripts/import-vault.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:schema": "tsx scripts/schema-sql.ts",

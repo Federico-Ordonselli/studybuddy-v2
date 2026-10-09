@@ -39,14 +39,15 @@ export function findArea(slug: string): Area | undefined {
 
 // --- validazione ---------------------------------------------------------------
 
-function cleanName(v: unknown): string {
+// esportati anche per l'import del vault (lib/vaultImport/plan.ts)
+export function cleanName(v: unknown): string {
   if (typeof v !== "string" || !v.trim()) throw new LibraryError("il nome del dominio non può essere vuoto");
   const n = v.trim().replace(/\s+/g, " ");
   if (n.length > 60) throw new LibraryError("nome del dominio troppo lungo (max 60 caratteri)");
   return n;
 }
 
-function cleanTagline(v: unknown): string {
+export function cleanTagline(v: unknown): string {
   if (v == null) return "";
   if (typeof v !== "string") throw new LibraryError("tagline non valida");
   const t = v.trim().replace(/\s+/g, " ");
@@ -56,7 +57,7 @@ function cleanTagline(v: unknown): string {
 
 const graphemes = (s: string) => [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(s)].length;
 
-function cleanSymbol(v: unknown): string {
+export function cleanSymbol(v: unknown): string {
   if (v == null) return "·";
   if (typeof v !== "string") throw new LibraryError("simbolo non valido");
   const s = v.trim();
