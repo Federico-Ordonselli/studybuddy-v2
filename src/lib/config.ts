@@ -18,7 +18,8 @@ export type Task =
   | "quiz"       // generazione domande (structured output)
   | "grade"      // LLM-as-judge sulle risposte aperte
   | "embed"      // embeddings per il retrieval
-  | "rerank";    // reranking dei chunk recuperati
+  | "rerank"     // reranking dei chunk recuperati
+  | "extract";   // estrazione strutturata da trascrizioni (modulo SF6)
 
 export const models: Record<Task, ModelRef> = {
   chat:      { provider: "ollama", model: "gemma4:12b" },
@@ -27,6 +28,7 @@ export const models: Record<Task, ModelRef> = {
   grade:     { provider: "ollama", model: "gemma4:12b" },
   embed:     { provider: "ollama", model: "qwen3-embedding:0.6b" },
   rerank:    { provider: "ollama", model: "gemma4:12b" }, // listwise via LLM (vedi rag/rerank.ts)
+  extract:   { provider: "ollama", model: "gemma4:12b" },
 };
 
 /**

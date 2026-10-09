@@ -13,6 +13,8 @@ export interface GenerateOptions {
   schema?: Record<string, unknown>;
   /** Modelli "reasoning" (es. gpt-oss): disattiva il thinking per output diretto/veloce. */
   think?: boolean;
+  /** Finestra di contesto per questa chiamata (solo Ollama); default `config.ollama.numCtx`. */
+  numCtx?: number;
 }
 
 export interface LLMProvider {
