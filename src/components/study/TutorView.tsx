@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { decodedSse } from "@/lib/client/sse";
 import { post } from "@/lib/client/api";
 import Markdown from "./Markdown";
 import { S } from "./styles";
@@ -18,6 +19,8 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
   const [pendingQ, setPendingQ] = useState<QuizQuestion | null>(null);
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [video, setVideo] = useState<{ path: string; startSec: number; label: string } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
   const threadRef = useRef<HTMLDivElement>(null);
 
   // Socratico: riprende la sessione salvata per questo dominio (il componente è rimontato per dominio/modalità).
@@ -58,9 +61,24 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     setLoading(true);
     try {
       if (mode === "socratic") {
-        const turn = await chat({ mode, domainId, message: text, sessionId });
-        if (turn.sessionId && domainId) { setSessionId(turn.sessionId); localStorage.setItem(sessionKey(domainId), String(turn.sessionId)); }
-        setMsgs((m) => [...m, { role: "assistant", content: turn.reply, citations: turn.citations }]);
+        abortRef.current = new AbortController();
+        const response = await fetch("/api/chat", {method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({mode,domainId,message:text,sessionId,stream:true}), signal:abortRef.current.signal});
+        if (!response.ok) throw new Error((await response.json()).error ?? "Errore del tutor");
+        if (!response.body) throw new Error("Stream assente");
+        setMsgs(m => [...m,{role:"assistant",content:""}]);
+        let completed = false;
+        for await (const {event,data} of decodedSse(response.body)) {
+          if (event === "metadata") {
+            setSessionId(data.sessionId);
+            try { localStorage.setItem(sessionKey(domainId),String(data.sessionId)); } catch {}
+            setMsgs(m => m.map((msg,i) => i === m.length-1 ? {...msg,citations:data.citations} : msg));
+          } else if (event === "token") {
+            setMsgs(m => m.map((msg,i) => i === m.length-1 ? {...msg,content:msg.content+data.text} : msg));
+          } else if (event === "error") throw new Error(data.error);
+          else if (event === "done") completed = true;
+        }
+        if (!completed) throw new Error("Risposta incompleta. Riprova.");
       } else {
         const turn = await chat({ mode: "quiz", domainId, message: text });
         setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Domanda", citations: turn.citations, question: turn.question }]);

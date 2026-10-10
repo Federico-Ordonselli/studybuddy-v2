@@ -26,7 +26,7 @@ export const anthropicProvider: LLMProvider = {
         role: m.role === "assistant" ? "assistant" : "user",
         content: m.content,
       })),
-    });
+    }, { signal: opts.signal });
     const block = msg.content.find((b) => b.type === "text");
     return block && block.type === "text" ? block.text : "";
   },

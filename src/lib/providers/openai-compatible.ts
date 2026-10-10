@@ -13,6 +13,7 @@ export const openAICompatibleProvider: LLMProvider = {
       ...opts.messages,
     ];
     const res = await fetch(`${BASE()}/chat/completions`, {
+      signal: opts.signal,
       method: "POST",
       headers: {
         "Content-Type": "application/json",

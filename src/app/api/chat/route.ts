@@ -1,3 +1,4 @@
+import { socraticResponse } from "@/lib/tutor/stream";
 import { NextRequest, NextResponse } from "next/server";
 import { socraticTurn, quizTurn, gradeTurn, type TutorMode } from "@/lib/tutor/session";
 import { appendTurn, forModel, getOrCreateSession, saveState } from "@/lib/tutor/sessions";
@@ -14,6 +15,7 @@ export async function POST(req: NextRequest) {
     if (mode === "socratic") {
       // Stato conversazione persistito in sessions.state (single source of truth).
       const session = await getOrCreateSession("socratic", domainId, body.sessionId);
+      if (body.stream === true) return await socraticResponse(session, body.message ?? "", domainId, req.signal);
       const history = session.state?.history ?? [];
       const message = body.message ?? "";
       const turn = await socraticTurn(forModel(history), message, domainId);
