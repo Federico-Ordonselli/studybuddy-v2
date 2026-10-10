@@ -85,6 +85,7 @@ export function ensureHubSchema() {
   ensureTable("notes");
   ensureTable("sf6_combos");
   ensureTable("sf6_tips");
+  ensureColumn("cards", "suspended", "integer NOT NULL DEFAULT 0");
   ensureColumn("sessions", "updated_at", "integer");
   const cols = sqlite.prepare("PRAGMA table_info(domains)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "areas")) return;

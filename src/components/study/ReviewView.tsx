@@ -3,12 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { post } from "@/lib/client/api";
+import CardManager from "./CardManager";
 import { S } from "./styles";
 import type { ReviewCard, ReviewResult } from "./types";
 
 /** Ripasso SM-2: coda delle carte in scadenza (figli inclusi se è un macro) + generazione carte. */
 export default function ReviewView({ domainId }: { domainId: number }) {
   const router = useRouter();
+  const [version, setVersion] = useState(0);
   const [due, setDue] = useState(0);
   const [card, setCard] = useState<ReviewCard | null>(null);
   const [answer, setAnswer] = useState("");
@@ -32,6 +34,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
       });
       setGenTopic("");
       await loadDue(domainId);
+      setVersion(v=>v+1);
       if (res.ok) router.refresh(); // aggiorna i badge della sidebar
     } finally { setBusy(false); }
   }
@@ -104,6 +107,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
           )}
         </div>
       )}
+      <CardManager domainId={domainId} version={version} onChange={()=>{void loadDue(domainId);router.refresh();}} />
     </div>
   );
 }

@@ -29,3 +29,15 @@ export async function readJson(req: Request): Promise<Record<string, unknown> | 
 }
 
 export const badJson = () => NextResponse.json({ error: "JSON non valido" }, { status: 400 });
+
+/** Errori LLM: nessun dettaglio interno al client. */
+export function llmError(e: unknown) {
+  if (e instanceof LibraryError) return NextResponse.json({error:e.message},{status:e.status});
+  console.error('[api llm]',e);
+  const code = (e as {cause?: {code?: string}})?.cause?.code;
+  const unavailable = code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'EHOSTUNREACH';
+  return NextResponse.json({error:unavailable ? 'Ollama non raggiungibile' : 'Errore interno. Riprova.'},{status:unavailable ? 503 : 500});
+}
+export async function handleLlm(fn: () => Promise<unknown>) {
+  try { return NextResponse.json(await fn()); } catch (e) { return llmError(e); }
+}
