@@ -63,6 +63,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     if (mode === "quiz" && pendingQ) { await submitAnswer(text, pendingQ); return; }
     setMsgs((m) => [...m, { role: "user", content: text }]);
     setLoading(true);
+    let streamPlaceholder = false;
     try {
       if (mode === "socratic") {
         abortRef.current = new AbortController();
@@ -70,6 +71,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
           body:JSON.stringify({mode,domainId,message:text,sessionId,stream:true}), signal:abortRef.current.signal});
         if (!response.ok) throw new Error((await response.json()).error ?? "Errore del tutor");
         if (!response.body) throw new Error("Stream assente");
+        streamPlaceholder = true;
         setMsgs(m => [...m,{role:"assistant",content:""}]);
         let completed = false;
         for await (const {event,data} of decodedSse(response.body)) {
@@ -89,7 +91,11 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
         if (turn.question) setPendingQ(turn.question);
       }
     } catch (e) {
-      setMsgs((m) => [...m, { role: "assistant", content: `Errore: ${e}` }]);
+      setMsgs((m) => {
+        const last = m.at(-1);
+        const history = streamPlaceholder && last?.role === "assistant" && !last.content ? m.slice(0, -1) : m;
+        return [...history, { role: "assistant", content: `Errore: ${e}` }];
+      });
     } finally { setLoading(false); }
   }
 
