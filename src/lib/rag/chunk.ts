@@ -36,7 +36,7 @@ function splitOversize(text: string, max: number): string[] {
  */
 export function chunkText(text: string): string[] {
   // Spazio per l'overlap che viene anteposto al pezzo successivo.
-  const max = (rag.chunkTokens - rag.chunkOverlap) * 4;
+  const max = Math.max(1, (rag.chunkTokens - rag.chunkOverlap) * 4 - 2);
   const paras = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
     .flatMap((p) => splitOversize(p, max));
   const out: string[] = [];
@@ -69,7 +69,8 @@ export function chunkTranscript(cues: TranscriptCue[]): ChunkRecord[] {
   let buf = "";
   let start = cues[0]?.startSec ?? 0;
   let end = start;
-  for (const c of cues) {
+  const bounded = cues.flatMap(c => splitOversize(c.text, rag.chunkTokens * 4).map(text => ({...c,text})));
+  for (const c of bounded) {
     if (approxTokens(buf + " " + c.text) > rag.chunkTokens && buf) {
       out.push({ content: buf.trim(), meta: { startSec: start, endSec: end } });
       buf = c.text;
