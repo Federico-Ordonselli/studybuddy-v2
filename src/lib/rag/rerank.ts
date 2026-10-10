@@ -11,9 +11,10 @@ import type { Retrieved } from "./store";
 export async function rerank(
   query: string,
   candidates: Retrieved[],
-  topN: number
+  topN: number,
+  force = false
 ): Promise<Retrieved[]> {
-  if (candidates.length <= topN) return candidates;
+  if (!force && candidates.length <= topN) return candidates;
 
   if (cfg.strategy === "cross-encoder") {
     try {
