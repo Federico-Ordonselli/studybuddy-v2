@@ -41,6 +41,8 @@ export const models: Record<Task, ModelRef> = {
  */
 export const ollama = {
   numCtx: 16384,
+  headersTimeoutMs: 30 * 60_000,
+  bodyTimeoutMs: 30 * 60_000,
   think: false,
 };
 

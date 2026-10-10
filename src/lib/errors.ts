@@ -4,3 +4,6 @@ export class LibraryError extends Error {
     super(message);
   }
 }
+
+/** Connessione a Ollama fallita, distinta dagli errori del modello. */
+export class OllamaUnavailableError extends Error {}
