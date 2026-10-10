@@ -4,6 +4,7 @@ export interface ChatMessage {
 }
 
 export interface GenerateOptions {
+  signal?: AbortSignal;
   system?: string;
   messages: ChatMessage[];
   temperature?: number;
@@ -20,5 +21,6 @@ export interface GenerateOptions {
 export interface LLMProvider {
   readonly name: string;
   generate(model: string, opts: GenerateOptions): Promise<string>;
+  generateStream?(model: string, opts: GenerateOptions): AsyncIterable<string>;
   embed(model: string, texts: string[]): Promise<number[][]>;
 }

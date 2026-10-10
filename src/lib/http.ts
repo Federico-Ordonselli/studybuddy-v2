@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { LibraryError } from "@/lib/errors";
+import { LibraryError, OllamaUnavailableError } from "@/lib/errors";
 
 /** Esegue una mutazione: risultato (o `{ ok: true }`) come JSON, `LibraryError` → `{ error }` con il suo status. */
 export function handle(fn: () => unknown) {
@@ -7,7 +7,8 @@ export function handle(fn: () => unknown) {
     return NextResponse.json(fn() ?? { ok: true });
   } catch (e) {
     if (e instanceof LibraryError) return NextResponse.json({ error: e.message }, { status: e.status });
-    throw e;
+    console.error("[api]", e);
+    return NextResponse.json({ error: "Errore interno. Riprova." }, { status: 500 });
   }
 }
 
@@ -29,3 +30,14 @@ export async function readJson(req: Request): Promise<Record<string, unknown> | 
 }
 
 export const badJson = () => NextResponse.json({ error: "JSON non valido" }, { status: 400 });
+
+/** Errori LLM: nessun dettaglio interno al client. */
+export function llmError(e: unknown) {
+  if (e instanceof LibraryError) return NextResponse.json({error:e.message},{status:e.status});
+  console.error('[api llm]',e);
+  const unavailable = e instanceof OllamaUnavailableError;
+  return NextResponse.json({error:unavailable ? 'Ollama non raggiungibile' : 'Errore interno. Riprova.'},{status:unavailable ? 503 : 500});
+}
+export async function handleLlm(fn: () => Promise<unknown>) {
+  try { return NextResponse.json(await fn()); } catch (e) { return llmError(e); }
+}

@@ -1,9 +1,30 @@
+import { decodedLines } from "./stream";
+import { Agent } from "undici";
+import { OllamaUnavailableError } from "@/lib/errors";
 import { ollama as cfg } from "@/lib/config";
 import type { LLMProvider, GenerateOptions } from "./types";
 
 /** URL di Ollama (letto a ogni chiamata: i test e Docker lo cambiano via env). */
 export const ollamaBaseUrl = () => process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const BASE = ollamaBaseUrl;
+let transport: {key:string;agent:Agent} | undefined;
+function dispatcher() {
+  const key = `${cfg.headersTimeoutMs}:${cfg.bodyTimeoutMs}`;
+  if (!transport || transport.key !== key) {
+    void transport?.agent.close();
+    transport = {key,agent:new Agent({headersTimeout:cfg.headersTimeoutMs,bodyTimeout:cfg.bodyTimeoutMs})};
+  }
+  return transport.agent;
+}
+async function ollamaFetch(url: string, init: RequestInit) {
+  try {
+    return await fetch(url, {...init, dispatcher:dispatcher()} as RequestInit);
+  } catch(e) {
+    const code = (e as {cause?:{code?:string}})?.cause?.code;
+    if (["ECONNREFUSED","ENOTFOUND","EHOSTUNREACH"].includes(code ?? "")) throw new OllamaUnavailableError("Ollama non raggiungibile",{cause:e});
+    throw e;
+  }
+}
 
 export const ollamaProvider: LLMProvider = {
   name: "ollama",
@@ -13,7 +34,8 @@ export const ollamaProvider: LLMProvider = {
       ...(opts.system ? [{ role: "system", content: opts.system }] : []),
       ...opts.messages,
     ];
-    const res = await fetch(`${BASE()}/api/chat`, {
+    const res = await ollamaFetch(`${BASE()}/api/chat`, {
+      signal: opts.signal,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -35,8 +57,29 @@ export const ollamaProvider: LLMProvider = {
     return data.message?.content ?? "";
   },
 
+  async *generateStream(model, opts) {
+    const res = await ollamaFetch(`${BASE()}/api/chat`, {
+      method: "POST", signal: opts.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({model, messages: [...(opts.system ? [{role:"system",content:opts.system}] : []), ...opts.messages],
+        stream: true, think: opts.think ?? cfg.think, format: opts.schema ?? (opts.json ? "json" : undefined),
+        options: {num_ctx: opts.numCtx ?? cfg.numCtx, temperature: opts.temperature ?? 0.7, num_predict: opts.maxTokens ?? 1024}}),
+    });
+    if (!res.ok) throw new Error(`Ollama generate failed: ${res.status} ${await res.text()}`);
+    if (!res.body) throw new Error("Ollama: stream assente");
+    let done = false;
+    for await (const line of decodedLines(res.body)) {
+      if (!line.trim()) continue;
+      const data = JSON.parse(line);
+      if (data.error) throw new Error(`Ollama: ${data.error}`);
+      if (data.message?.content) yield data.message.content;
+      if (data.done) { done = true; break; }
+    }
+    if (!done) throw new Error("Ollama: stream incompleto");
+  },
+
   async embed(model, texts) {
-    const res = await fetch(`${BASE()}/api/embed`, {
+    const res = await ollamaFetch(`${BASE()}/api/embed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model, input: texts }),

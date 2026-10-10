@@ -1,6 +1,8 @@
 import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cards } from "@/lib/db/schema";
+import { LibraryError } from "@/lib/errors";
+import { jaccard, wordShingles } from "@/lib/rag/pipeline";
+import { cards, domains } from "@/lib/db/schema";
 import { retrieve, asContext } from "@/lib/rag/pipeline";
 import { resolveScope } from "@/lib/rag/store";
 import { generateQuiz } from "./quiz";
@@ -31,16 +33,19 @@ export async function generateCards(domainId: number, topic: string, n = 5): Pro
   if (!chunks.length) return { created: 0 };
 
   const qs = await generateQuiz(asContext(chunks), n, { topic, kind: "open" });
-  const sourceChunkId = chunks[0]?.chunkId ?? null; // attribuzione best-effort
+  const existing = db.select({question:cards.question}).from(cards).where(eq(cards.domainId,domainId)).all().map(c=>c.question);
   let created = 0;
   for (const q of qs) {
     if (!q.question?.trim() || !q.answer?.trim()) continue;
+    if (isDuplicateQuestion(q.question, existing)) continue;
+    const sourceChunkId = sourceForAnswer(q.answer, chunks);
     await db.insert(cards).values({
       domainId,
       question: q.question,
       answer: q.answer,
       sourceChunkId,
     });
+    existing.push(q.question);
     created++;
   }
   return { created };
@@ -48,7 +53,7 @@ export async function generateCards(domainId: number, topic: string, n = 5): Pro
 
 /** Carte in scadenza (dueAt <= ora) nello scope del dominio: un macro include le carte dei figli. */
 function dueIn(domainId: number) {
-  return and(inArray(cards.domainId, resolveScope(domainId) ?? [domainId]), lte(cards.dueAt, new Date()));
+  return and(eq(cards.suspended,false), inArray(cards.domainId, resolveScope(domainId) ?? [domainId]), lte(cards.dueAt, new Date()));
 }
 
 /** Numero di carte attualmente in scadenza per il dominio (figli inclusi). */
@@ -79,7 +84,7 @@ export function nextDueCard(domainId: number): ReviewCard | null {
  */
 export async function reviewCard(cardId: number, answer: string, scopeDomainId?: number): Promise<ReviewResult | null> {
   const card = db.select().from(cards).where(eq(cards.id, cardId)).get();
-  if (!card) return null;
+  if (!card || card.suspended) return null;
 
   const grade = await gradeAnswer(card.question, card.answer, answer);
   const next = sm2(
@@ -100,4 +105,49 @@ export async function reviewCard(cardId: number, answer: string, scopeDomainId?:
     dueAt: due.getTime(),
     remaining: scope ? dueCount(scope) : 0,
   };
+}
+
+export function listCards(domainId: number, filter: "due" | "all" = "all") {
+  return db.select().from(cards).where(filter === "due" ? dueIn(domainId) : inArray(cards.domainId,resolveScope(domainId) ?? [domainId])).orderBy(asc(cards.dueAt),asc(cards.id)).all();
+}
+
+function requireCard(id: number) {
+  const card = db.select().from(cards).where(eq(cards.id,id)).get();
+  if (!card) throw new LibraryError("Carta non trovata",404);
+  return card;
+}
+function cardText(value: string, name: string): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 10000) throw new LibraryError(`${name}: serve testo non vuoto di massimo 10000 caratteri`);
+  return value.trim();
+}
+export function updateCard(id: number, values: {question: string; answer: string}) {
+  requireCard(id);
+  const question = cardText(values.question,"Domanda"), answer = cardText(values.answer,"Risposta");
+  return db.update(cards).set({question,answer}).where(eq(cards.id,id)).returning().get();
+}
+export function deleteCard(id: number) { requireCard(id); db.delete(cards).where(eq(cards.id,id)).run(); }
+export function suspendCard(id: number, suspended: boolean) {
+  requireCard(id);
+  if (typeof suspended !== "boolean") throw new LibraryError("suspended deve essere booleano");
+  return db.update(cards).set({suspended}).where(eq(cards.id,id)).returning().get();
+}
+export function isDuplicateQuestion(question: string, existing: string[], threshold = 0.6): boolean {
+  const normalized = (s:string) => (s.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).join(" ");
+  return existing.some(q => normalized(q) === normalized(question) || jaccard(wordShingles(q),wordShingles(question)) >= threshold);
+}
+/** Attribuzione lessicale della risposta al passaggio più pertinente. */
+export function sourceForAnswer(answer: string, chunks: {chunkId:number;content:string}[]): number | null {
+  const words = (s:string) => new Set(s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+  return chunks.map((c,i)=>({id:c.chunkId,score:jaccard(words(answer),words(c.content)),i})).sort((a,b)=>b.score-a.score || a.i-b.i)[0]?.id ?? null;
+}
+
+/** Il quiz entra nel ripasso solo su richiesta esplicita dello studente. */
+export function createCardFromQuiz(domainId: number, quiz: {question:string;answer:string}) {
+  if (!db.select({id:domains.id}).from(domains).where(eq(domains.id,domainId)).get()) throw new LibraryError('Corso non trovato',404);
+  const question=cardText(quiz.question,'Domanda'), answer=cardText(quiz.answer,'Risposta');
+  const existing=db.select().from(cards).where(eq(cards.domainId,domainId)).all();
+  const duplicate=existing.find(c=>isDuplicateQuestion(question,[c.question]));
+  if(duplicate) return {created:false,card:duplicate};
+  const card=db.insert(cards).values({domainId,question,answer}).returning().get();
+  return {created:true,card};
 }

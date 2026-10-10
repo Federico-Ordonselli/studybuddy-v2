@@ -1,24 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { dueCount, nextDueCard, reviewCard } from "@/lib/tutor/cards";
-
+import {handle, handleLlm, readJson, badJson} from "@/lib/http";
+import {positiveId,text} from "@/lib/validation";
+import {LibraryError} from "@/lib/errors";
 export const runtime = "nodejs";
-
-/** Prossima carta in scadenza + conteggio coda per un dominio. */
 export async function GET(req: NextRequest) {
-  const domainId = Number(req.nextUrl.searchParams.get("domainId"));
-  if (!domainId) return NextResponse.json({ error: "domainId richiesto" }, { status: 400 });
-  return NextResponse.json({ due: dueCount(domainId), card: nextDueCard(domainId) });
+  return handle(()=>{
+    const domainId=positiveId(Number(req.nextUrl.searchParams.get("domainId")),"domainId",true)!;
+    return {due:dueCount(domainId),card:nextDueCard(domainId)};
+  });
 }
-
-/** Valuta la risposta a una carta e la riprogramma con SM-2. */
 export async function POST(req: NextRequest) {
-  const { cardId, answer, domainId } = await req.json();
-  if (!cardId) return NextResponse.json({ error: "cardId richiesto" }, { status: 400 });
-  try {
-    const res = await reviewCard(cardId, answer ?? "", domainId ? Number(domainId) : undefined);
-    if (!res) return NextResponse.json({ error: "carta non trovata" }, { status: 404 });
-    return NextResponse.json(res);
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 });
-  }
+  const body=await readJson(req);if(!body)return badJson();
+  return handleLlm(async()=>{
+    const cardId=positiveId(body.cardId,"cardId",true)!;
+    const answer=text(body.answer,"answer"),domainId=positiveId(body.domainId,"domainId");
+    const result=await reviewCard(cardId,answer,domainId);
+    if(!result)throw new LibraryError("Carta non trovata",404);
+    return result;
+  });
 }

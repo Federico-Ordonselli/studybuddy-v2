@@ -85,6 +85,7 @@ export function ensureHubSchema() {
   ensureTable("notes");
   ensureTable("sf6_combos");
   ensureTable("sf6_tips");
+  ensureColumn("cards", "suspended", "integer NOT NULL DEFAULT 0");
   ensureColumn("sessions", "updated_at", "integer");
   const cols = sqlite.prepare("PRAGMA table_info(domains)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "areas")) return;
@@ -156,12 +157,22 @@ initSchema();
 ensureLibrarySchema();
 ensureHubSchema();
 
-/** Crea la virtual table degli embedding. Idempotente. */
+let warnedLegacyVectorStore = false;
+
+/** Crea la virtual table e restituisce il supporto al filtro per dominio. */
 export function initVectorStore() {
   sqlite.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
       chunk_id INTEGER PRIMARY KEY,
-      embedding float[${EMBED_DIM}]
+      embedding float[${EMBED_DIM}],
+      domain_id INTEGER
     );
   `);
+  const columns = sqlite.prepare("PRAGMA table_info(vec_chunks)").all() as { name: string }[];
+  const scoped = columns.some((column) => column.name === "domain_id");
+  if (!scoped && !warnedLegacyVectorStore) {
+    warnedLegacyVectorStore = true;
+    console.warn("[vec] Schema precedente: kNN globale con post-filtro. Migrare una copia con scripts/migrate-vec-domain.ts.");
+  }
+  return scoped;
 }

@@ -15,12 +15,12 @@ export function dueByDomain(): DueItem[] {
   return sqlite.prepare(
     `SELECT d.id, d.name, d.kind, count(*) AS due
      FROM cards c JOIN domains d ON d.id = c.domain_id
-     WHERE c.due_at <= ? GROUP BY d.id ORDER BY due DESC, d.name COLLATE NOCASE`
+     WHERE c.suspended = 0 AND c.due_at <= ? GROUP BY d.id ORDER BY due DESC, d.name COLLATE NOCASE`
   ).all(nowSec()) as DueItem[];
 }
 
 export function dueTotal(): number {
-  return (sqlite.prepare("SELECT count(*) AS n FROM cards WHERE due_at <= ?").get(nowSec()) as { n: number }).n;
+  return (sqlite.prepare("SELECT count(*) AS n FROM cards WHERE suspended = 0 AND due_at <= ?").get(nowSec()) as { n: number }).n;
 }
 
 /** Ultimi corsi studiati: per dominio l'ultima sessione (`updated_at`, o `created_at` sulle righe vecchie). */

@@ -7,6 +7,7 @@ import { CAPTURE_EVENT } from "@/lib/client/captureTarget";
 import type { ShellData } from "@/lib/home";
 import QuickCapture from "@/components/notes/QuickCapture";
 import Sidebar from "./Sidebar";
+import ThemeToggle from "./ThemeToggle";
 
 /** True se il tasto va a un campo di testo: lì `n` è una lettera, non una scorciatoia. */
 export function isTypingTarget(el: EventTarget | null): boolean {
@@ -55,7 +56,7 @@ export default function Shell({ data, children }: { data: ShellData; children: R
   const openCapture = () => { setDrawer(false); setCapture(true); };
 
   return (
-    <div className="h-dvh flex">
+    <div className="app-shell h-dvh flex">
       <div className="hidden md:flex">
         <Sidebar data={data} pathname={pathname} collapsed={collapsed} onToggle={() => setExpanded(collapsed)} onCapture={openCapture} />
       </div>
@@ -67,11 +68,12 @@ export default function Shell({ data, children }: { data: ShellData; children: R
         </div>
       )}
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="md:hidden h-12 shrink-0 border-b border-border px-4 flex items-center gap-3">
+        <header className="mobile-bar md:hidden h-14 shrink-0 border-b border-border px-4 flex items-center gap-3">
           <button type="button" onClick={() => setDrawer(true)} aria-label="Apri il menu" className="text-lg text-fg-muted hover:text-fg">☰</button>
           <Link href="/" className="font-display text-xl tracking-tight">StudyBuddy</Link>
+          <ThemeToggle collapsed />
         </header>
-        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">{children}</div>
+        <div className="app-content flex-1 min-h-0 overflow-y-auto flex flex-col">{children}</div>
       </div>
       {capture && <QuickCapture data={data} pathname={pathname} onClose={() => setCapture(false)} />}
     </div>

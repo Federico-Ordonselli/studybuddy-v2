@@ -8,7 +8,7 @@ import { rerank } from "./rerank";
  * Reciprocal Rank Fusion: fonde più liste ordinate per posizione (non per score,
  * così non serve normalizzare cosine vs BM25). score(d) = Σ 1/(rrfK + rank_d).
  */
-function rrfFuse(lists: Retrieved[][], k: number): Retrieved[] {
+export function rrfFuse(lists: Retrieved[][], k: number): Retrieved[] {
   const score = new Map<number, number>();
   const byId = new Map<number, Retrieved>();
   for (const list of lists) {
@@ -37,7 +37,8 @@ export async function retrieve(query: string, domainId?: number): Promise<Retrie
   const candidates = rag.hybrid
     ? await hybridSearch(query, rag.topK, domainId)
     : await vectorSearch(query, rag.topK, domainId);
-  return rerank(query, candidates, rag.topN);
+  const ranked = await rerank(query, candidates, candidates.length, true);
+  return dedupChunks(ranked).slice(0, rag.topN);
 }
 
 export function asContext(chunks: Retrieved[]): string {
@@ -86,4 +87,32 @@ export function toCitations(chunks: Retrieved[]): Citation[] {
       video: mp4 ? { path: mp4, startSec: startSec ?? 0 } : undefined,
     };
   });
+}
+
+/** Shingle di tre parole, con fallback per i testi più corti. */
+export function wordShingles(text: string): Set<string> {
+  const words = text.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  const size = Math.min(3, words.length);
+  return new Set(size ? Array.from({length: words.length - size + 1}, (_,i) => words.slice(i,i+size).join(" ")) : []);
+}
+
+export function jaccard(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let shared = 0;
+  for (const value of a) if (b.has(value)) shared++;
+  return shared / (a.size + b.size - shared);
+}
+
+/** Conserva l'ordine del reranker; una trascrizione sostituisce un duplicato senza timestamp. */
+export function dedupChunks(chunks: Retrieved[], threshold = rag.dedupThreshold): Retrieved[] {
+  const kept: Retrieved[] = [];
+  for (const chunk of chunks) {
+    const matches = kept.map((c,i) => jaccard(wordShingles(c.content), wordShingles(chunk.content)) >= threshold ? i : -1).filter(i => i >= 0);
+    if (!matches.length) kept.push(chunk);
+    else if (chunk.docKind === "transcript" && matches.every(i => kept[i].docKind !== "transcript")) {
+      kept[matches[0]] = chunk;
+      for (const i of matches.slice(1).reverse()) kept.splice(i,1);
+    }
+  }
+  return kept;
 }

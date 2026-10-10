@@ -1,3 +1,4 @@
+import { exclusiveWithRetry } from "@/lib/transcriptionLock";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -90,7 +91,7 @@ async function localSrt(media: string, language = cfg.language, signal?: AbortSi
 export async function transcribeToSrt(media: string): Promise<string | null> {
   if (!pickBackend()) return null;
   try {
-    return await localSrt(media);
+    return await exclusiveWithRetry(() => localSrt(media), cfg.lockWaitMs);
   } catch (e) {
     console.warn(`[whisper] trascrizione fallita per ${path.basename(media)}: ${e instanceof Error ? e.message : e}`);
     return null;

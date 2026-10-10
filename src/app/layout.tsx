@@ -18,7 +18,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // I dati della shell si rileggono a ogni richiesta e a ogni router.refresh(), NON a ogni navigazione client
   // (il layout condiviso non viene rifetchato): chi cambia carte o note deve chiamare router.refresh().
   return (
-    <html lang="it">
+    <html lang="it" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){var t;try{t=localStorage.getItem("studybuddy-theme-v1")}catch{}document.documentElement.dataset.theme=t==="dark"||t==="light"?t:matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"})();` }} />
+      </head>
       <body>
         <Shell data={getShellData()}>{children}</Shell>
       </body>

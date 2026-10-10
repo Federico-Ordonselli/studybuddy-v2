@@ -69,18 +69,5 @@ export async function transcribeSource(input: { url?: string; file?: string; lan
   throw new LibraryError("Specifica url, vod_filename o upload_id.");
 }
 
-let busySince: number | null = null;
-
-/** Esegue `fn` se non c'è già una trascrizione in corso (stesso processo Next), altrimenti 409. */
-export async function exclusive<T>(fn: () => Promise<T>): Promise<T> {
-  if (busySince !== null) {
-    const min = Math.max(1, Math.round((Date.now() - busySince) / 60_000));
-    throw new LibraryError(`c'è già una trascrizione in corso (da ${min} min): riprova quando finisce`, 409);
-  }
-  busySince = Date.now();
-  try {
-    return await fn();
-  } finally {
-    busySince = null;
-  }
-}
+// Stesso lock dell'ingest, condiviso anche fra processi CLI e server.
+export { exclusive, formatTranscriptionAge } from "@/lib/transcriptionLock";

@@ -1,3 +1,4 @@
+import { rag } from "@/lib/config";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
@@ -31,8 +32,20 @@ export function appendTurn(
 }
 
 /** Al modello vanno solo i turni: le citazioni sono per la UI. */
-export const forModel = (history: TutorMessage[]): ChatMessage[] =>
-  history.map(({ role, content }) => ({ role, content }));
+export function forModel(history: TutorMessage[], turns = rag.historyTurns, budget = rag.historyChars): ChatMessage[] {
+  const selected: ChatMessage[] = [];
+  let used = 0;
+  for (const { role, content } of history.slice(-Math.max(0, turns) * 2).reverse()) {
+    if (turns <= 0 || budget <= used) break;
+    const text = content.slice(0, budget - used);
+    selected.push({ role, content: text });
+    used += text.length;
+  }
+  const ordered = selected.reverse();
+  // Non iniziare con una risposta orfana se il budget ha escluso la domanda.
+  while (ordered[0]?.role === "assistant") ordered.shift();
+  return ordered;
+}
 
 export interface SessionRow {
   id: number;

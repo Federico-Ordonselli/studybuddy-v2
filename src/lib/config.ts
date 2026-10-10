@@ -41,6 +41,8 @@ export const models: Record<Task, ModelRef> = {
  */
 export const ollama = {
   numCtx: 16384,
+  headersTimeoutMs: 30 * 60_000,
+  bodyTimeoutMs: 30 * 60_000,
   think: false,
 };
 
@@ -88,6 +90,7 @@ export const image = {
  * è installato l'ingest salta i video (no-op). Attivo solo con `--whisper` nella CLI.
  */
 export const whisper = {
+  lockWaitMs: Number(process.env.WHISPER_LOCK_WAIT_MS ?? 30 * 60_000), // attesa massima ingest
   backend: "auto" as "auto" | "faster-whisper" | "whisper.cpp" | "openai-whisper",
   model: process.env.WHISPER_MODEL ?? "base", // tiny|base|small|medium|large-v3
   language: process.env.WHISPER_LANG || undefined, // es. "en"; undefined = auto-detect
@@ -102,5 +105,9 @@ export const rag = {
   topK: 20,        // candidati dal retrieval (per ramo: dense e sparse)
   topN: 6,         // chunk tenuti dopo il rerank
   hybrid: true,    // fonde dense (sqlite-vec) + sparse (BM25/FTS5) via RRF
+  historyTurns: 8,
+  historyChars: 12000,
+  retrievalExcerptChars: 600,
+  dedupThreshold: 0.6,
   rrfK: 60,        // costante della Reciprocal Rank Fusion
 };

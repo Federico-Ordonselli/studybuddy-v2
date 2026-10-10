@@ -83,6 +83,7 @@ export const cards = sqliteTable("cards", {
   question: text("question").notNull(),
   answer: text("answer").notNull(),
   sourceChunkId: integer("source_chunk_id").references(() => chunks.id),
+  suspended: integer("suspended", {mode:"boolean"}).notNull().default(false),
   // stato SM-2
   ease: real("ease").notNull().default(2.5),
   intervalDays: integer("interval_days").notNull().default(0),

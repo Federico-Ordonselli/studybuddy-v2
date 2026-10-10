@@ -29,10 +29,10 @@ type TypeMeta = { label: string; color: string; bg: string; border: string };
 
 const CHARACTER_TYPE_META: Record<string, TypeMeta> = {
   overview: { label: "Overview",  color: "text-[var(--color-accent)]",   bg: "bg-[var(--color-accent)]/15", border: "border-[var(--color-accent)]/50" },
-  combo:    { label: "Combo",     color: "text-[#F0CC75]",                bg: "bg-[#D4A437]/15",             border: "border-[#D4A437]/40" },
-  tech:     { label: "Tech",      color: "text-[#7CC0B7]",                bg: "bg-[#5FA89F]/15",             border: "border-[#5FA89F]/40" },
-  strategy: { label: "Strategy",  color: "text-[#B86FB5]",                bg: "bg-[#B86FB5]/15",             border: "border-[#B86FB5]/40" },
-  matchup:  { label: "Matchup",   color: "text-[#E07B3D]",                bg: "bg-[#E07B3D]/15",             border: "border-[#E07B3D]/40" },
+  combo:    { label: "Combo",     color: "text-[var(--accent)]",                bg: "bg-[var(--accent)]/15",             border: "border-[var(--accent)]/40" },
+  tech:     { label: "Tech",      color: "text-[var(--color-ok)]",                bg: "bg-[var(--color-ok)]/15",             border: "border-[var(--color-ok)]/40" },
+  strategy: { label: "Strategy",  color: "text-[var(--color-fg-muted)]",                bg: "bg-[var(--color-fg-muted)]/15",             border: "border-[var(--color-fg-muted)]/40" },
+  matchup:  { label: "Matchup",   color: "text-[var(--accent)]",                bg: "bg-[var(--accent)]/15",             border: "border-[var(--accent)]/40" },
   general:  { label: "General",   color: "text-[var(--color-fg-muted)]",  bg: "bg-[var(--color-surface-2)]", border: "border-[var(--color-border)]" },
 };
 

@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { decodedSse } from "@/lib/client/sse";
 import { post } from "@/lib/client/api";
 import Markdown from "./Markdown";
 import { S } from "./styles";
@@ -12,12 +14,17 @@ async function chat(body: Record<string, unknown>) {
 
 /** Thread del tutor: `socratic` (sessione salvata e ripresa) o `quiz` (domanda → valutazione). */
 export default function TutorView({ domainId, mode, initialInput = "" }: { domainId: number; mode: "socratic" | "quiz"; initialInput?: string }) {
+  const router = useRouter();
+  const [cardError, setCardError] = useState("");
+  const [adding, setAdding] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState(initialInput);
   const [loading, setLoading] = useState(false);
   const [pendingQ, setPendingQ] = useState<QuizQuestion | null>(null);
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [video, setVideo] = useState<{ path: string; startSec: number; label: string } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
   const threadRef = useRef<HTMLDivElement>(null);
 
   // Socratico: riprende la sessione salvata per questo dominio (il componente è rimontato per dominio/modalità).
@@ -43,7 +50,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     setPendingQ(null); setLoading(true);
     try {
       const turn = await chat({ mode: "review", question: q, answer: ans });
-      setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Valutazione", grade: turn.grade }]);
+      setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Valutazione", grade: turn.grade, reviewQuiz: q }]);
     } catch (e) {
       setMsgs((m) => [...m, { role: "assistant", content: `Errore: ${e}` }]);
     } finally { setLoading(false); }
@@ -56,19 +63,49 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     if (mode === "quiz" && pendingQ) { await submitAnswer(text, pendingQ); return; }
     setMsgs((m) => [...m, { role: "user", content: text }]);
     setLoading(true);
+    let streamPlaceholder = false;
     try {
       if (mode === "socratic") {
-        const turn = await chat({ mode, domainId, message: text, sessionId });
-        if (turn.sessionId && domainId) { setSessionId(turn.sessionId); localStorage.setItem(sessionKey(domainId), String(turn.sessionId)); }
-        setMsgs((m) => [...m, { role: "assistant", content: turn.reply, citations: turn.citations }]);
+        abortRef.current = new AbortController();
+        const response = await fetch("/api/chat", {method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({mode,domainId,message:text,sessionId,stream:true}), signal:abortRef.current.signal});
+        if (!response.ok) throw new Error((await response.json()).error ?? "Errore del tutor");
+        if (!response.body) throw new Error("Stream assente");
+        streamPlaceholder = true;
+        setMsgs(m => [...m,{role:"assistant",content:""}]);
+        let completed = false;
+        for await (const {event,data} of decodedSse(response.body)) {
+          if (event === "metadata") {
+            setSessionId(data.sessionId);
+            try { localStorage.setItem(sessionKey(domainId),String(data.sessionId)); } catch {}
+            setMsgs(m => m.map((msg,i) => i === m.length-1 ? {...msg,citations:data.citations} : msg));
+          } else if (event === "token") {
+            setMsgs(m => m.map((msg,i) => i === m.length-1 ? {...msg,content:msg.content+data.text} : msg));
+          } else if (event === "error") throw new Error(data.error);
+          else if (event === "done") completed = true;
+        }
+        if (!completed) throw new Error("Risposta incompleta. Riprova.");
       } else {
         const turn = await chat({ mode: "quiz", domainId, message: text });
         setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Domanda", citations: turn.citations, question: turn.question }]);
         if (turn.question) setPendingQ(turn.question);
       }
     } catch (e) {
-      setMsgs((m) => [...m, { role: "assistant", content: `Errore: ${e}` }]);
+      setMsgs((m) => {
+        const last = m.at(-1);
+        const history = streamPlaceholder && last?.role === "assistant" && !last.content ? m.slice(0, -1) : m;
+        return [...history, { role: "assistant", content: `Errore: ${e}` }];
+      });
     } finally { setLoading(false); }
+  }
+
+  async function addToReview(index: number, quiz: QuizQuestion) {
+    setAdding(true);setCardError("");
+    try {
+      await post("/api/cards",{domainId,question:quiz.question,answer:quiz.answer});
+      setMsgs(m=>m.map((msg,i)=>i===index?{...msg,addedToReview:true}:msg));
+      router.refresh();
+    } catch(e) {setCardError(String(e));} finally {setAdding(false);}
   }
 
   const placeholder = mode === "socratic"
@@ -85,7 +122,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
           </div>
           <video key={video.path + video.startSec}
             src={`/api/video?path=${encodeURIComponent(video.path)}#t=${video.startSec}`}
-            controls autoPlay style={{ width: "100%", borderRadius: 8, background: "#000" }} />
+            controls autoPlay style={{ width: "100%", borderRadius: 8, background: "var(--bg)" }} />
         </div>
       )}
 
@@ -111,8 +148,13 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
                   )}
                   {m.grade && (
                     <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted)" }}>
-                      Qualità SM-2: <b style={{ color: m.grade.correct ? "#6ee7a8" : "#ff8f8f" }}>{m.grade.quality}/5</b>
+                      Qualità SM-2: <b style={{ color: m.grade.correct ? "var(--color-ok)" : "var(--color-danger)" }}>{m.grade.quality}/5</b>
                     </div>
+                  )}
+                  {m.grade && m.grade.quality < 3 && m.reviewQuiz && (
+                    <button style={S.ghost} disabled={adding || m.addedToReview} onClick={()=>addToReview(i,m.reviewQuiz!)}>
+                      {m.addedToReview ? "Aggiunta al ripasso" : "Aggiungi al ripasso"}
+                    </button>
                   )}
                   {m.citations && m.citations.length > 0 && (
                     <div style={S.cites}>
@@ -134,6 +176,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
             {loading && <div style={{ ...S.row, justifyContent: "flex-start" }}><div style={{ ...S.bubble, ...S.assistant }}><span className="spin" /> <span style={{ color: "var(--muted)" }}>sto pensando…</span></div></div>}
           </div>
 
+          {cardError && <p role="alert" style={{color:"var(--color-danger)"}}>{cardError}</p>}
           <div style={S.inputBar}>
             <textarea value={input} onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}

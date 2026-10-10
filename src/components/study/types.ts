@@ -26,6 +26,8 @@ export interface Msg {
   citations?: Citation[];
   tag?: string;
   grade?: Grade;
+  reviewQuiz?: QuizQuestion;
+  addedToReview?: boolean;
   question?: QuizQuestion;
 }
 
