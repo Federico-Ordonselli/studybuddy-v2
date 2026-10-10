@@ -102,5 +102,9 @@ export const rag = {
   topK: 20,        // candidati dal retrieval (per ramo: dense e sparse)
   topN: 6,         // chunk tenuti dopo il rerank
   hybrid: true,    // fonde dense (sqlite-vec) + sparse (BM25/FTS5) via RRF
+  historyTurns: 8,
+  historyChars: 12000,
+  retrievalExcerptChars: 600,
+  dedupThreshold: 0.6,
   rrfK: 60,        // costante della Reciprocal Rank Fusion
 };

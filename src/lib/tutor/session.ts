@@ -1,15 +1,12 @@
 import { retrieve, asContext, toCitations, type Citation } from "@/lib/rag/pipeline";
+import { rag } from "@/lib/config";
 import { generate, type ChatMessage } from "@/lib/providers";
 import { generateQuiz, normalizeOption, type QuizQuestion } from "./quiz";
 import { gradeAnswer, type Grade } from "./grade";
 
 export type TutorMode = "socratic" | "quiz" | "review";
 
-/**
- * Macchina a stati minimale del tutor.
- * TODO(claude-code): persistere lo stato in `sessions.state`, gestire la coda
- * delle carte SM-2 in modalita' "review", difficolta' adattiva.
- */
+/** Risultato di un turno del tutor. */
 export interface TutorTurn {
   reply: string;
   citations?: Citation[];
@@ -23,7 +20,7 @@ export async function socraticTurn(
   userMessage: string,
   domainId?: number
 ): Promise<TutorTurn> {
-  const chunks = await retrieve(userMessage, domainId);
+  const chunks = await retrieve(buildRetrievalQuery(history, userMessage), domainId);
   const reply = await generate("chat", {
     system:
       "Sei un tutor socratico. Usa SOLO il contesto fornito. Invece di dare la risposta " +
@@ -59,10 +56,18 @@ export async function gradeTurn(
  * Le mcq hanno una sola risposta giusta: confronto esatto, niente LLM-as-judge
  * (che premiava opzioni sbagliate ma "concettualmente vicine"). Errata = 1 per SM-2.
  */
-function gradeChoice(q: QuizQuestion, chosen: string): Grade {
+export function gradeChoice(q: QuizQuestion, chosen: string): Grade {
   const correct = normalizeOption(chosen) === normalizeOption(q.answer);
   const why = q.rationale?.trim() ? ` ${q.rationale.trim()}` : "";
   return correct
     ? { quality: 5, correct: true, feedback: `Corretto.${why}` }
     : { quality: 1, correct: false, feedback: `Non è corretta. Risposta giusta: «${q.answer}».${why}` };
+}
+
+/** Il seguito resta ancorato all'ultima domanda e risposta, senza una chiamata LLM. */
+export function buildRetrievalQuery(history: ChatMessage[], message: string, excerptChars = rag.retrievalExcerptChars): string {
+  if (!history.length) return message;
+  const user = [...history].reverse().find((m) => m.role === "user");
+  const assistant = [...history].reverse().find((m) => m.role === "assistant");
+  return [user?.content.slice(0, excerptChars), assistant?.content.slice(0, excerptChars), message].filter(Boolean).join("\n");
 }
