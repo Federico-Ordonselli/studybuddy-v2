@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { NotationRenderer } from "./notation-renderer";
 import { FUNDAMENTAL_TYPE_META } from "@/lib/sf6/fundamentals";
@@ -287,7 +288,9 @@ export function ImportDialog({
 
   const overviewCount = items.filter((i) => i.type === "overview").length;
 
-  return (
+  // Portal su body: le sezioni `fade-up` lasciano un transform che farebbe da
+  // containing block al `fixed`, ritagliando il dialogo dentro la sezione.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-md pt-8 pb-12 px-4">
       <div className="w-full max-w-5xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] rounded-lg shadow-2xl">
         {/* Header */}
@@ -726,7 +729,8 @@ export function ImportDialog({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
