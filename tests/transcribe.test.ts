@@ -41,3 +41,28 @@ test("parseSubtitles: spostato in lib/subtitles, coursera lo ri-esporta", async 
   const { parseSubtitles: fromCoursera } = await import("@/lib/rag/sources/coursera");
   assert.equal(fromCoursera, parseSubtitles);
 });
+
+test('transcribeToSrt salta il video con warning alla scadenza del lock', async () => {
+  const { whisper } = await import('@/lib/config');
+  const { transcribeToSrt } = await import('@/lib/transcribe');
+  const { exclusive } = await import('@/lib/transcriptionLock');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-ingest-lock-'));
+  const previousLock = process.env.STUDYBUDDY_TRANSCRIBE_LOCK;
+  const previous = { ...whisper };
+  const warn = console.warn;
+  const warnings: string[] = [];
+  process.env.STUDYBUDDY_TRANSCRIBE_LOCK = path.join(root, 'gpu.lock');
+  Object.assign(whisper, { backend: 'whisper.cpp', cppBinary: '/bin/true', cppModel: 'test', lockWaitMs: 0 });
+  console.warn = message => warnings.push(String(message));
+  try {
+    await exclusive(async () => assert.equal(await transcribeToSrt('video.mp4'), null));
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /video.mp4.*trascrizione in corso/);
+  } finally {
+    Object.assign(whisper, previous);
+    console.warn = warn;
+    if (previousLock === undefined) delete process.env.STUDYBUDDY_TRANSCRIBE_LOCK;
+    else process.env.STUDYBUDDY_TRANSCRIBE_LOCK = previousLock;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

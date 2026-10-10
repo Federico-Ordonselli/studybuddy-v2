@@ -90,6 +90,7 @@ export const image = {
  * è installato l'ingest salta i video (no-op). Attivo solo con `--whisper` nella CLI.
  */
 export const whisper = {
+  lockWaitMs: Number(process.env.WHISPER_LOCK_WAIT_MS ?? 30 * 60_000), // attesa massima ingest
   backend: "auto" as "auto" | "faster-whisper" | "whisper.cpp" | "openai-whisper",
   model: process.env.WHISPER_MODEL ?? "base", // tiny|base|small|medium|large-v3
   language: process.env.WHISPER_LANG || undefined, // es. "en"; undefined = auto-detect

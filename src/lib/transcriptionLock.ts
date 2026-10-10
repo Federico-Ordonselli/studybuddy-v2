@@ -45,3 +45,20 @@ export async function exclusive<T>(fn:()=>Promise<T>):Promise<T> {
   try {fs.writeFileSync(fd,JSON.stringify({pid:process.pid,since:Date.now(),identity}));return await fn();}
   finally {activeLocks.delete(lock);fs.closeSync(fd);fs.rmSync(lock,{force:true});}
 }
+
+/** Attesa riservata all'ingest; le route continuano a usare exclusive direttamente. */
+export async function exclusiveWithRetry<T>(fn: () => Promise<T>, maxWaitMs = 30 * 60_000): Promise<T> {
+  if (!Number.isFinite(maxWaitMs) || maxWaitMs < 0) throw new Error('Attesa lock non valida');
+  const deadline = performance.now() + maxWaitMs;
+  let delay = 1000;
+  for (;;) {
+    try { return await exclusive(fn); }
+    catch (error) {
+      if (!(error instanceof LibraryError) || error.status !== 409) throw error;
+      const remaining = deadline - performance.now();
+      if (remaining <= 0) throw error;
+      await new Promise(resolve => setTimeout(resolve, Math.min(delay, remaining)));
+      delay = Math.min(delay * 2, 30_000);
+    }
+  }
+}
