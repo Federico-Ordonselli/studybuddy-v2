@@ -74,8 +74,8 @@ let busySince: number | null = null;
 /** Esegue `fn` se non c'è già una trascrizione in corso (stesso processo Next), altrimenti 409. */
 export async function exclusive<T>(fn: () => Promise<T>): Promise<T> {
   if (busySince !== null) {
-    const min = Math.max(1, Math.round((Date.now() - busySince) / 60_000));
-    throw new LibraryError(`c'è già una trascrizione in corso (da ${min} min): riprova quando finisce`, 409);
+    const elapsed = formatTranscriptionAge(Date.now() - busySince);
+    throw new LibraryError(`c'è già una trascrizione in corso (da ${elapsed}): riprova quando finisce`, 409);
   }
   busySince = Date.now();
   try {
@@ -83,4 +83,9 @@ export async function exclusive<T>(fn: () => Promise<T>): Promise<T> {
   } finally {
     busySince = null;
   }
+}
+
+export function formatTranscriptionAge(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min${seconds % 60 ? ` ${seconds % 60} s` : ""}`;
 }
