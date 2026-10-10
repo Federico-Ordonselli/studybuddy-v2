@@ -1,4 +1,4 @@
-import {test} from 'node:test';
+import {test, after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,5 +15,20 @@ test('lock GPU condiviso fra processi e liberato anche dopo errori',async()=>{
  assert.equal(fs.existsSync(process.env.STUDYBUDDY_TRANSCRIBE_LOCK!),false);
  await assert.rejects(exclusive(async()=>{throw Error('failure')}));
  assert.equal(await exclusive(async()=>42),42);
- fs.rmSync(dir,{recursive:true,force:true});
+
+});
+
+after(() => fs.rmSync(dir,{recursive:true,force:true}));
+test('recupera un PID vivo appartenente a un processo precedente', async () => {
+ fs.writeFileSync(process.env.STUDYBUDDY_TRANSCRIBE_LOCK!, JSON.stringify({pid:process.pid,since:Date.now(),identity:'precedente'}));
+ assert.equal(await exclusive(async()=>42),42);
+});
+test('recupera lo stesso processo senza lock attivo in memoria', async () => {
+ let owner = '';
+ await exclusive(async()=> {
+  owner = fs.readFileSync(process.env.STUDYBUDDY_TRANSCRIBE_LOCK!, 'utf8');
+  await assert.rejects(exclusive(async()=>{}), (e: unknown) => (e as {status:number}).status === 409);
+ });
+ fs.writeFileSync(process.env.STUDYBUDDY_TRANSCRIBE_LOCK!,owner);
+ assert.equal(await exclusive(async()=>42),42);
 });

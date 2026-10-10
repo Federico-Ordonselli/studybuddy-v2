@@ -1,7 +1,19 @@
 import fs from 'node:fs';
+import {randomUUID} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import {LibraryError} from './errors';
+
+// Il boot ID distingue anche riavvii dell'host; starttime distingue il riuso del PID.
+function processIdentity(pid: number): string | undefined {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const start = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+    return `${fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()}:${start}`;
+  } catch { return undefined; }
+}
+const identity = processIdentity(process.pid) ?? randomUUID();
+const activeLocks = new Set<string>();
 
 export function formatTranscriptionAge(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));
@@ -15,17 +27,21 @@ export async function exclusive<T>(fn:()=>Promise<T>):Promise<T> {
     try { fd=fs.openSync(lock,'wx',0o600); break; }
     catch(e) {
       if((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
-      let owner:{pid:number;since:number}|undefined;
+      let owner:{pid:number;since:number;identity?:string}|undefined;
       try {owner=JSON.parse(fs.readFileSync(lock,'utf8'));}catch{}
       let alive=true;
       if(owner && Number.isSafeInteger(owner.pid) && owner.pid>0) {
         try{process.kill(owner.pid,0);}catch(e){alive=(e as NodeJS.ErrnoException).code !== 'ESRCH';}
       }
-      if(!alive && attempt===0){fs.unlinkSync(lock);continue;}
+      const currentIdentity = owner ? (owner.pid === process.pid ? identity : processIdentity(owner.pid)) : undefined;
+      const abandoned = !alive || (owner && currentIdentity !== undefined && owner.identity !== currentIdentity)
+        || (owner?.pid === process.pid && owner.identity === identity && !activeLocks.has(lock));
+      if(abandoned && attempt===0){fs.unlinkSync(lock);continue;}
       throw new LibraryError(`c'è già una trascrizione in corso (da ${formatTranscriptionAge(Date.now()-(owner?.since ?? Date.now()))}): riprova quando finisce`,409);
     }
   }
   if(fd===undefined)throw new LibraryError('Trascrizione occupata',409);
-  try {fs.writeFileSync(fd,JSON.stringify({pid:process.pid,since:Date.now()}));return await fn();}
-  finally {fs.closeSync(fd);fs.rmSync(lock,{force:true});}
+  activeLocks.add(lock);
+  try {fs.writeFileSync(fd,JSON.stringify({pid:process.pid,since:Date.now(),identity}));return await fn();}
+  finally {activeLocks.delete(lock);fs.closeSync(fd);fs.rmSync(lock,{force:true});}
 }
