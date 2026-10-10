@@ -161,7 +161,8 @@ export function initVectorStore() {
   sqlite.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
       chunk_id INTEGER PRIMARY KEY,
-      embedding float[${EMBED_DIM}]
+      embedding float[${EMBED_DIM}],
+      domain_id INTEGER
     );
   `);
 }
