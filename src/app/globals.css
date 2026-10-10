@@ -218,3 +218,29 @@
 .studio-explanation, .studio-examples, .studio-editor button.studio-source { color: var(--color-fg-muted); }
 .studio-editor button.danger, .studio-notice.error { color: var(--color-danger); }
 .studio-editor button.danger { background: var(--color-surface); border-color: var(--color-danger); }
+
+/* Colori semantici del modulo SF6: contrasto adatto ai due temi. */
+:root {
+  --sf6-shoto: #8B641A;
+  --sf6-charge: #365F8F;
+  --sf6-grappler: #9D3529;
+  --sf6-rushdown: #914918;
+  --sf6-zoner: #536B35;
+  --sf6-setplay: #70528F;
+  --sf6-footsies: #78603F;
+  --sf6-mixup: #9B4265;
+  --sf6-stance: #287066;
+  --sf6-trickster: #874782;
+}
+[data-theme="dark"] {
+  --sf6-shoto: #DFB650;
+  --sf6-charge: #80ACD5;
+  --sf6-grappler: #E38E7D;
+  --sf6-rushdown: #E7AD77;
+  --sf6-zoner: #A9BC85;
+  --sf6-setplay: #B49AD0;
+  --sf6-footsies: #C8AF8D;
+  --sf6-mixup: #DFA0BA;
+  --sf6-stance: #8FCAC1;
+  --sf6-trickster: #CB98C7;
+}

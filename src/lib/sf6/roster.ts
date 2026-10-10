@@ -64,14 +64,14 @@ export function getSf6Character(slug: string): Sf6Character | undefined {
 }
 
 export const SF6_ARCHETYPE_COLORS: Record<Sf6Archetype, string> = {
-  Shoto:     "#D4A437",
-  Charge:    "#5B85B5",
-  Grappler:  "#C95A47",
-  Rushdown:  "#E07B3D",
-  Zoner:     "#7A8C5F",
-  Setplay:   "#9B7BB5",
-  Footsies:  "#B59570",
-  Mixup:     "#D17B9A",
-  Stance:    "#5FA89F",
-  Trickster: "#B86FB5",
+  Shoto:     "var(--sf6-shoto)",
+  Charge:    "var(--sf6-charge)",
+  Grappler:  "var(--sf6-grappler)",
+  Rushdown:  "var(--sf6-rushdown)",
+  Zoner:     "var(--sf6-zoner)",
+  Setplay:   "var(--sf6-setplay)",
+  Footsies:  "var(--sf6-footsies)",
+  Mixup:     "var(--sf6-mixup)",
+  Stance:    "var(--sf6-stance)",
+  Trickster: "var(--sf6-trickster)",
 };

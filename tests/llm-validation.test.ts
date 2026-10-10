@@ -19,3 +19,8 @@ test('review/cards/summarize rifiutano id e testo invalidi prima del modello',as
  for(const b of [{domainId:1,topic:''},{domainId:0,topic:'a'},{domainId:1,topic:'a',n:100}])assert.equal((await cards.POST(request(b))).status,400);
  for(const b of [{domainId:'1',topic:'a'},{domainId:1,topic:''},{domainId:1,module:42}])assert.equal((await summary.POST(request(b))).status,400);
 });
+test('Ollama non raggiungibile: 503 senza dettagli interni',async()=>{
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>{throw new TypeError('fetch failed',{cause:{code:'ECONNREFUSED',secret:'nascosto'}});};
+ try{const response=await chat.POST(request({message:'domanda'}));assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'Ollama non raggiungibile'});}finally{globalThis.fetch=original;}
+});

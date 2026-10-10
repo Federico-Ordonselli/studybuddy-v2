@@ -7,7 +7,8 @@ export function handle(fn: () => unknown) {
     return NextResponse.json(fn() ?? { ok: true });
   } catch (e) {
     if (e instanceof LibraryError) return NextResponse.json({ error: e.message }, { status: e.status });
-    throw e;
+    console.error("[api]", e);
+    return NextResponse.json({ error: "Errore interno. Riprova." }, { status: 500 });
   }
 }
 

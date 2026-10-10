@@ -27,3 +27,9 @@ test('SSE spezzato: metadata, testo accentato, done',async()=>{
  const events=[];for await(const e of decodedSse(body('event: metadata\ndata: {"sessionId":1}\n\nevent: token\ndata: {"text":"è"}\n\nevent: done\ndata: {}\n\n')))events.push(e);
  assert.deepEqual(events.map(e=>e.event),['metadata','token','done']);assert.equal(events[1].data.text,'è');
 });
+test('OpenAI-compatible: SSE nativo, token e marker finale',async()=>{
+ const {openAICompatibleProvider}=await import('@/lib/providers/openai-compatible');
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(body('data: {"choices":[{"delta":{"content":"ciao"}}]}\n\ndata: [DONE]\n\n'));
+ try{const tokens=[];for await(const token of openAICompatibleProvider.generateStream!('test',{messages:[]}))tokens.push(token);assert.deepEqual(tokens,['ciao']);}finally{globalThis.fetch=original;}
+});

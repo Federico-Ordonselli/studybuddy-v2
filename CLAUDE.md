@@ -88,3 +88,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Migrazione del filtro vettoriale per dominio
+I nuovi indici `vec_chunks` includono `domain_id INTEGER`, filtrato direttamente nella query `MATCH` con `AND k = ?`. PK e metadato si inseriscono come `BigInt`. Un indice precedente richiede una copia migrata: `node --import tsx scripts/migrate-vec-domain.ts --from <sorgente.db> --target <nuovo.db>` verifica e scarta il backup; aggiungere `--apply` crea il nuovo file senza sovrascrivere né modificare l'originale. La migrazione conserva gli embedding, non chiama Ollama. Dopo una review della copia si può impostare `DB_PATH` sul nuovo file. Non eseguire la migrazione sui DB reali durante sviluppo/test.

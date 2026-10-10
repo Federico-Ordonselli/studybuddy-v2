@@ -1,3 +1,4 @@
+import { OllamaUnavailableError } from '@/lib/errors';
 import { prepareSocraticStream } from './session';
 import { appendTurn, forModel, saveState, type SessionRow } from './sessions';
 
@@ -30,8 +31,10 @@ export async function socraticResponse(session: SessionRow, message: string, dom
       } catch (e) {
         if (!abort.signal.aborted) {
           console.error('[chat stream]',e);
-          emit('error', {error:'Generazione interrotta. Riprova.'});
+          emit('error', {error:e instanceof OllamaUnavailableError ? 'Ollama non raggiungibile' : 'Generazione interrotta. Riprova.',status:e instanceof OllamaUnavailableError?503:500});
           controller.close();
+        } else {
+          try { controller.error(e); } catch { /* lettore già cancellato */ }
         }
       } finally { requestSignal.removeEventListener('abort',onAbort); }
     },

@@ -14,7 +14,7 @@ export async function rerank(
   topN: number,
   force = false
 ): Promise<Retrieved[]> {
-  if (!force && candidates.length <= topN) return candidates;
+  if (candidates.length <= 1 || (!force && candidates.length <= topN)) return candidates;
 
   if (cfg.strategy === "cross-encoder") {
     try {
