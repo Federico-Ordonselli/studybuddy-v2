@@ -46,11 +46,12 @@ export function deleteDocumentChunks(documentId: number) {
 
 /** Salva i chunk (+ embedding) di un documento. */
 export async function indexChunks(documentId: number, records: ChunkRecord[]) {
-  initVectorStore();
+  const scoped = initVectorStore();
   initFts();
   const vectors = await embed(records.map((r) => r.content));
   const insertVec = sqlite.prepare(
-    "INSERT INTO vec_chunks(chunk_id, embedding, domain_id) VALUES (?, ?, ?)"
+    scoped ? "INSERT INTO vec_chunks(chunk_id, embedding, domain_id) VALUES (?, ?, ?)"
+      : "INSERT INTO vec_chunks(chunk_id, embedding) VALUES (?, ?)"
   );
   const document = sqlite.prepare("SELECT domain_id FROM documents WHERE id = ?").get(documentId) as {domain_id: number | null} | undefined;
   if (!document) throw new Error("Documento non trovato");
@@ -64,7 +65,7 @@ export async function indexChunks(documentId: number, records: ChunkRecord[]) {
       .returning({ id: chunks.id });
     // sqlite-vec vuole la primary key come BigInt: un JS `number` viene rifiutato
     // con "Only integers are allowed for primary key values".
-    insertVec.run(BigInt(row.id), JSON.stringify(vectors[i]), BigInt(document.domain_id ?? 0));
+    insertVec.run(BigInt(row.id), JSON.stringify(vectors[i]), ...(scoped ? [BigInt(document.domain_id ?? 0)] : []));
     insertFts.run(row.id, records[i].content, documentId); // rowid = chunk id
   }
 }
@@ -174,10 +175,10 @@ export async function vectorSearch(query: string, k: number, domainId?: number):
 
 /** Ricerca con embedding pronto, testabile senza provider. */
 export function vectorSearchByEmbedding(qv: number[], k: number, domainId?: number): Retrieved[] {
-  initVectorStore();
+  const scoped = initVectorStore();
   const scope = resolveScope(domainId);
 
-  const domClause = scope ? `AND v.domain_id IN (${scope.map(() => "?").join(",")})` : "";
+  const domClause = scoped && scope ? `AND v.domain_id IN (${scope.map(() => "?").join(",")})` : "";
   const rows = sqlite
     .prepare(
       `SELECT v.chunk_id AS chunkId, v.distance AS distance,
@@ -188,9 +189,9 @@ export function vectorSearchByEmbedding(qv: number[], k: number, domainId?: numb
        JOIN documents d ON d.id = c.document_id
        WHERE v.embedding MATCH ? AND k = ? ${domClause} ORDER BY v.distance`
     )
-    .all(JSON.stringify(qv), k, ...(scope ?? []).map(BigInt)) as VecRow[];
+    .all(JSON.stringify(qv), scoped ? k : Math.max(k * 8, 64), ...(scoped ? scope ?? [] : []).map(BigInt)) as VecRow[];
 
-  return rows.map((r) => ({
+  return rows.filter((r) => scoped || !scope || scope.includes(r.domainId ?? 0)).slice(0, k).map((r) => ({
     chunkId: r.chunkId,
     documentId: r.documentId,
     content: r.content,

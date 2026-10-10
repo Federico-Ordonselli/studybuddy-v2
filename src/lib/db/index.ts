@@ -157,7 +157,9 @@ initSchema();
 ensureLibrarySchema();
 ensureHubSchema();
 
-/** Crea la virtual table degli embedding. Idempotente. */
+let warnedLegacyVectorStore = false;
+
+/** Crea la virtual table e restituisce il supporto al filtro per dominio. */
 export function initVectorStore() {
   sqlite.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
@@ -166,4 +168,11 @@ export function initVectorStore() {
       domain_id INTEGER
     );
   `);
+  const columns = sqlite.prepare("PRAGMA table_info(vec_chunks)").all() as { name: string }[];
+  const scoped = columns.some((column) => column.name === "domain_id");
+  if (!scoped && !warnedLegacyVectorStore) {
+    warnedLegacyVectorStore = true;
+    console.warn("[vec] Schema precedente: kNN globale con post-filtro. Migrare una copia con scripts/migrate-vec-domain.ts.");
+  }
+  return scoped;
 }
