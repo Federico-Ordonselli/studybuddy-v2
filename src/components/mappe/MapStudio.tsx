@@ -151,7 +151,7 @@ export default function MapStudio({ domainId, onAskTutor }: { domainId?: number;
         {current && <>
           <span style={S.status}>{saveState}</span>
           <button onClick={exportSvg} style={S.ghost}>Esporta SVG</button>
-          <button onClick={remove} style={{ ...S.ghost, color: "#ff8f8f" }}>Elimina</button>
+          <button onClick={remove} style={{ ...S.ghost, color: "var(--color-danger)" }}>Elimina</button>
         </>}
       </div>
       {error && <div style={S.error}>{error}</div>}
@@ -166,7 +166,7 @@ export default function MapStudio({ domainId, onAskTutor }: { domainId?: number;
           </div>
           {source.video
             ? <video key={source.video.path + source.video.startSec} src={`/api/video?path=${encodeURIComponent(source.video.path)}#t=${source.video.startSec}`}
-                controls autoPlay style={{ width: "100%", maxHeight: 300, borderRadius: 8, background: "#000" }} />
+                controls autoPlay style={{ width: "100%", maxHeight: 300, borderRadius: 8, background: "var(--bg)" }} />
             : null}
           <div style={S.snippet}>{source.snippet}</div>
         </div>
@@ -186,14 +186,14 @@ const S: Record<string, React.CSSProperties> = {
   wrap: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 10 },
   bar: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" },
   input: { background: "var(--panel-2)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 10px" },
-  primary: { background: "var(--accent-2)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 600 },
+  primary: { background: "var(--accent-2)", color: "var(--button-ink)", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 600 },
   ghost: { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 12px" },
   status: { color: "var(--muted)", fontSize: 12, marginLeft: "auto" },
-  error: { color: "#ff8f8f", fontSize: 13 },
+  error: { color: "var(--color-danger)", fontSize: 13 },
   host: { flex: 1, minHeight: 520 },
   empty: { color: "var(--muted)", textAlign: "center", margin: "auto", maxWidth: 520, lineHeight: 1.6 },
   source: { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 10 },
   sourceHead: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 },
-  snippet: { fontSize: 13, color: "#c9cedb", lineHeight: 1.55, maxHeight: 140, overflowY: "auto", whiteSpace: "pre-wrap", marginTop: 8 },
+  snippet: { fontSize: 13, color: "var(--muted)", lineHeight: 1.55, maxHeight: 140, overflowY: "auto", whiteSpace: "pre-wrap", marginTop: 8 },
   x: { background: "transparent", border: "none", color: "var(--muted)", fontSize: 14 },
 };

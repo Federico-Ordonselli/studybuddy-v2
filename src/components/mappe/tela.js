@@ -8,11 +8,12 @@ function svg(tag, attrs = {}, text) {
   return node;
 }
 
-/* Palette allineata ai token scuri dell'app (globals.css). Attributi di
-   presentazione, non CSS: l'SVG esportato resta uguale a quello a schermo. */
+/* I token seguono il tema anche sulla tela; l'export li risolve in colori autonomi. */
 const C = {
-  bubble: '#1e222b', deep: '#1a2840', hub: '#1d3566', stroke: '#3a4252', selected: '#6ea8fe',
-  title: '#e6e8ee', text: '#98a0b3', edge: '#56607a', halo: '#0f1115', accent: '#6ea8fe', portal: '#171a21',
+  bubble: 'var(--color-surface)', deep: 'var(--color-surface-2)', hub: 'var(--user)',
+  stroke: 'var(--color-border-strong)', selected: 'var(--color-accent)',
+  title: 'var(--color-fg)', text: 'var(--color-fg-muted)', edge: 'var(--color-fg-dim)',
+  halo: 'var(--color-bg)', accent: 'var(--color-accent)', portal: 'var(--color-surface)',
 };
 const DOUBLE_TAP_MS = 380;
 const ease = t => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
@@ -261,6 +262,14 @@ export function createCanvas(container, { select, enter, move, portal, readOnly 
       copy.setAttribute('xmlns', NS); copy.setAttribute('viewBox', `${box.x} ${box.y} ${box.width} ${box.height}`);
       copy.setAttribute('width', box.width); copy.setAttribute('height', box.height);
       copy.insertBefore(svg('rect', { x: box.x, y: box.y, width: box.width, height: box.height, fill: C.halo }), copy.firstChild.nextSibling);
+      const tokens = getComputedStyle(document.documentElement);
+      for (const node of copy.querySelectorAll('[fill], [stroke], [data-stroke]')) {
+        for (const attr of ['fill', 'stroke', 'data-stroke']) {
+          const value = node.getAttribute(attr);
+          const token = value?.match(/^var\((--[\w-]+)\)$/)?.[1];
+          if (token) node.setAttribute(attr, tokens.getPropertyValue(token).trim());
+        }
+      }
       return new XMLSerializer().serializeToString(copy);
     },
     destroy() { destroyed = true; stop(); controller.abort(); resize.disconnect(); canvas.remove(); controls.remove(); busyBox.remove(); } };

@@ -85,7 +85,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
           </div>
           <video key={video.path + video.startSec}
             src={`/api/video?path=${encodeURIComponent(video.path)}#t=${video.startSec}`}
-            controls autoPlay style={{ width: "100%", borderRadius: 8, background: "#000" }} />
+            controls autoPlay style={{ width: "100%", borderRadius: 8, background: "var(--bg)" }} />
         </div>
       )}
 
@@ -111,7 +111,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
                   )}
                   {m.grade && (
                     <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted)" }}>
-                      Qualità SM-2: <b style={{ color: m.grade.correct ? "#6ee7a8" : "#ff8f8f" }}>{m.grade.quality}/5</b>
+                      Qualità SM-2: <b style={{ color: m.grade.correct ? "var(--color-ok)" : "var(--color-danger)" }}>{m.grade.quality}/5</b>
                     </div>
                   )}
                   {m.citations && m.citations.length > 0 && (

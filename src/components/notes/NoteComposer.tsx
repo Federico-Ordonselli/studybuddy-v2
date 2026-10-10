@@ -51,7 +51,7 @@ export default function NoteComposer({ areas, courses, initial, autoFocus, onDon
   }
 
   return (
-    <div className="border border-border bg-surface rounded-lg overflow-hidden focus-within:border-border-strong transition-colors shadow-xl"
+    <div className="note-composer border border-border bg-surface rounded-lg overflow-hidden focus-within:border-border-strong transition-colors shadow-xl"
       onKeyDown={(e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); save(); }
         else if (e.key === "Escape" && onDone) { e.preventDefault(); onDone(); }

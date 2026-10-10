@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-12">
-      <h2 className="text-xs uppercase tracking-[0.3em] text-fg-dim mb-3">{title}</h2>
+    <section className="home-block">
+      <h2 className="section-title">{title}</h2>
       {children}
     </section>
   );
@@ -26,8 +26,8 @@ export default function HomePage() {
   const now = new Date();
 
   return (
-    <div className="max-w-3xl w-full mx-auto px-4 md:px-8 py-10 md:py-14">
-      <header className="mb-12 fade-up">
+    <div className="home-screen w-full mx-auto px-4 md:px-8 py-10 md:py-14">
+      <header className="home-header mb-10 fade-up">
         <div className="text-[10px] uppercase tracking-[0.3em] text-fg-dim mb-3 tabular">{todayLabel(now)}</div>
         <h1 className="font-display text-5xl md:text-6xl leading-[0.95] tracking-tight">
           {greeting(now.getHours())}{name ? <>, <em className="italic text-accent">{name}</em></> : null}.
@@ -38,8 +38,8 @@ export default function HomePage() {
         <Block title="Oggi">
           <div className="grid gap-3 sm:grid-cols-2">
             {due.length > 0 && (
-              <div className="border border-border bg-surface rounded-lg p-4">
-                <div className="text-[10px] uppercase tracking-[0.25em] text-fg-dim mb-2">Da ripassare</div>
+              <div className="menu-panel">
+                <div className="menu-panel-title">Da ripassare</div>
                 <ul className="flex flex-col gap-1">
                   {due.map((d) => (
                     <li key={d.id}>
@@ -53,8 +53,8 @@ export default function HomePage() {
               </div>
             )}
             {recent.length > 0 && (
-              <div className="border border-border bg-surface rounded-lg p-4">
-                <div className="text-[10px] uppercase tracking-[0.25em] text-fg-dim mb-2">Riprendi</div>
+              <div className="menu-panel">
+                <div className="menu-panel-title">Riprendi</div>
                 <ul className="flex flex-col gap-1">
                   {recent.map((r) => (
                     <li key={r.id}>

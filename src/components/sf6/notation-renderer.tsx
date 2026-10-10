@@ -151,15 +151,15 @@ function TokenChip({ token, size }: { token: Token; size: "sm" | "md" | "lg" }) 
 // Color palettes for buttons. Punch = warm (amber-ish), Kick = cool (blue-teal).
 // Light = outline, Medium = subtle fill, Heavy = full fill.
 const PUNCH_STYLES: Record<string, string> = {
-  light:  "border border-[#D4A437]/60 text-[#D4A437]",
-  medium: "border border-[#D4A437]/70 bg-[#D4A437]/15 text-[#E5B85A]",
-  heavy:  "border border-[#D4A437] bg-[#D4A437]/30 text-[#F0CC75]",
-  any:    "border border-dashed border-[#D4A437]/60 text-[#D4A437]",
+  light:  "border border-[var(--accent)]/60 text-[var(--accent)]",
+  medium: "border border-[var(--accent)]/70 bg-[var(--accent)]/15 text-[var(--accent)]",
+  heavy:  "border border-[var(--accent)] bg-[var(--accent)]/30 text-[var(--accent)]",
+  any:    "border border-dashed border-[var(--accent)]/60 text-[var(--accent)]",
 };
 
 const KICK_STYLES: Record<string, string> = {
-  light:  "border border-[#5FA89F]/60 text-[#5FA89F]",
-  medium: "border border-[#5FA89F]/70 bg-[#5FA89F]/15 text-[#7CC0B7]",
-  heavy:  "border border-[#5FA89F] bg-[#5FA89F]/30 text-[#A0D6CE]",
-  any:    "border border-dashed border-[#5FA89F]/60 text-[#5FA89F]",
+  light:  "border border-[var(--color-ok)]/60 text-[var(--color-ok)]",
+  medium: "border border-[var(--color-ok)]/70 bg-[var(--color-ok)]/15 text-[var(--color-ok)]",
+  heavy:  "border border-[var(--color-ok)] bg-[var(--color-ok)]/30 text-[var(--color-ok)]",
+  any:    "border border-dashed border-[var(--color-ok)]/60 text-[var(--color-ok)]",
 };

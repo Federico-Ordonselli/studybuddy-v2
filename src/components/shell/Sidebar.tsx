@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import ThemeToggle from "./ThemeToggle";
 import type { ShellData } from "@/lib/home";
 import { MODULES } from "@/lib/modules";
 
@@ -13,9 +14,9 @@ function Item({ href, symbol, label, active, collapsed, badge }: {
 }) {
   return (
     <Link href={href} title={collapsed ? label : undefined} aria-current={active ? "page" : undefined}
-      className={`group flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${active
+      className={`menu-item group flex items-center gap-3 px-3 py-2 text-sm transition-colors ${active
         ? "bg-surface-2 text-fg" : "text-fg-muted hover:text-fg hover:bg-surface-2"}`}>
-      <span className={`w-5 text-center text-base leading-none ${active ? "text-accent" : "text-fg-dim group-hover:text-fg-muted"}`}>{symbol}</span>
+      <span className={`menu-symbol w-5 text-center text-base leading-none ${active ? "text-accent" : "text-fg-dim group-hover:text-fg-muted"}`}>{symbol}</span>
       {!collapsed && <span className="flex-1 truncate">{label}</span>}
       {!collapsed && badge !== undefined && <Badge n={badge} />}
     </Link>
@@ -25,7 +26,7 @@ function Item({ href, symbol, label, active, collapsed, badge }: {
 function Section({ label, collapsed, children }: { label: string; collapsed: boolean; children: React.ReactNode }) {
   return (
     <div className="mb-4">
-      {!collapsed && <div className="px-3 mb-1.5 text-[9.5px] uppercase tracking-[0.28em] text-fg-dim">{label}</div>}
+      {!collapsed && <div className="menu-section-label">{label}</div>}
       <div className="flex flex-col gap-0.5">{children}</div>
     </div>
   );
@@ -38,8 +39,8 @@ export default function Sidebar({ data, pathname, collapsed, onToggle, onCapture
   const on = (p: string) => pathname === p || pathname.startsWith(`${p}/`);
   const moduleOn = (m: string | null) => !!m && Object.hasOwn(MODULES, m) && on(MODULES[m].href);
   return (
-    <aside className={`h-full shrink-0 border-r border-border bg-surface flex flex-col ${collapsed ? "w-14" : "w-60"}`}>
-      <div className={`flex items-center border-b border-border ${collapsed ? "justify-center py-4" : "justify-between px-5 pt-6 pb-4"}`}>
+    <aside className={`menu-sidebar h-full shrink-0 flex flex-col ${collapsed ? "menu-collapsed w-16" : "w-60"}`}>
+      <div className={`menu-brand flex items-center ${collapsed ? "justify-center py-4" : "justify-between px-5 pt-6 pb-4"}`}>
         {!collapsed && <Link href="/" className="font-display text-2xl tracking-tight leading-none">StudyBuddy</Link>}
         {onToggle && (
           <button type="button" onClick={onToggle} className="text-fg-dim hover:text-fg px-1"
@@ -62,12 +63,13 @@ export default function Sidebar({ data, pathname, collapsed, onToggle, onCapture
         <Section label="Sistema" collapsed={collapsed}>
           <Item href="/settings" symbol="◐" label="Impostazioni" active={on("/settings")} collapsed={collapsed} />
           <button type="button" onClick={onCapture} title={collapsed ? "Appunto (n)" : undefined}
-            className="group flex items-center gap-3 px-3 py-2 rounded-md text-sm text-fg-muted hover:text-fg hover:bg-surface-2 transition-colors">
-            <span className="w-5 text-center text-base leading-none text-fg-dim group-hover:text-fg-muted">✎</span>
+            className="menu-item group flex items-center gap-3 px-3 py-2 text-sm text-fg-muted hover:text-fg hover:bg-surface-2 transition-colors">
+            <span className="menu-symbol w-5 text-center text-base leading-none text-fg-dim group-hover:text-fg-muted">✎</span>
             {!collapsed && <><span className="flex-1 text-left">Appunto</span><kbd className="text-[10px] font-mono text-fg-dim">n</kbd><Badge n={data.inboxCount} /></>}
           </button>
         </Section>
       </nav>
+      <div className="menu-footer"><ThemeToggle collapsed={collapsed} /></div>
     </aside>
   );
 }

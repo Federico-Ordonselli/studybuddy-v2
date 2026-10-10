@@ -88,7 +88,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
           ) : (
             <div style={{ marginTop: 14 }}>
               <div style={{ fontSize: 14 }}>
-                Esito: <b style={{ color: result.grade.correct ? "#6ee7a8" : "#ff8f8f" }}>
+                Esito: <b style={{ color: result.grade.correct ? "var(--color-ok)" : "var(--color-danger)" }}>
                   {result.grade.quality}/5 {result.grade.correct ? "✓" : "✗"}
                 </b>
                 <span style={{ color: "var(--muted)" }}> · prossimo ripasso tra {result.intervalDays} {result.intervalDays === 1 ? "giorno" : "giorni"}</span>

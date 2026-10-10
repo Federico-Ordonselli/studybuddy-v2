@@ -14,7 +14,7 @@ const STATUS_META: Record<
   ComboRow["status"],
   { label: string; dot: string; order: number }
 > = {
-  practicing:   { label: "In pratica",       dot: "bg-[#E07B3D]",            order: 0 },
+  practicing:   { label: "In pratica",       dot: "bg-[var(--accent)]",            order: 0 },
   learning:     { label: "In apprendimento", dot: "bg-[var(--color-fg-dim)]", order: 1 },
   consolidated: { label: "Consolidate",      dot: "bg-emerald-400",           order: 2 },
 };
@@ -205,7 +205,7 @@ function ComboItem({
           {combo.status !== "practicing" && (
             <button
               onClick={() => setStatus("practicing")}
-              className="text-[10px] uppercase tracking-[0.15em] px-2 py-1 rounded text-[var(--color-fg-muted)] hover:text-[#E07B3D] hover:bg-[var(--color-surface-2)]"
+              className="text-[10px] uppercase tracking-[0.15em] px-2 py-1 rounded text-[var(--color-fg-muted)] hover:text-[var(--accent)] hover:bg-[var(--color-surface-2)]"
               title="Sposta in pratica"
             >
               pratica
