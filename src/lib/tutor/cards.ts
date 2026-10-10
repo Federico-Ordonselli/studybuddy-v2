@@ -140,3 +140,14 @@ export function sourceForAnswer(answer: string, chunks: {chunkId:number;content:
   const words = (s:string) => new Set(s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
   return chunks.map((c,i)=>({id:c.chunkId,score:jaccard(words(answer),words(c.content)),i})).sort((a,b)=>b.score-a.score || a.i-b.i)[0]?.id ?? null;
 }
+
+/** Il quiz entra nel ripasso solo su richiesta esplicita dello studente. */
+export function createCardFromQuiz(domainId: number, quiz: {question:string;answer:string}) {
+  if (!db.select({id:domains.id}).from(domains).where(eq(domains.id,domainId)).get()) throw new LibraryError('Corso non trovato',404);
+  const question=cardText(quiz.question,'Domanda'), answer=cardText(quiz.answer,'Risposta');
+  const existing=db.select().from(cards).where(eq(cards.domainId,domainId)).all();
+  const duplicate=existing.find(c=>isDuplicateQuestion(question,[c.question]));
+  if(duplicate) return {created:false,card:duplicate};
+  const card=db.insert(cards).values({domainId,question,answer}).returning().get();
+  return {created:true,card};
+}

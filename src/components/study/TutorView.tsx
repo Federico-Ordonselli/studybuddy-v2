@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { decodedSse } from "@/lib/client/sse";
 import { post } from "@/lib/client/api";
@@ -13,6 +14,9 @@ async function chat(body: Record<string, unknown>) {
 
 /** Thread del tutor: `socratic` (sessione salvata e ripresa) o `quiz` (domanda → valutazione). */
 export default function TutorView({ domainId, mode, initialInput = "" }: { domainId: number; mode: "socratic" | "quiz"; initialInput?: string }) {
+  const router = useRouter();
+  const [cardError, setCardError] = useState("");
+  const [adding, setAdding] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState(initialInput);
   const [loading, setLoading] = useState(false);
@@ -46,7 +50,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     setPendingQ(null); setLoading(true);
     try {
       const turn = await chat({ mode: "review", question: q, answer: ans });
-      setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Valutazione", grade: turn.grade }]);
+      setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Valutazione", grade: turn.grade, reviewQuiz: q }]);
     } catch (e) {
       setMsgs((m) => [...m, { role: "assistant", content: `Errore: ${e}` }]);
     } finally { setLoading(false); }
@@ -87,6 +91,15 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     } catch (e) {
       setMsgs((m) => [...m, { role: "assistant", content: `Errore: ${e}` }]);
     } finally { setLoading(false); }
+  }
+
+  async function addToReview(index: number, quiz: QuizQuestion) {
+    setAdding(true);setCardError("");
+    try {
+      await post("/api/cards",{domainId,question:quiz.question,answer:quiz.answer});
+      setMsgs(m=>m.map((msg,i)=>i===index?{...msg,addedToReview:true}:msg));
+      router.refresh();
+    } catch(e) {setCardError(String(e));} finally {setAdding(false);}
   }
 
   const placeholder = mode === "socratic"
@@ -132,6 +145,11 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
                       Qualità SM-2: <b style={{ color: m.grade.correct ? "var(--color-ok)" : "var(--color-danger)" }}>{m.grade.quality}/5</b>
                     </div>
                   )}
+                  {m.grade && m.grade.quality < 3 && m.reviewQuiz && (
+                    <button style={S.ghost} disabled={adding || m.addedToReview} onClick={()=>addToReview(i,m.reviewQuiz!)}>
+                      {m.addedToReview ? "Aggiunta al ripasso" : "Aggiungi al ripasso"}
+                    </button>
+                  )}
                   {m.citations && m.citations.length > 0 && (
                     <div style={S.cites}>
                       {m.citations.map((c) => (
@@ -152,6 +170,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
             {loading && <div style={{ ...S.row, justifyContent: "flex-start" }}><div style={{ ...S.bubble, ...S.assistant }}><span className="spin" /> <span style={{ color: "var(--muted)" }}>sto pensando…</span></div></div>}
           </div>
 
+          {cardError && <p role="alert" style={{color:"var(--color-danger)"}}>{cardError}</p>}
           <div style={S.inputBar}>
             <textarea value={input} onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}

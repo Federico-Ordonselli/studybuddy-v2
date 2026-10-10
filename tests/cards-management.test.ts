@@ -17,3 +17,11 @@ test('dedup domande e attribuzione lessicale della risposta',()=>{
  assert.equal(isDuplicateQuestion('domanda diversa', ['come funziona questo sistema']),false);
  assert.equal(sourceForAnswer('gatto sul divano',[{chunkId:1,content:'astronomia stelle galassie'},{chunkId:2,content:'gatto sul divano'}]),2);
 });
+
+test('dal quiz al ripasso: dominio, contenuto, dedup e nessuna carta in altri corsi', async()=>{
+ const {createCardFromQuiz}=await import('@/lib/tutor/cards');
+ const result=createCardFromQuiz(2,{question:'Come funziona il ripasso?',answer:'Con intervalli progressivi'});
+ assert.ok(result.created);assert.equal(result.card?.domainId,2);assert.equal(result.card?.answer,'Con intervalli progressivi');
+ assert.equal(createCardFromQuiz(2,{question:'Come funziona il ripasso?',answer:'Con intervalli progressivi'}).created,false);
+ assert.throws(()=>createCardFromQuiz(999,{question:'q',answer:'a'}));
+});

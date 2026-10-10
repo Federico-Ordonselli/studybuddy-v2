@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { generateCards, listCards, updateCard, deleteCard, suspendCard } from '@/lib/tutor/cards';
+import { createCardFromQuiz, generateCards, listCards, updateCard, deleteCard, suspendCard } from '@/lib/tutor/cards';
 import { handle, handleLlm, readJson, badJson } from '@/lib/http';
 import { positiveId, text } from '@/lib/validation';
 import { LibraryError } from '@/lib/errors';
@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
   const body = await readJson(req); if (!body) return badJson();
   return handleLlm(async()=>{
     const domainId=positiveId(body.domainId,'domainId',true)!;
+    if(body.question !== undefined) return createCardFromQuiz(domainId,{question:text(body.question,'question'),answer:text(body.answer,'answer')});
     const topic=text(body.topic,'topic');
     const n=body.n ?? 5;
     if(typeof n !== 'number' || !Number.isInteger(n) || n<1 || n>20) throw new LibraryError('n deve essere un intero tra 1 e 20');
