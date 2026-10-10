@@ -1,3 +1,5 @@
+import { LibraryError } from "@/lib/errors";
+import { exclusive } from "@/lib/transcriptionLock";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -90,8 +92,9 @@ async function localSrt(media: string, language = cfg.language, signal?: AbortSi
 export async function transcribeToSrt(media: string): Promise<string | null> {
   if (!pickBackend()) return null;
   try {
-    return await localSrt(media);
+    return await exclusive(() => localSrt(media));
   } catch (e) {
+    if (e instanceof LibraryError && e.status === 409) throw e;
     console.warn(`[whisper] trascrizione fallita per ${path.basename(media)}: ${e instanceof Error ? e.message : e}`);
     return null;
   }
