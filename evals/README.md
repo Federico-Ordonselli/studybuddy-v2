@@ -37,6 +37,6 @@ Criterio dei verdetti (quello con cui sono stati confermati i casi; il prompt de
 
 Metriche: accordo esatto, accordo entro 1 (wrong < partial < correct), matrice di confusione
 e numero di casi `long-wrong` promossi a `correct` (obiettivo della Fase 2: 0, con accordo esatto ≥ 80%).
-Il giudice attuale (`grade-v1`) dà un voto 0–5, convertito con 0–2 → wrong, 3 → partial, 4–5 → correct.
+Dalla Fase 2 il giudice (`grade-v2`) dà direttamente il verdetto, dopo aver elencato cosa chiede la domanda (`required`), cosa c'è (`present`), cosa manca (`missing`) e cosa è falso (`errors`); riceve il `source` del caso. `grade-v1` (voto 0–5) era convertito con 0–2 → wrong, 3 → partial, 4–5 → correct.
 
 Da aggiungere con le fasi successive: `cards.jsonl` (Fase 3), `tutor.jsonl` (Fase 4), `maps.jsonl` (Fase 5).
