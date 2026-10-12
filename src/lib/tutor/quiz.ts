@@ -34,6 +34,8 @@ export interface QuizOptions {
   topic?: string;
   /** "open" per le flashcard (allenano il richiamo e non salvano le opzioni). */
   kind?: "mixed" | "open";
+  /** Bulk: privilegia conoscenze riutilizzabili, evitando la logistica del corso. */
+  focus?: "concepts";
 }
 
 /** Normalizza un testo per confronti esatti tra opzioni (spazi, maiuscole). */
@@ -79,6 +81,12 @@ export async function generateQuiz(context: string, n = 3, opts: QuizOptions = {
       "Sei un tutor. Genera domande di studio basate ESCLUSIVAMENTE sul contesto fornito. " +
       (topic
         ? `Le domande devono riguardare l'argomento richiesto: usa solo i passaggi del contesto pertinenti e ignora gli altri. `
+        : "") +
+      (opts.focus === "concepts"
+        ? "Valuta concetti, definizioni, meccanismi, differenze, applicazioni ed esempi tecnici. " +
+          "Ignora introduzioni promozionali, prerequisiti di iscrizione, pubblico destinatario, " +
+          "obiettivi didattici e organizzazione del corso (numeri dei moduli, nomi dei laboratori o progetti). " +
+          "Non chiedere informazioni sul corso stesso: le domande devono servire a ripassare la materia. "
         : "") +
       `${types} Ogni domanda deve essere comprensibile da sola: lo studente non vede il contesto, ` +
       "quindi niente riferimenti a 'il testo', 'il contesto', 'i seguenti esempi' o opzioni non incluse. " +

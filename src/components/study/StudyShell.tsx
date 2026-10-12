@@ -17,7 +17,7 @@ export interface StudyTree {
 }
 
 /** Barra dell'area studio (breadcrumb, cambio corso, modalità) + la vista della modalità. */
-export default function StudyShell({ trail, tree, mode, notes }: { trail: Trail; tree: StudyTree; mode: UrlMode; notes: NoteView[] }) {
+export default function StudyShell({ trail, tree, mode, notes, initialTopic = "" }: { initialTopic?: string; trail: Trail; tree: StudyTree; mode: UrlMode; notes: NoteView[] }) {
   const router = useRouter();
   const [wide, setWide] = useState(false);   // la mappa concettuale usa tutta la larghezza
   const [draft, setDraft] = useState("");    // testo passato dallo Studio al tutor ("chiedi al tutor")
@@ -81,7 +81,7 @@ export default function StudyShell({ trail, tree, mode, notes }: { trail: Trail;
         ) : mode === "review" ? (
           <ReviewView key={trail.id} domainId={trail.id} />
         ) : (
-          <TutorView key={`${trail.id}-${mode}`} domainId={trail.id} mode={mode === "quiz" ? "quiz" : "socratic"} initialInput={mode === "tutor" ? draft : ""} />
+          <TutorView key={`${trail.id}-${mode}`} domainId={trail.id} mode={mode === "quiz" ? "quiz" : "socratic"} initialInput={mode === "tutor" ? draft : initialTopic} />
         )}
       </div>
     </div>

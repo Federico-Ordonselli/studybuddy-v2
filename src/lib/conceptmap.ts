@@ -137,8 +137,8 @@ function sourceRef(c: Retrieved, cite: Citation): SourceRef {
 const provenance = () => ({ origin: "llm", model: models.summarize.model, createdAt: new Date().toISOString() });
 
 /** Mappa nuova su un argomento: il primo concetto è il centro, poi 6-10 concetti chiave. */
-export async function generateMap(domainId: number, topic: string): Promise<MapDocument> {
-  const found = await diverseSearch(topic, 14, domainId);
+export async function generateMap(domainId: number, topic: string, sourceChunks?: Retrieved[]): Promise<MapDocument> {
+  const found = sourceChunks ?? await diverseSearch(topic, 14, domainId);
   if (!found.length) throw new Error("nessun materiale trovato per questo argomento");
   const proposal = await propose(
     "Costruisci una mappa concettuale di studio dal materiale fornito. `center` = il concetto centrale " +

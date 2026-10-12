@@ -144,3 +144,17 @@ export const sf6Tips = sqliteTable("sf6_tips", {
   sourceUrl: text("source_url"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
+
+/** Materiali generati per modulo e avanzamento del bulk. */
+export const studyMaterials = sqliteTable("study_materials", {
+  id: text("id").primaryKey(),
+  domainId: integer("domain_id").notNull().references(() => domains.id),
+  module: text("module").notNull(),
+  kind: text("kind").notNull(),
+  content: text("content").notNull(),
+});
+export const generationJobs = sqliteTable("generation_jobs", {
+  id: text("id").primaryKey(),
+  domainId: integer("domain_id").notNull().references(() => domains.id),
+  state: text("state").notNull(),
+});

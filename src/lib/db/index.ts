@@ -83,6 +83,8 @@ function ensureColumn(table: string, column: string, type: string) {
 export function ensureHubSchema() {
   ensureTable("areas");
   ensureTable("notes");
+  ensureTable("study_materials");
+  ensureTable("generation_jobs");
   ensureTable("sf6_combos");
   ensureTable("sf6_tips");
   ensureColumn("cards", "suspended", "integer NOT NULL DEFAULT 0");

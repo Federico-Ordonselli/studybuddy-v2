@@ -14,7 +14,7 @@ export default async function StudyPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
-  const { mode } = await searchParams;
+  const { mode, topic } = await searchParams;
   const n = Number(id);
   const trail = Number.isInteger(n) ? getTrail(n) : null;
   if (!trail) notFound();
@@ -23,5 +23,5 @@ export default async function StudyPage({
     macros: lib.macros.map((m) => ({ id: m.id, name: m.name, courses: m.courses.map(({ id, name }) => ({ id, name })) })),
     loose: lib.loose.map(({ id, name }) => ({ id, name })),
   };
-  return <StudyShell key={trail.id} trail={trail} tree={tree} mode={parseMode(mode)} notes={listForCourse(trail.id)} />;
+  return <StudyShell key={trail.id} trail={trail} tree={tree} mode={parseMode(mode)} initialTopic={typeof topic === "string" ? topic.slice(0,1000) : ""} notes={listForCourse(trail.id)} />;
 }

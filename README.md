@@ -204,3 +204,29 @@ Screenshots show real output generated locally on purchased online courses. Vide
 ## License
 
 [MIT](LICENSE), except the concept-map engine (`src/components/mappe/*.js|*.css`, `src/lib/mappe/*.js`), which is derived from a separate project and remains under the [PolyForm Noncommercial License 1.0.0](src/components/mappe/LICENSE). See [NOTICE](NOTICE).
+
+### Autogenerare i materiali di un corso
+
+Dopo avere importato un corso da **Corsi → Aggiungi corso**, apri **Studio → Autogenera**.
+Seleziona schede di studio, flashcard, mappe, riassunti e/o glossario, quindi i singoli
+moduli oppure **Tutto il corso**. Per una specializzazione la selezione include i
+moduli dei corsi figli, mantenendoli distinti.
+
+La generazione usa i chunk del modulo selezionato, procede in sequenza sul provider
+configurato e salva ogni materiale completato. La barra indica i passaggi elaborati,
+non una stima del tempo. Puoi cambiare pagina mentre il server continua a lavorare.
+Se il server si riavvia o un passaggio fallisce, **Riprendi / riprova** riparte dai
+passaggi incompleti. Un passaggio flashcard può aver già salvato alcune domande:
+la ripresa scarta quelle duplicate.
+
+La raccolta in Studio permette ricerca testuale e filtro per tipo, incluso il
+**Glossario**, e offre collegamenti a tutor, quiz e ripasso. Le flashcard sono vere
+carte SM-2; le schede sono spiegazioni dei concetti. I materiali di testo vengono
+aggiornati quando rigeneri lo stesso modulo; le mappe già generate vengono aggiornate
+anche nell'editor. Le mappe bulk sono basate sulla sintesi dell'intero modulo e non
+attribuiscono citazioni dirette a singoli passaggi. I quiz dal collegamento vengono
+aperti con l'argomento di ricerca (o il modulo) precompilato.
+
+Le cartelle copiate in `Courses/` devono essere importate prima di generare materiali;
+la generazione non importa automaticamente i file. Nessuna dipendenza da un corso
+specifico o da un provider esterno.

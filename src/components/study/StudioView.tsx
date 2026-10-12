@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AutoGenerate from "./AutoGenerate";
 import MapStudio from "@/components/mappe/MapStudio";
 import { post } from "@/lib/client/api";
 import Markdown from "./Markdown";
@@ -49,6 +50,7 @@ export default function StudioView({ domainId, onWide, onAskTutor }: { domainId:
 
   return (
     <div style={S.review}>
+      <AutoGenerate key={domainId} domainId={domainId} onMap={() => setTool("map")} onAskTutor={onAskTutor} />
       <div style={S.reviewBar}>
         {tool !== "map" && <input value={topic} onChange={(e) => setTopic(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && tool) run(tool); }}
