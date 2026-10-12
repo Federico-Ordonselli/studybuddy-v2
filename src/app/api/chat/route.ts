@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
     if (mode === "review") {
       // body.question = QuizQuestion, body.answer = string
-      return NextResponse.json(await gradeTurn(quizQuestion(body.question), text(body.answer, "answer")));
+      return NextResponse.json(await gradeTurn(quizQuestion(body.question), text(body.answer, "answer"), domainId));
     }
     return NextResponse.json({ error: "mode non valido" }, { status: 400 });
   } catch (e) {

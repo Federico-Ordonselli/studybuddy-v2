@@ -5,6 +5,7 @@ import * as schema from "./schema";
 import { EMBED_DIM } from "@/lib/config";
 import { SCHEMA_SQL } from "./schemaSql";
 import { slugify, uniqueSlug } from "@/lib/slug";
+import { convertSm2 } from "@/lib/tutor/scheduler";
 
 const path = process.env.DB_PATH ?? "studybuddy.db";
 
@@ -75,9 +76,40 @@ function ensureColumn(table: string, column: string, type: string) {
   }).immediate();
 }
 
+const FSRS_COLUMNS = [
+  ["fsrs_state", "integer"], ["stability", "real"], ["difficulty", "real"], ["reps", "integer"], ["lapses", "integer"],
+  ["learning_steps", "integer"], ["scheduled_days", "integer"], ["last_review", "integer"],
+] as const;
+
 /**
- * Hub su un DB esistente: crea le tabelle `areas`, `notes`, `sf6_combos` e `sf6_tips` e la colonna `sessions.updated_at`
- * con lo stesso SQL di un DB nuovo, e converte una volta i nomi liberi di `domains.areas` in slug.
+ * Carte SM-2 → FSRS (`convertSm2`), solo le righe con `fsrs_state` NULL: idempotente, e le carte
+ * inserite a mano senza stato si convertono al prossimo avvio (intanto lo scheduler le converte al
+ * volo). Restituisce quante ne ha convertite. Caso comune (nessuna): una lettura, nessun lock.
+ */
+export function convertCardsToFsrs(): number {
+  const cols = sqlite.prepare("PRAGMA table_info(cards)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "fsrs_state")) return 0; // tabella assente
+  const pending = sqlite.prepare("SELECT 1 FROM cards WHERE fsrs_state IS NULL LIMIT 1");
+  if (!pending.get()) return 0;
+  type Row = { id: number; ease: number; interval_days: number; repetitions: number; due_at: number | null };
+  const update = sqlite.prepare(`UPDATE cards SET fsrs_state = ?, stability = ?, difficulty = ?, reps = ?, lapses = ?,
+    learning_steps = ?, scheduled_days = ?, last_review = ?, due_at = ? WHERE id = ? AND fsrs_state IS NULL`);
+  const sec = (d: Date) => Math.floor(d.getTime() / 1000);
+  return sqlite.transaction(() => {
+    const rows = sqlite.prepare("SELECT id, ease, interval_days, repetitions, due_at FROM cards WHERE fsrs_state IS NULL").all() as Row[];
+    for (const r of rows) {
+      const s = convertSm2({ ease: r.ease, intervalDays: r.interval_days, repetitions: r.repetitions,
+        dueAt: r.due_at == null ? null : new Date(r.due_at * 1000) });
+      update.run(s.fsrsState, s.stability, s.difficulty, s.reps, s.lapses, s.learningSteps, s.scheduledDays,
+        s.lastReview && sec(s.lastReview), sec(s.dueAt), r.id);
+    }
+    return rows.length;
+  }).immediate();
+}
+
+/**
+ * Hub su un DB esistente: crea le tabelle `areas`, `notes`, `sf6_combos`, `sf6_tips` e `review_logs`, le colonne `sessions.updated_at` e FSRS di `cards`
+ * con lo stesso SQL di un DB nuovo, converte le carte SM-2 a FSRS e una volta i nomi liberi di `domains.areas` in slug.
  * Idempotente. Caso comune (tutto già fatto): solo letture, nessun lock di scrittura.
  */
 export function ensureHubSchema() {
@@ -87,8 +119,11 @@ export function ensureHubSchema() {
   ensureTable("generation_jobs");
   ensureTable("sf6_combos");
   ensureTable("sf6_tips");
+  ensureTable("review_logs");
   ensureColumn("cards", "suspended", "integer NOT NULL DEFAULT 0");
   ensureColumn("sessions", "updated_at", "integer");
+  for (const [column, type] of FSRS_COLUMNS) ensureColumn("cards", column, type);
+  convertCardsToFsrs();
   const cols = sqlite.prepare("PRAGMA table_info(domains)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "areas")) return;
   // valori di domains.areas che non sono slug esistenti (né stringhe valide da convertire)

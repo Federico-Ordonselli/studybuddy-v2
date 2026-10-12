@@ -31,6 +31,10 @@ tsconfig.tsbuildinfo
 # output Playwright (test e2e)
 .playwright-mcp/
 
+# set di valutazione: dati da corsi a pagamento e risultati (evals/README.md resta)
+evals/data/
+evals/results/
+
 # backup DB
 *.db.bak*
 

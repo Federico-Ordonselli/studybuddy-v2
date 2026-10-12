@@ -84,12 +84,48 @@ export const cards = sqliteTable("cards", {
   answer: text("answer").notNull(),
   sourceChunkId: integer("source_chunk_id").references(() => chunks.id),
   suspended: integer("suspended", {mode:"boolean"}).notNull().default(false),
-  // stato SM-2
+  // stato SM-2 (non più aggiornato: resta per la conversione, via a fine Fase 1)
   ease: real("ease").notNull().default(2.5),
   intervalDays: integer("interval_days").notNull().default(0),
   repetitions: integer("repetitions").notNull().default(0),
   dueAt: integer("due_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  // stato FSRS (`tutor/scheduler.ts`). NULL = carta SM-2 non ancora convertita (`convertCardsToFsrs`)
+  fsrsState: integer("fsrs_state").$defaultFn(() => 0), // 0 New · 1 Learning · 2 Review · 3 Relearning
+  stability: real("stability").$defaultFn(() => 0),
+  difficulty: real("difficulty").$defaultFn(() => 0),
+  reps: integer("reps").$defaultFn(() => 0),
+  lapses: integer("lapses").$defaultFn(() => 0),
+  learningSteps: integer("learning_steps").$defaultFn(() => 0),
+  scheduledDays: integer("scheduled_days").$defaultFn(() => 0),
+  lastReview: integer("last_review", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+/**
+ * Storico delle review: una riga per ripasso, scritta nella stessa transazione
+ * dell'update della carta e mai modificata dopo (tranne `overridden`, dalla Fase 1).
+ * Serve all'ottimizzazione di FSRS e alla calibrazione del giudice e della fiducia.
+ * `state_before` è lo stato FSRS completo prima della review (serve alla correzione del voto);
+ * `stability`/`difficulty`/`scheduled_days` sono i valori dopo. `legacy_quality` era il voto 0–5
+ * del giudice: dalla Fase 2 non si scrive più, resta per i ripassi precedenti. Una correzione segna `overridden = 1` e
+ * aggiunge una riga con il rating manuale (`grader_model = "manual"`).
+ */
+export const reviewLogs = sqliteTable("review_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
+  reviewedAt: integer("reviewed_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  rating: integer("rating"),                    // 1 Again · 2 Hard · 3 Good · 4 Easy (da FSRS)
+  legacyQuality: integer("legacy_quality"),     // 0–5, non scritta dalla Fase 2 (solo ripassi precedenti)
+  confidence: integer("confidence"),            // 1–3, dalla Fase 6
+  answer: text("answer").notNull(),
+  graderRationale: text("grader_rationale"),
+  stateBefore: text("state_before", { mode: "json" }), // stato della carta prima della review
+  stability: real("stability"),
+  difficulty: real("difficulty"),
+  scheduledDays: integer("scheduled_days"),
+  graderModel: text("grader_model"),
+  promptVersion: text("prompt_version"),
+  overridden: integer("overridden").notNull().default(0), // voto corretto a mano (Fase 1.6)
 });
 
 /** Sessioni del tutor (loop stile Coursera). */

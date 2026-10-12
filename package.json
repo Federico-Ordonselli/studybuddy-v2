@@ -8,11 +8,13 @@
     "build": "next build",
     "start": "next start",
     "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts",
+    "eval": "tsx --env-file-if-exists=.env.local scripts/eval.ts",
     "import-vault": "tsx --env-file-if-exists=.env.local scripts/import-vault.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:schema": "tsx scripts/schema-sql.ts",
     "typecheck": "tsc --noEmit",
+    "colors:check": "python3 color-boss/colorboss.py check src/app/tokens.css",
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
@@ -28,6 +30,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sqlite-vec": "^0.1.6",
+    "ts-fsrs": "5.4.2",
     "undici": "^7.30.0",
     "unpdf": "^1.6.2"
   },

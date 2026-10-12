@@ -4,24 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {useTempDb} from './helpers/db';
 const {dir}=await useTempDb();
-const {sm2,nextDue}=await import('@/lib/tutor/sm2');
 const {rrfFuse,toCitations}=await import('@/lib/rag/pipeline');
 const {chunkText,chunkTranscript}=await import('@/lib/rag/chunk');
 const {gradeChoice}=await import('@/lib/tutor/session');
 const {normalizeOption}=await import('@/lib/tutor/quiz');
 const {rag}=await import('@/lib/config');
-test('SM-2: quality 0–5, ease e reset degli intervalli',()=>{
- const expected=[1.7,1.96,2.18,2.36,2.5,2.6];
- for(let quality=0;quality<=5;quality++){
-  const next=sm2({ease:2.5,intervalDays:6,repetitions:2},quality);
-  assert.ok(Math.abs(next.ease-expected[quality])<1e-9);
-  assert.equal(next.intervalDays,quality<3?1:15);assert.equal(next.repetitions,quality<3?0:3);
- }
- assert.equal(sm2({ease:1.3,intervalDays:100,repetitions:9},0).ease,1.3);
- const first=sm2({ease:2.5,intervalDays:0,repetitions:0},5);assert.equal(first.intervalDays,1);
- assert.equal(sm2(first,5).intervalDays,6);
- const now=Date.now();assert.ok(nextDue(1).getTime()>now+23*3600000);
-});
 const chunk=(id:number,content='testo')=>({chunkId:id,documentId:id,content,distance:0});
 test('RRF: premia accordo dei rami, dedup per id, topK ed empty',()=>{
  const one=chunk(1),two=chunk(2),three=chunk(3);
@@ -44,8 +31,8 @@ test('chunkTranscript: timestamp del primo e ultimo cue e budget ordinario',()=>
 test('gradeChoice e normalizeOption: spazi, maiuscole e scelta errata',()=>{
  assert.equal(normalizeOption('  A   B\nC '),'a b c');
  const q={type:'mcq' as const,question:'Scegli',answer:'Prima opzione',options:['Prima opzione','Seconda'],rationale:'Motivo'};
- assert.equal(gradeChoice(q,' PRIMA  OPZIONE ').quality,5);
- assert.equal(gradeChoice(q,'Seconda').quality,1);assert.equal(gradeChoice(q,'Seconda').correct,false);
+ assert.equal(gradeChoice(q,' PRIMA  OPZIONE ').verdict,'correct');
+ assert.equal(gradeChoice(q,'Seconda').verdict,'wrong');assert.deepEqual(gradeChoice(q,'Seconda').missing,[]);
  assert.match(gradeChoice(q,'Seconda').feedback,/Prima opzione/);
 });
 test('toCitations: numero, breadcrumb, snippet e video al secondo corretto',()=>{

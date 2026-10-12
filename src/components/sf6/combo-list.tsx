@@ -16,7 +16,7 @@ const STATUS_META: Record<
 > = {
   practicing:   { label: "In pratica",       dot: "bg-[var(--accent)]",            order: 0 },
   learning:     { label: "In apprendimento", dot: "bg-[var(--color-fg-dim)]", order: 1 },
-  consolidated: { label: "Consolidate",      dot: "bg-emerald-400",           order: 2 },
+  consolidated: { label: "Consolidate",      dot: "bg-ok",                    order: 2 },
 };
 
 export function ComboList({
@@ -214,7 +214,7 @@ function ComboItem({
           {combo.status !== "consolidated" && (
             <button
               onClick={() => setStatus("consolidated")}
-              className="text-[10px] uppercase tracking-[0.15em] px-2 py-1 rounded text-[var(--color-fg-muted)] hover:text-emerald-400 hover:bg-[var(--color-surface-2)]"
+              className="text-[10px] uppercase tracking-[0.15em] px-2 py-1 rounded text-[var(--color-fg-muted)] hover:text-ok hover:bg-[var(--color-surface-2)]"
               title="Segna come consolidata"
             >
               ✓

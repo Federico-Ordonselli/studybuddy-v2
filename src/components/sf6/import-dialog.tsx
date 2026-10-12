@@ -291,7 +291,7 @@ export function ImportDialog({
   // Portal su body: le sezioni `fade-up` lasciano un transform che farebbe da
   // containing block al `fixed`, ritagliando il dialogo dentro la sezione.
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-md pt-8 pb-12 px-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim backdrop-blur-md pt-8 pb-12 px-4">
       <div className="w-full max-w-5xl border border-[var(--color-border-strong)] bg-[var(--color-surface)] rounded-lg shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
@@ -377,7 +377,7 @@ export function ImportDialog({
                       onChange={(e) => setSourceUrl(e.target.value)}
                       placeholder="https://youtube.com/watch?v=…  o  https://twitch.tv/videos/…"
                       disabled={stage === "fetchingUrl"}
-                      className="flex-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-3 py-2 text-sm font-[var(--font-mono)] focus:outline-none focus:border-[var(--color-border-strong)] disabled:opacity-50"
+                      className="flex-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-3 py-2 text-sm font-[var(--font-mono)] focus:outline-none focus:border-[var(--color-border-strong)] disabled:text-fg-subtle"
                     />
                     <button
                       onClick={() => fetchTranscript({ url: sourceUrl.trim() })}

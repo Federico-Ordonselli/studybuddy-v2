@@ -262,14 +262,27 @@ export function createCanvas(container, { select, enter, move, portal, readOnly 
       copy.setAttribute('xmlns', NS); copy.setAttribute('viewBox', `${box.x} ${box.y} ${box.width} ${box.height}`);
       copy.setAttribute('width', box.width); copy.setAttribute('height', box.height);
       copy.insertBefore(svg('rect', { x: box.x, y: box.y, width: box.width, height: box.height, fill: C.halo }), copy.firstChild.nextSibling);
-      const tokens = getComputedStyle(document.documentElement);
+      // I token sono light-dark(oklch…): si risolvono solo su una proprietà vera,
+      // quindi una sonda nel container (eredita color-scheme) + un pixel → hex sRGB.
+      const probe = document.createElement('span'), ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+      container.append(probe);
+      const resolved = new Map(), solid = (token) => {
+        if (!resolved.has(token)) {
+          probe.style.color = `var(${token})`;
+          ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = getComputedStyle(probe).color; ctx.fillRect(0, 0, 1, 1);
+          const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+          resolved.set(token, a === 255 ? '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('') : `rgba(${r},${g},${b},${(a / 255).toFixed(2)})`);
+        }
+        return resolved.get(token);
+      };
       for (const node of copy.querySelectorAll('[fill], [stroke], [data-stroke]')) {
         for (const attr of ['fill', 'stroke', 'data-stroke']) {
           const value = node.getAttribute(attr);
           const token = value?.match(/^var\((--[\w-]+)\)$/)?.[1];
-          if (token) node.setAttribute(attr, tokens.getPropertyValue(token).trim());
+          if (token) node.setAttribute(attr, solid(token));
         }
       }
+      probe.remove();
       return new XMLSerializer().serializeToString(copy);
     },
     destroy() { destroyed = true; stop(); controller.abort(); resize.disconnect(); canvas.remove(); controls.remove(); busyBox.remove(); } };

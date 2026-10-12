@@ -11,7 +11,7 @@ export default function CardManager({domainId,version,onChange}:{domainId:number
   async function change(method:string,body:unknown){setBusy(true);setError('');try{await api(method,'/api/cards',body);setEdit(null);await load();onChange();}catch(e){setError(String(e));}finally{setBusy(false);}}
   return <details style={{...S.card,marginTop:20}}><summary>Le mie carte ({cards.length})</summary>
     <label><input type="checkbox" checked={due} onChange={e=>setDue(e.target.checked)}/> Solo in scadenza</label>
-    {error && <p role="alert" style={{color:'var(--color-danger)'}}>{error}</p>}
+    {error && <p role="alert" style={{color:'var(--danger)'}}>{error}</p>}
     {cards.map(card=><div key={card.id} style={{borderTop:'1px solid var(--border)',padding:'12px 0'}}>
       {edit?.id===card.id ? <>
         <label>Domanda<textarea aria-label="Domanda della carta" style={S.textarea} value={edit.question} onChange={e=>setEdit({...edit,question:e.target.value})}/></label>
@@ -23,7 +23,7 @@ export default function CardManager({domainId,version,onChange}:{domainId:number
         <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
         <button style={S.ghost} disabled={busy} onClick={()=>setEdit({...card})}>Modifica</button>
         <button style={S.ghost} disabled={busy} onClick={()=>change('PATCH',{id:card.id,suspended:!card.suspended})}>{card.suspended?'Riattiva':'Sospendi'}</button>
-        <button style={{...S.ghost,color:'var(--color-danger)'}} disabled={busy} onClick={()=>change('DELETE',{id:card.id})}>Elimina</button>
+        <button style={{...S.ghost,color:'var(--danger)'}} disabled={busy} onClick={()=>change('DELETE',{id:card.id})}>Elimina</button>
         </div>
       </>}
     </div>)}

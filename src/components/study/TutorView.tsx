@@ -4,12 +4,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { decodedSse } from "@/lib/client/sse";
 import { post } from "@/lib/client/api";
+import CitationChip from "./CitationChip";
 import Markdown from "./Markdown";
 import { S } from "./styles";
-import { mmss, sessionKey, type Citation, type Grade, type Msg, type QuizQuestion } from "./types";
+import VerdictPanel from "./VerdictPanel";
+import VideoPanel from "./VideoPanel";
+import { sessionKey, type Citation, type Grade, type Msg, type PlayingVideo, type QuizQuestion } from "./types";
 
 async function chat(body: Record<string, unknown>) {
-  return post<{ reply: string; citations?: Citation[]; question?: QuizQuestion; grade?: Grade; sessionId?: number }>("/api/chat", body);
+  return post<{ reply: string; citations?: Citation[]; question?: QuizQuestion; grade?: Grade; source?: Citation; sessionId?: number }>("/api/chat", body);
 }
 
 /** Thread del tutor: `socratic` (sessione salvata e ripresa) o `quiz` (domanda → valutazione). */
@@ -22,7 +25,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
   const [loading, setLoading] = useState(false);
   const [pendingQ, setPendingQ] = useState<QuizQuestion | null>(null);
   const [sessionId, setSessionId] = useState<number | undefined>();
-  const [video, setVideo] = useState<{ path: string; startSec: number; label: string } | null>(null);
+  const [video, setVideo] = useState<PlayingVideo | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -49,8 +52,8 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     setMsgs((m) => [...m, { role: "user", content: ans }]);
     setPendingQ(null); setLoading(true);
     try {
-      const turn = await chat({ mode: "review", question: q, answer: ans });
-      setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Valutazione", grade: turn.grade, reviewQuiz: q }]);
+      const turn = await chat({ mode: "review", domainId, question: q, answer: ans });
+      setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Valutazione", grade: turn.grade, source: turn.source, reviewQuiz: q }]);
     } catch (e) {
       setMsgs((m) => [...m, { role: "assistant", content: `Errore: ${e}` }]);
     } finally { setLoading(false); }
@@ -114,17 +117,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
 
   return (
     <>
-      {video && (
-        <div style={S.player}>
-          <div style={S.playerHead}>
-            <span style={{ color: "var(--muted)", fontSize: 13 }}>▶ {video.label} · {mmss(video.startSec)}</span>
-            <button onClick={() => setVideo(null)} style={S.x}>✕</button>
-          </div>
-          <video key={video.path + video.startSec}
-            src={`/api/video?path=${encodeURIComponent(video.path)}#t=${video.startSec}`}
-            controls autoPlay style={{ width: "100%", borderRadius: 8, background: "var(--bg)" }} />
-        </div>
-      )}
+      <VideoPanel video={video} onClose={() => setVideo(null)} />
 
           <div ref={threadRef} style={S.thread}>
             {msgs.length === 0 && (
@@ -138,7 +131,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
               <div key={i} style={{ ...S.row, justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
                 <div style={{ ...S.bubble, ...(m.role === "user" ? S.user : S.assistant) }}>
                   {m.tag && <div style={S.badge}>{m.tag}</div>}
-                  {m.role === "user" ? <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div> : <Markdown text={m.content} />}
+                  {m.role === "user" ? <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div> : m.grade ? null : <Markdown text={m.content} />}
                   {m.question?.type === "mcq" && m.question.options && (
                     <div style={S.opts}>
                       {m.question.options.map((opt, k) => (
@@ -147,27 +140,16 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
                     </div>
                   )}
                   {m.grade && (
-                    <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted)" }}>
-                      Qualità SM-2: <b style={{ color: m.grade.correct ? "var(--color-ok)" : "var(--color-danger)" }}>{m.grade.quality}/5</b>
-                    </div>
+                    <div style={{ marginTop: 4 }}><VerdictPanel grade={m.grade} source={m.source} onPlay={setVideo} /></div>
                   )}
-                  {m.grade && m.grade.quality < 3 && m.reviewQuiz && (
+                  {m.grade && m.grade.verdict !== "correct" && m.reviewQuiz && (
                     <button style={S.ghost} disabled={adding || m.addedToReview} onClick={()=>addToReview(i,m.reviewQuiz!)}>
                       {m.addedToReview ? "Aggiunta al ripasso" : "Aggiungi al ripasso"}
                     </button>
                   )}
                   {m.citations && m.citations.length > 0 && (
                     <div style={S.cites}>
-                      {m.citations.map((c) => (
-                        <button key={c.n} title={c.snippet}
-                          onClick={() => c.video && setVideo({ path: c.video.path, startSec: c.video.startSec, label: c.label })}
-                          style={{ ...S.cite, cursor: c.video ? "pointer" : "default" }}>
-                          <span style={S.citeN}>[{c.n}]</span>
-                          <span style={{ color: "var(--muted)" }}>{c.kind}</span>
-                          <span style={S.citeLabel}>{c.label}</span>
-                          {c.video && <span style={S.citePlay}>▶ {mmss(c.video.startSec)}</span>}
-                        </button>
-                      ))}
+                      {m.citations.map((c) => <CitationChip key={c.n} c={c} onPlay={setVideo} />)}
                     </div>
                   )}
                 </div>
@@ -176,7 +158,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
             {loading && <div style={{ ...S.row, justifyContent: "flex-start" }}><div style={{ ...S.bubble, ...S.assistant }}><span className="spin" /> <span style={{ color: "var(--muted)" }}>sto pensando…</span></div></div>}
           </div>
 
-          {cardError && <p role="alert" style={{color:"var(--color-danger)"}}>{cardError}</p>}
+          {cardError && <p role="alert" style={{color:"var(--danger)"}}>{cardError}</p>}
           <div style={S.inputBar}>
             <textarea value={input} onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
