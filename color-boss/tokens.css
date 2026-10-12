@@ -1,0 +1,165 @@
+/* ==========================================================================
+   tokens.css · Il Boss dei Colori
+   Light + dark in un solo blocco grazie a light-dark().
+   Tutti i valori sono in gamut sRGB: niente clipping del browser.
+   Gli hex nei commenti sono CALCOLATI (colorboss.py), non copiati.
+
+   Regole:
+   - I componenti usano SOLO i token semantici (sezione 2), mai le primitive.
+   - Per cambiare brand rigenera le scale:
+       python3 colorboss.py scale "#TUOCOLORE" --name brand
+       python3 colorboss.py scale "#TUOCOLORE" --name neutral --neutral
+   - Dopo ogni modifica: python3 colorboss.py check tokens.css  (exit 1 = rotto)
+
+   Tema: segue il sistema; per forzarlo <html data-theme="light|dark">.
+   Requisiti browser: oklch() + light-dark() (Chrome 123+, Firefox 120+, Safari 17.5+).
+   ========================================================================== */
+
+:root { color-scheme: light dark; }
+[data-theme="light"] { color-scheme: light; }
+[data-theme="dark"]  { color-scheme: dark; }
+
+:root {
+  /* ---------------- 1. PRIMITIVE (scale OKLCH, 50 = chiaro, 950 = scuro) */
+  --white: oklch(100% 0 0);                   /* #FFFFFF */
+  /* brand */
+  --brand-50: oklch(97.5% 0.011 258.0);       /* #F2F7FE */
+  --brand-100: oklch(94.5% 0.026 258.0);      /* #E2EEFF */
+  --brand-200: oklch(89.5% 0.051 258.0);      /* #C8DEFF */
+  --brand-300: oklch(82.5% 0.087 258.0);      /* #A3C8FE */
+  --brand-400: oklch(73.0% 0.140 258.0);      /* #6EA8FF */
+  --brand-500: oklch(63.0% 0.189 258.0);      /* #3485F8 */
+  --brand-600: oklch(55.0% 0.189 258.0);      /* #176CDD */
+  --brand-700: oklch(47.5% 0.174 258.0);      /* #0356BB */
+  --brand-800: oklch(40.0% 0.148 258.0);      /* #004395 */
+  --brand-900: oklch(33.0% 0.122 258.0);      /* #003172 */
+  --brand-950: oklch(26.0% 0.096 258.0);      /* #002151 */
+
+  /* neutral */
+  --neutral-50: oklch(98.5% 0.004 258.0);     /* #F8FAFD */
+  --neutral-100: oklch(96.5% 0.004 258.0);    /* #F2F3F6 */
+  --neutral-200: oklch(92.5% 0.008 258.0);    /* #E3E6EC */
+  --neutral-300: oklch(87.0% 0.008 258.0);    /* #D1D4DA */
+  --neutral-400: oklch(71.5% 0.008 258.0);    /* #A0A3A8 */
+  --neutral-500: oklch(55.5% 0.008 258.0);    /* #707378 */
+  --neutral-600: oklch(46.0% 0.008 258.0);    /* #55585D */
+  --neutral-700: oklch(37.5% 0.008 258.0);    /* #3E4145 */
+  --neutral-800: oklch(28.5% 0.008 258.0);    /* #282A2E */
+  --neutral-900: oklch(22.5% 0.008 258.0);    /* #191C20 */
+  --neutral-950: oklch(18.0% 0.008 258.0);    /* #0F1215 */
+
+  /* green */
+  --green-50: oklch(97.5% 0.016 150.0);       /* #F0FAF1 */
+  --green-100: oklch(94.5% 0.035 150.0);      /* #DDF4E1 */
+  --green-200: oklch(89.5% 0.067 150.0);      /* #BEEAC5 */
+  --green-300: oklch(82.5% 0.108 150.0);      /* #92DAA1 */
+  --green-400: oklch(73.0% 0.144 150.0);      /* #5BC176 */
+  --green-500: oklch(63.0% 0.160 150.0);      /* #25A351 */
+  --green-600: oklch(54.5% 0.150 150.0);      /* #00873C */
+  --green-700: oklch(47.5% 0.130 150.0);      /* #026F31 */
+  --green-800: oklch(40.0% 0.110 150.0);      /* #005725 */
+  --green-900: oklch(33.0% 0.090 150.0);      /* #01421A */
+  --green-950: oklch(26.0% 0.071 150.0);      /* #002D10 */
+
+  /* amber */
+  --amber-50: oklch(97.5% 0.016 70.0);        /* #FEF5EC */
+  --amber-100: oklch(94.5% 0.035 70.0);       /* #FDE9D4 */
+  --amber-200: oklch(89.5% 0.067 70.0);       /* #FAD5AD */
+  --amber-300: oklch(82.5% 0.108 70.0);       /* #F3B976 */
+  --amber-400: oklch(73.0% 0.144 70.0);       /* #E0952C */
+  --amber-500: oklch(63.0% 0.136 70.0);       /* #BC7802 */
+  --amber-600: oklch(54.5% 0.118 70.0);       /* #9B6200 */
+  --amber-700: oklch(47.5% 0.102 70.0);       /* #805002 */
+  --amber-800: oklch(40.0% 0.086 70.0);       /* #653E01 */
+  --amber-900: oklch(33.0% 0.071 70.0);       /* #4C2E01 */
+  --amber-950: oklch(26.0% 0.056 70.0);       /* #351E00 */
+
+  /* red */
+  --red-50: oklch(97.5% 0.012 27.0);          /* #FFF4F2 */
+  --red-100: oklch(94.5% 0.027 27.0);         /* #FFE6E3 */
+  --red-200: oklch(89.5% 0.054 27.0);         /* #FED0C9 */
+  --red-300: oklch(82.5% 0.097 27.0);         /* #FFAEA4 */
+  --red-400: oklch(73.0% 0.166 27.0);         /* #FF796D */
+  --red-500: oklch(63.0% 0.210 27.0);         /* #ED413B */
+  --red-600: oklch(54.5% 0.210 27.0);         /* #CE1A1F */
+  --red-700: oklch(47.5% 0.193 27.0);         /* #AF0111 */
+  --red-800: oklch(40.0% 0.163 27.0);         /* #8B000B */
+  --red-900: oklch(33.0% 0.134 27.0);         /* #6A0106 */
+  --red-950: oklch(26.0% 0.105 27.0);         /* #4B0103 */
+  /* ---------------- 2. SEMANTICI: light-dark(<chiaro>, <scuro>) */
+
+  /* superfici: in dark l'elevazione si fa con la luminosità, non con le ombre */
+  --bg-page:        light-dark(var(--neutral-50),  var(--neutral-950));
+  --bg-surface:     light-dark(var(--white),       var(--neutral-900));
+  --bg-raised:      light-dark(var(--white),       var(--neutral-800));
+  --bg-subtle:      light-dark(var(--neutral-100), var(--neutral-900));
+  --bg-hover:       light-dark(var(--neutral-100), var(--neutral-800));
+
+  /* bordi */
+  --border:         light-dark(var(--neutral-300), var(--neutral-700));  /* decorativo */
+  --border-strong:  light-dark(var(--neutral-500), var(--neutral-400));  /* input, controlli: >= 3:1 */
+
+  /* testo */
+  --text:           light-dark(var(--neutral-900), var(--neutral-50));
+  --text-muted:     light-dark(var(--neutral-600), var(--neutral-300));
+  --text-subtle:    light-dark(var(--neutral-400), var(--neutral-400));  /* placeholder, disabled */
+
+  /* accento (brand) */
+  --accent:         light-dark(var(--brand-600), var(--brand-300));      /* sfondo bottone primario */
+  --accent-hover:   light-dark(var(--brand-700), var(--brand-200));
+  --on-accent:      light-dark(var(--white),     var(--neutral-950));    /* testo sopra --accent */
+  --accent-text:    light-dark(var(--brand-700), var(--brand-300));      /* link, testo colorato */
+  --accent-soft:    light-dark(var(--brand-100), var(--brand-950));      /* badge, selezione */
+  --on-accent-soft: light-dark(var(--brand-800), var(--brand-200));
+  --focus-ring:     light-dark(var(--brand-500), var(--brand-400));
+
+  /* stati: luminosità diverse tra loro (distinguibili anche con daltonismo,
+     verificato con colorboss.py cvd) + SEMPRE icona o testo, mai solo colore */
+  --success:        light-dark(var(--green-700), var(--green-200));      /* testo/icona */
+  --success-soft:   light-dark(var(--green-100), var(--green-950));
+  --on-success-soft:light-dark(var(--green-800), var(--green-200));
+  --warning:        light-dark(var(--amber-800), var(--amber-300));
+  --warning-soft:   light-dark(var(--amber-100), var(--amber-950));
+  --on-warning-soft:light-dark(var(--amber-800), var(--amber-200));
+  --danger:         light-dark(var(--red-600),   var(--red-300));
+  --danger-solid:   light-dark(var(--red-600),   var(--red-300));        /* bottone distruttivo */
+  --on-danger:      light-dark(var(--white),     var(--neutral-950));
+  --danger-soft:    light-dark(var(--red-100),   var(--red-950));
+  --on-danger-soft: light-dark(var(--red-800),   var(--red-200));
+}
+
+/* ---------------- 3. STATI DERIVATI (opzionale, relative color syntax)
+   .btn:active { background: oklch(from var(--accent) calc(l - 0.08) c h); }
+   .btn:disabled { opacity: 1; background: var(--bg-subtle); color: var(--text-subtle); }
+*/
+
+/* ---------------- 4. CONTRATTI DI CONTRASTO (letti da colorboss.py check)
+   Livelli: body | text | large | ui | disabled | decor
+   @check --text            on --bg-page    : body
+   @check --text            on --bg-surface : body
+   @check --text            on --bg-raised  : body
+   @check --text            on --bg-subtle  : body
+   @check --text            on --bg-hover   : body
+   @check --text-muted      on --bg-page    : text
+   @check --text-muted      on --bg-surface : text
+   @check --text-muted      on --bg-subtle  : text
+   @check --text-subtle     on --bg-surface : disabled
+   @check --border          on --bg-surface : decor
+   @check --border-strong   on --bg-surface : ui
+   @check --border-strong   on --bg-page    : ui
+   @check --on-accent       on --accent     : text
+   @check --on-accent       on --accent-hover : text
+   @check --accent          on --bg-surface : ui
+   @check --accent-text     on --bg-page    : text
+   @check --accent-text     on --bg-surface : text
+   @check --on-accent-soft  on --accent-soft : text
+   @check --focus-ring      on --bg-surface : ui
+   @check --focus-ring      on --bg-page    : ui
+   @check --success         on --bg-surface : text
+   @check --on-success-soft on --success-soft : text
+   @check --warning         on --bg-surface : text
+   @check --on-warning-soft on --warning-soft : text
+   @check --danger          on --bg-surface : text
+   @check --on-danger       on --danger-solid : text
+   @check --on-danger-soft  on --danger-soft : text
+*/
