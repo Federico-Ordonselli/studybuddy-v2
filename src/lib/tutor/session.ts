@@ -3,6 +3,7 @@ import { rag } from "@/lib/config";
 import { generateStream, generate, type ChatMessage, type GenerateOptions } from "@/lib/providers";
 import { generateQuiz, normalizeOption, type QuizQuestion } from "./quiz";
 import { gradeAnswer, type Grade } from "./grade";
+import { gradingSource } from "./gradingSource";
 
 export type TutorMode = "socratic" | "quiz" | "review";
 
@@ -12,6 +13,7 @@ export interface TutorTurn {
   citations?: Citation[];
   question?: QuizQuestion;
   grade?: Grade;
+  source?: Citation; // passaggio usato dal giudice
 }
 
 /** Modalita' socratica: risponde con domande/indizi invece di dare la soluzione. */
@@ -48,13 +50,15 @@ export async function quizTurn(topic: string, domainId?: number): Promise<TutorT
   };
 }
 
-/** Valuta la risposta dello studente a una domanda di quiz. */
-export async function gradeTurn(
-  q: QuizQuestion,
-  studentAnswer: string
-): Promise<TutorTurn> {
-  const grade = q.type === "mcq" && q.options?.length ? gradeChoice(q, studentAnswer) : await gradeAnswer(q.question, q.answer, studentAnswer);
-  return { reply: grade.feedback, grade };
+/** Valuta la risposta a una domanda di quiz; le aperte col passaggio più pertinente come riferimento. */
+export async function gradeTurn(q: QuizQuestion, studentAnswer: string, domainId?: number): Promise<TutorTurn> {
+  if (q.type === "mcq" && q.options?.length) {
+    const grade = gradeChoice(q, studentAnswer);
+    return { reply: grade.feedback, grade };
+  }
+  const source = await gradingSource(q.question, null, domainId);
+  const grade = await gradeAnswer(q.question, q.answer, studentAnswer, source?.text);
+  return { reply: grade.feedback, grade, source: source?.citation };
 }
 
 /**

@@ -154,6 +154,28 @@ export function ftsSearch(query: string, k: number, domainId?: number): Retrieve
   }));
 }
 
+/** Un chunk con i dati del documento, nello stesso formato dei risultati di ricerca (distance 0). */
+export function getChunk(id: number): Retrieved | null {
+  const r = sqlite
+    .prepare(
+      `SELECT c.id AS chunkId, 0 AS distance, c.content AS content, c.document_id AS documentId, c.meta AS meta,
+              d.source AS source, d.kind AS docKind, d.meta AS docMeta
+       FROM chunks c JOIN documents d ON d.id = c.document_id WHERE c.id = ?`
+    )
+    .get(id) as Omit<VecRow, "domainId"> | undefined;
+  if (!r) return null;
+  return {
+    chunkId: r.chunkId,
+    documentId: r.documentId,
+    content: r.content,
+    distance: r.distance,
+    meta: r.meta ? JSON.parse(r.meta) : undefined,
+    source: r.source,
+    docKind: r.docKind,
+    docMeta: r.docMeta ? JSON.parse(r.docMeta) : undefined,
+  };
+}
+
 interface VecRow {
   chunkId: number;
   distance: number;

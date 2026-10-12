@@ -6,6 +6,8 @@ import { cards, domains, reviewLogs } from "@/lib/db/schema";
 import { retrieve, asContext } from "@/lib/rag/pipeline";
 import { resolveScope } from "@/lib/rag/store";
 import { generateQuiz } from "./quiz";
+import { gradingSource } from "./gradingSource";
+import type { Citation } from "@/lib/rag/pipeline";
 import { gradeAnswer, PROMPT_VERSION, rationaleJson, type Grade } from "./grade";
 import { models } from "@/lib/config";
 import { fromSnapshot, isGrade, toRating, scheduleFrom, schedule, toSnapshot, type FsrsFields, type Grade as Rating } from "./scheduler";
@@ -26,6 +28,7 @@ export interface ReviewResult {
   rating: Rating;    // 1 Again · 2 Hard · 3 Good · 4 Easy
   dueAt: number;     // epoch ms della prossima scadenza
   remaining: number; // carte ancora in scadenza per il dominio
+  source?: Citation; // passaggio usato dal giudice
 }
 
 /** Genera e persiste fino a `n` carte (Q/A) dal materiale di un dominio. */
@@ -87,7 +90,8 @@ export async function reviewCard(cardId: number, answer: string, scopeDomainId?:
   const card = db.select().from(cards).where(eq(cards.id, cardId)).get();
   if (!card || card.suspended) return null;
 
-  const grade = await gradeAnswer(card.question, card.answer, answer);
+  const source = await gradingSource(card.question, card.sourceChunkId, card.domainId);
+  const grade = await gradeAnswer(card.question, card.answer, answer, source?.text);
   const rating = toRating(grade.verdict);
   // al secondo, come `reviewed_at`: la correzione del voto rischedula con la stessa ora (il fuzz ne dipende)
   const now = new Date(Math.floor(Date.now() / 1000) * 1000);
@@ -107,7 +111,7 @@ export async function reviewCard(cardId: number, answer: string, scopeDomainId?:
     }).run();
   })();
 
-  return { grade, expected: card.answer, rating, dueAt: update.dueAt.getTime(), remaining: remainingFor(scopeDomainId ?? card.domainId) };
+  return { grade, expected: card.answer, rating, dueAt: update.dueAt.getTime(), remaining: remainingFor(scopeDomainId ?? card.domainId), source: source?.citation };
 }
 
 /**
