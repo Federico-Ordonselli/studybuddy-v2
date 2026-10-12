@@ -106,8 +106,8 @@ export const cards = sqliteTable("cards", {
  * dell'update della carta e mai modificata dopo (tranne `overridden`, dalla Fase 1).
  * Serve all'ottimizzazione di FSRS e alla calibrazione del giudice e della fiducia.
  * `state_before` è lo stato FSRS completo prima della review (serve alla correzione del voto);
- * `stability`/`difficulty`/`scheduled_days` sono i valori dopo. `legacy_quality` è il voto 0–5
- * del giudice finché non passa ai verdetti (Fase 2). Una correzione segna `overridden = 1` e
+ * `stability`/`difficulty`/`scheduled_days` sono i valori dopo. `legacy_quality` era il voto 0–5
+ * del giudice: dalla Fase 2 non si scrive più, resta per i ripassi precedenti. Una correzione segna `overridden = 1` e
  * aggiunge una riga con il rating manuale (`grader_model = "manual"`).
  */
 export const reviewLogs = sqliteTable("review_logs", {
@@ -115,7 +115,7 @@ export const reviewLogs = sqliteTable("review_logs", {
   cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
   reviewedAt: integer("reviewed_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   rating: integer("rating"),                    // 1 Again · 2 Hard · 3 Good · 4 Easy (da FSRS)
-  legacyQuality: integer("legacy_quality"),     // 0–5, finché il giudice usa SM-2
+  legacyQuality: integer("legacy_quality"),     // 0–5, non scritta dalla Fase 2 (solo ripassi precedenti)
   confidence: integer("confidence"),            // 1–3, dalla Fase 6
   answer: text("answer").notNull(),
   graderRationale: text("grader_rationale"),
