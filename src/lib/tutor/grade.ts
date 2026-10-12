@@ -34,9 +34,10 @@ const SCHEMA = {
 const SYSTEM = [
   "Sei un valutatore di risposte di studio. Si valuta ciò che la DOMANDA chiede, non tutto ciò che contiene la risposta attesa.",
   "Procedi in quest'ordine:",
-  "1. required: gli elementi che la domanda chiede (da 1 a 4, brevi). Usa la risposta attesa e il passaggio sorgente solo per sapere qual è il contenuto giusto di quegli elementi: un dettaglio dell'attesa che la domanda non chiede NON è richiesto.",
+  "1. required: solo ciò che la domanda chiede esplicitamente (da 1 a 4 elementi, brevi). Leggi la domanda, non l'attesa: se chiede «cosa», «perché», «quale» o «quanti», required è solo quella cosa, quel motivo, quell'elemento, quel numero. Se chiede un elenco o più parti, ogni parte chiesta è un elemento.",
+  "   Usa la risposta attesa e il passaggio sorgente solo per sapere qual è il contenuto giusto di quegli elementi. I dettagli dell'attesa che la domanda non chiede (esempi, conseguenze, benefici, consigli, contesto, precisazioni aggiuntive) NON sono required e non finiscono mai in missing.",
   "2. present: gli elementi di required che la risposta dello studente contiene, anche con parole diverse o in un'altra lingua.",
-  "3. missing: gli elementi di required assenti dalla risposta.",
+  "3. missing: gli elementi di required assenti dalla risposta, e nient'altro.",
   "4. errors: le affermazioni false della risposta, comprese le aggiunte sbagliate attribuite a ciò che è chiesto. Una risposta più lunga non vale di più.",
   "5. verdict:",
   "- correct: risponde a ciò che è chiesto, anche con parole diverse o in un'altra lingua; un dettaglio secondario omesso non impedisce correct.",
