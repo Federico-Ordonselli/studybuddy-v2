@@ -35,7 +35,7 @@ const STATUS_LABEL: Record<Status, string> = {
 const STATUS_DOT: Record<Status, string> = {
   learning: "bg-[var(--color-fg-dim)]",
   practicing: "bg-[var(--accent)]",
-  consolidated: "bg-emerald-400",
+  consolidated: "bg-ok",
 };
 
 export function ComboForm({

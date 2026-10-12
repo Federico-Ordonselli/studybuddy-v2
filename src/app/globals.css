@@ -1,85 +1,47 @@
 @import "tailwindcss";
+@import "./tokens.css";
 
-/* Palette da colorpalettenuova.png: sabbia, oliva, blu notte e ambra.
- * Le grandi superfici chiare usano tinte attenuate per limitare la luminosità. */
+/* I colori stanno in tokens.css (primitive OKLCH → semantici → componenti).
+ * Qui solo l'aggancio a Tailwind: le utility (bg-surface, text-fg-dim, …)
+ * leggono i semantici, che cambiano tema da soli con light-dark(). */
 @theme {
-  --color-bg: #E5DDD1;
-  --color-surface: #EEE8DE;
-  --color-surface-2: #DDD4C5;
-  --color-border: #C5BBAA;
-  --color-border-strong: #958874;
-  --color-fg: #242A3B;
-  --color-fg-muted: #4B535B;
-  --color-fg-dim: #5F655F;
-  --color-accent: #914918;
-  --color-accent-soft: #E7AD77;
-  --color-danger: #CF3714;
-  --color-ok: #386A47;
+  --color-bg: var(--bg-page);
+  --color-surface: var(--bg-surface);
+  --color-surface-2: var(--bg-subtle);
+  --color-raised: var(--bg-raised);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--text);
+  --color-fg-muted: var(--text-muted);
+  --color-fg-dim: var(--text-dim);
+  --color-fg-subtle: var(--text-subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent-soft: var(--on-accent-soft);
+  --color-danger: var(--danger);
+  --color-ok: var(--success);
+  --color-scrim: var(--scrim);
   --font-display: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
 }
 
-:root {
-  color-scheme: light;
-  --menu-rule: #7C8665;
-  --action-fill: #E7AD77;
-  --sidebar-bg: #D9C2A6;
-  --menu-bg: #E5D2BB;
-  --menu-selected: #E7AD77;
-  --menu-ink: #242A3B;
-  --selected-ink: #111231;
-  --panel-tint: #C3CED2;
-  --panel-line: #80969F;
-  --button-ink: #111231;
-  --accent-ink: #EEE8DE;
-  --shadow: #321C1410;
-  --user: #E6D0B5;
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --color-bg: #0F112D;
-  --color-surface: #1B2238;
-  --color-surface-2: #263044;
-  --color-border: #365C71;
-  --color-border-strong: #7C8665;
-  --color-fg: #EEE5D7;
-  --color-fg-muted: #C4B9A8;
-  --color-fg-dim: #B0B5AD;
-  --color-accent: #E7AD77;
-  --color-accent-soft: #EB9337;
-  --color-danger: #FA9C39;
-  --color-ok: #ABC098;
-  --menu-rule: #7C8665;
-  --action-fill: #E7AD77;
-  --sidebar-bg: #111231;
-  --menu-bg: #263044;
-  --menu-selected: #E7AD77;
-  --menu-ink: #EEE5D7;
-  --selected-ink: #111231;
-  --panel-tint: #25384A;
-  --panel-line: #365C71;
-  --button-ink: #111231;
-  --accent-ink: #111231;
-  --shadow: #00000030;
-  --user: #3C302D;
-}
-
 /*
  * Alias dei vecchi token: le viste di studio (stili inline) e l'editor delle mappe
- * (components/mappe/studio.css) li usano ancora. Si tolgono con l'unione al vault.
+ * (components/mappe/studio.css) li usano ancora. --border, --text, --accent,
+ * --shadow e --user sono già semantici in tokens.css.
  */
 :root {
-  --bg: var(--color-bg);
-  --panel: var(--color-surface);
-  --panel-2: var(--color-surface-2);
-  --border: var(--color-border);
-  --text: var(--color-fg);
-  --muted: var(--color-fg-muted);
-  --accent: var(--color-accent);
-  --accent-2: var(--color-accent-soft);
-
+  --bg: var(--bg-page);
+  --panel: var(--bg-surface);
+  --panel-2: var(--bg-subtle);
+  --muted: var(--text-muted);
+  --accent-2: var(--menu-selected);
+  --action-fill: var(--menu-selected);
+  --button-ink: var(--selected-ink);
+  --accent-ink: var(--on-accent);
 }
 
 @layer base {
@@ -92,7 +54,9 @@
     -webkit-font-smoothing: antialiased;
   }
   button { cursor: pointer; }
-  button:disabled { opacity: 0.5; cursor: default; }
+  /* Disabilitati: colore dedicato, mai opacity (contrasto imprevedibile). */
+  button:disabled { cursor: default; color: var(--text-subtle); }
+  button:disabled:where(.bg-accent) { background: var(--bg-subtle); border-color: var(--border); }
   ::selection { background: var(--color-accent); color: var(--color-bg); }
   input[type="checkbox"], input[type="radio"] { accent-color: var(--color-accent); }
 }
@@ -110,10 +74,10 @@
 
 /* La cornice resta decorativa: non crea containing block per gli overlay. */
 @layer base {
-  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }
+  :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
   button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   input, select, textarea { color: var(--color-fg); }
-  ::placeholder { opacity: 1; }
+  ::placeholder { opacity: 1; color: var(--text-subtle); }
 }
 
 .font-display { font-weight: 750; font-style: italic; letter-spacing: -0.045em; }
@@ -182,7 +146,7 @@
 .note-composer { border-color: var(--panel-line); border-radius: 12px 3px; box-shadow: inset 0 0 0 3px var(--color-bg), 0 4px 0 var(--shadow); }
 .note-composer textarea { min-height: 120px; }
 .note-composer > div { padding: 12px 16px; }
-.note-composer button.bg-accent { background: var(--action-fill); color: var(--selected-ink); font-weight: 750; border: 1px solid var(--color-border-strong); box-shadow: inset 0 0 0 2px #ffffff50; }
+.note-composer button.bg-accent { background: var(--action-fill); color: var(--selected-ink); font-weight: 750; border: 1px solid var(--color-border-strong); box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--white) 30%, transparent); }
 .bg-accent { color: var(--accent-ink); }
 .shadow-xl { --tw-shadow: 0 8px 24px var(--shadow); }
 @media (max-width: 767px) {
@@ -219,28 +183,4 @@
 .studio-editor button.danger, .studio-notice.error { color: var(--color-danger); }
 .studio-editor button.danger { background: var(--color-surface); border-color: var(--color-danger); }
 
-/* Colori semantici del modulo SF6: contrasto adatto ai due temi. */
-:root {
-  --sf6-shoto: #8B641A;
-  --sf6-charge: #365F8F;
-  --sf6-grappler: #9D3529;
-  --sf6-rushdown: #914918;
-  --sf6-zoner: #536B35;
-  --sf6-setplay: #70528F;
-  --sf6-footsies: #78603F;
-  --sf6-mixup: #9B4265;
-  --sf6-stance: #287066;
-  --sf6-trickster: #874782;
-}
-[data-theme="dark"] {
-  --sf6-shoto: #DFB650;
-  --sf6-charge: #80ACD5;
-  --sf6-grappler: #E38E7D;
-  --sf6-rushdown: #E7AD77;
-  --sf6-zoner: #A9BC85;
-  --sf6-setplay: #B49AD0;
-  --sf6-footsies: #C8AF8D;
-  --sf6-mixup: #DFA0BA;
-  --sf6-stance: #8FCAC1;
-  --sf6-trickster: #CB98C7;
-}
+.studio-editor button:disabled { opacity: 1; color: var(--text-subtle); }

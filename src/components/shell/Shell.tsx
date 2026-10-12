@@ -61,7 +61,7 @@ export default function Shell({ data, children }: { data: ShellData; children: R
         <Sidebar data={data} pathname={pathname} collapsed={collapsed} onToggle={() => setExpanded(collapsed)} onCapture={openCapture} />
       </div>
       {drawer && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setDrawer(false)}>
+        <div className="md:hidden fixed inset-0 z-40 bg-scrim" onClick={() => setDrawer(false)}>
           <div className="h-full w-60" onClick={(e) => e.stopPropagation()}>
             <Sidebar data={data} pathname={pathname} collapsed={false} onCapture={openCapture} />
           </div>

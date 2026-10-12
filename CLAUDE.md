@@ -76,8 +76,15 @@ Attenzione ai **duplicati** slide-PDF vs trascrizione: stesso contenuto da due f
 - Test: `npm test` (`node:test` via tsx, DB temporaneo per file con `tests/helpers/db.ts`, nessuna dipendenza da Ollama). `learning-vault/` è escluso dal typecheck e i suoi dati sono gitignored.
 - **Docker**: `docker compose up -d --build` (vedi README). `network_mode: host` (Ollama sull'host), `./data` per DB e cache modelli (`STUDYBUDDY_MODELS_DIR`, `HF_HOME`), corsi montati `:ro` allo stesso percorso dell'host (`COURSES_DIR`) così `documents.source` resta valido. `/api/health?warm=1` dice se il reranker è su `cuda` (dopo un'inferenza vera). Porta/indirizzo: `STUDYBUDDY_PORT`/`STUDYBUDDY_HOST` in `.env`. La CLI funziona anche nel container: `docker compose exec studybuddy npm run ingest -- <dir> <dominio>`.
 
+## Colori
+- Prima di toccare colori, temi o UI leggi `color-boss/COLOR_BOSS.md` (sezioni 1, 9, 10).
+- I colori stanno **solo** in `src/app/tokens.css`: primitive OKLCH generate con `color-boss/colorboss.py` (neutri `sand` per il light e `navy` per il dark; brand rust→ambra con tinta interpolata; `red`, `green`, `olive`) → semantici `light-dark()` (`--bg-page`, `--text-dim`, `--accent`, `--danger`…) → token di componente (menu, pannelli, `--sf6-*`). `globals.css` li espone a Tailwind con i vecchi nomi (`bg-surface`, `text-fg-dim`, `bg-accent`, `bg-scrim`…), quindi nei componenti si usano quelle utility o `var(--semantico)`. Niente hex, `rgb()` o colori Tailwind di default nei componenti (eccezione: le SVG generate in `providers/image.ts`, che sono `<img>` autonome).
+- Colore nuovo = token semantico + riga `@check` in fondo a `tokens.css`. Dopo ogni modifica `npm run colors:check`: exit ≠ 0 non si consegna; i 3 warning APCA sul danger dark sono motivati nel file. Mai dichiarare un contrasto senza averlo calcolato.
+- Disabilitati: `--text-subtle`/`--bg-subtle`, mai `opacity`. Stati sempre con testo o icona, non solo colore.
+- Chi legge i token da JS deve risolverli su una proprietà vera (`light-dark()` resta testo nelle custom property): vedi `serialize()` in `components/mappe/tela.js`.
+
 ## Comandi
-`npm run dev` · `npm run ingest -- <dir> <dominio>` · `npm run import-vault -- --vault <dir> --target <nuovo.db> [--skip <slug>] [--apply]` · `npm run db:schema` · `npm run db:push` · `npm run db:studio` · `npm run typecheck` · `npm test` · `docker compose up -d --build`
+`npm run dev` · `npm run ingest -- <dir> <dominio>` · `npm run import-vault -- --vault <dir> --target <nuovo.db> [--skip <slug>] [--apply]` · `npm run db:schema` · `npm run db:push` · `npm run db:studio` · `npm run typecheck` · `npm test` · `npm run colors:check` · `docker compose up -d --build`
 
 <!-- BEGIN:nextjs-agent-rules -->
 

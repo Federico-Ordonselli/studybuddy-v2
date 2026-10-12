@@ -48,7 +48,7 @@ export default function AutoGenerate({domainId,onMap,onAskTutor}:{domainId:numbe
       <button className="underline" onClick={()=>setKeys(data?.modules.map(m=>m.key) ?? [])}>Tutto il corso</button> <button className="underline" onClick={()=>setKeys([])}>Deseleziona</button>
       <div className="max-h-56 overflow-auto space-y-2">{data?.modules.map(m=><label className="block" key={m.key}><input type="checkbox" checked={keys.includes(m.key)} onChange={e=>setKeys(e.target.checked ? [...keys,m.key]:keys.filter(k=>k!==m.key))}/> {m.label}</label>)}</div>
       <p className="text-sm text-fg-muted">{keys.length} moduli × {kinds.length} materiali. I materiali vengono salvati per modulo; rigenerare aggiorna quelli esistenti. Le flashcard duplicate vengono saltate.</p>
-      <button className="bg-accent text-bg rounded-md px-4 py-2 disabled:opacity-50" disabled={busy || !keys.length || !kinds.length || job?.status === "running"} onClick={()=>start()}>Genera materiali</button>
+      <button className="bg-accent text-bg rounded-md px-4 py-2" disabled={busy || !keys.length || !kinds.length || job?.status === "running"} onClick={()=>start()}>Genera materiali</button>
     </div>}
     {job && <div aria-live="polite">
       <p>{job.status === "running" ? "Generazione in corso" : errors.length ? "Generazione terminata con errori" : "Generazione completata"} · {completed}/{job.steps.length} passaggi</p>

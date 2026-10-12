@@ -9,7 +9,7 @@ import NoteComposer from "./NoteComposer";
 export default function QuickCapture({ data, pathname, onClose }: { data: ShellData; pathname: string; onClose: () => void }) {
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="Appunto"
-      className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center pt-[15vh] px-4"
+      className="fixed inset-0 z-50 bg-scrim flex items-start justify-center pt-[15vh] px-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-xl">
         <NoteComposer areas={data.areas} courses={data.courses} initial={captureTarget(pathname, data.areas)} autoFocus onDone={onClose} />
