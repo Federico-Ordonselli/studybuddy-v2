@@ -1,5 +1,8 @@
 import { generate } from "@/lib/providers";
 
+/** Versione del prompt del giudice: finisce in review_logs e nei risultati di `npm run eval`. */
+export const PROMPT_VERSION = "grade-v1";
+
 export interface Grade {
   quality: number;   // 0-5 per SM-2
   correct: boolean;

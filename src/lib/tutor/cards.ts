@@ -1,12 +1,13 @@
 import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
-import { db } from "@/lib/db";
+import { db, sqlite } from "@/lib/db";
 import { LibraryError } from "@/lib/errors";
 import { jaccard, wordShingles } from "@/lib/rag/pipeline";
-import { cards, domains } from "@/lib/db/schema";
+import { cards, domains, reviewLogs } from "@/lib/db/schema";
 import { retrieve, asContext } from "@/lib/rag/pipeline";
 import { resolveScope } from "@/lib/rag/store";
 import { generateQuiz } from "./quiz";
-import { gradeAnswer, type Grade } from "./grade";
+import { gradeAnswer, PROMPT_VERSION, type Grade } from "./grade";
+import { models } from "@/lib/config";
 import { sm2, nextDue } from "./sm2";
 
 /**
@@ -79,7 +80,7 @@ export function nextDueCard(domainId: number): ReviewCard | null {
 }
 
 /**
- * Valuta la risposta a una carta e riprogramma con SM-2. `scopeDomainId` è il dominio
+ * Valuta la risposta a una carta, riprogramma con SM-2 e registra la review in `review_logs`. `scopeDomainId` è il dominio
  * selezionato in UI (può essere il macro): serve per contare le carte rimaste in coda.
  */
 export async function reviewCard(cardId: number, answer: string, scopeDomainId?: number): Promise<ReviewResult | null> {
@@ -92,10 +93,23 @@ export async function reviewCard(cardId: number, answer: string, scopeDomainId?:
     grade.quality
   );
   const due = nextDue(next.intervalDays);
-  db.update(cards)
-    .set({ ease: next.ease, intervalDays: next.intervalDays, repetitions: next.repetitions, dueAt: due })
-    .where(eq(cards.id, cardId))
-    .run();
+  // Carta e log insieme: niente review registrata senza riprogrammazione, né il contrario.
+  sqlite.transaction(() => {
+    db.update(cards)
+      .set({ ease: next.ease, intervalDays: next.intervalDays, repetitions: next.repetitions, dueAt: due })
+      .where(eq(cards.id, cardId))
+      .run();
+    db.insert(reviewLogs).values({
+      cardId,
+      answer,
+      legacyQuality: grade.quality,
+      graderRationale: grade.feedback,
+      stateBefore: { ease: card.ease, intervalDays: card.intervalDays, repetitions: card.repetitions },
+      scheduledDays: next.intervalDays,
+      graderModel: models.grade.model,
+      promptVersion: PROMPT_VERSION,
+    }).run();
+  })();
 
   const scope = scopeDomainId ?? card.domainId;
   return {

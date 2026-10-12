@@ -92,6 +92,31 @@ export const cards = sqliteTable("cards", {
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
+/**
+ * Storico delle review: una riga per ripasso, scritta nella stessa transazione
+ * dell'update della carta e mai modificata dopo (tranne `overridden`, dalla Fase 1).
+ * Serve all'ottimizzazione di FSRS e alla calibrazione del giudice e della fiducia.
+ * Le colonne FSRS (`rating`, `stability`, `difficulty`) restano NULL finché lo
+ * scheduler è SM-2; `legacy_quality` è il voto 0–5 del giudice attuale.
+ */
+export const reviewLogs = sqliteTable("review_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
+  reviewedAt: integer("reviewed_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  rating: integer("rating"),                    // 1 Again · 2 Hard · 3 Good · 4 Easy (da FSRS)
+  legacyQuality: integer("legacy_quality"),     // 0–5, finché il giudice usa SM-2
+  confidence: integer("confidence"),            // 1–3, dalla Fase 6
+  answer: text("answer").notNull(),
+  graderRationale: text("grader_rationale"),
+  stateBefore: text("state_before", { mode: "json" }), // stato della carta prima della review
+  stability: real("stability"),
+  difficulty: real("difficulty"),
+  scheduledDays: integer("scheduled_days"),
+  graderModel: text("grader_model"),
+  promptVersion: text("prompt_version"),
+  overridden: integer("overridden").notNull().default(0), // voto corretto a mano (Fase 1.6)
+});
+
 /** Sessioni del tutor (loop stile Coursera). */
 export const sessions = sqliteTable("sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
