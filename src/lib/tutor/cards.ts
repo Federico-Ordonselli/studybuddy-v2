@@ -6,9 +6,9 @@ import { cards, domains, reviewLogs } from "@/lib/db/schema";
 import { retrieve, asContext } from "@/lib/rag/pipeline";
 import { resolveScope } from "@/lib/rag/store";
 import { generateQuiz } from "./quiz";
-import { gradeAnswer, PROMPT_VERSION, type Grade } from "./grade";
+import { gradeAnswer, PROMPT_VERSION, rationaleJson, type Grade } from "./grade";
 import { models } from "@/lib/config";
-import { fromSnapshot, isGrade, ratingFromQuality, scheduleFrom, schedule, toSnapshot, type FsrsFields, type Grade as Rating } from "./scheduler";
+import { fromSnapshot, isGrade, toRating, scheduleFrom, schedule, toSnapshot, type FsrsFields, type Grade as Rating } from "./scheduler";
 
 /**
  * Carte di studio per lo spaced repetition. Le domande si generano dal materiale
@@ -88,7 +88,7 @@ export async function reviewCard(cardId: number, answer: string, scopeDomainId?:
   if (!card || card.suspended) return null;
 
   const grade = await gradeAnswer(card.question, card.answer, answer);
-  const rating = ratingFromQuality(grade.quality);
+  const rating = toRating(grade.verdict);
   // al secondo, come `reviewed_at`: la correzione del voto rischedula con la stessa ora (il fuzz ne dipende)
   const now = new Date(Math.floor(Date.now() / 1000) * 1000);
   const { before, update } = schedule(card, rating, now);
@@ -100,8 +100,7 @@ export async function reviewCard(cardId: number, answer: string, scopeDomainId?:
       reviewedAt: now,
       rating,
       answer,
-      legacyQuality: grade.quality,
-      graderRationale: grade.feedback,
+      graderRationale: rationaleJson(grade),
       ...logState(before, update),
       graderModel: models.grade.model,
       promptVersion: PROMPT_VERSION,

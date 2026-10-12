@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { useTempDb } from "./helpers/db";
+import { verdictJson, withJudge } from "./helpers/judge";
 
 const { sqlite } = await useTempDb();
-const { schedule, convertSm2, fsrsFields, ratingFromQuality, Rating, State } = await import("@/lib/tutor/scheduler");
+const { schedule, convertSm2, fsrsFields, Rating, State } = await import("@/lib/tutor/scheduler");
 const { reviewCard, overrideLastReview } = await import("@/lib/tutor/cards");
 const { convertCardsToFsrs } = await import("@/lib/db");
 
@@ -13,20 +14,6 @@ const sm2Row = (o: Partial<{ ease: number; intervalDays: number; repetitions: nu
   ease: 2.5, intervalDays: 0, repetitions: 0, dueAt: now,
   fsrsState: null, stability: null, difficulty: null, reps: null, lapses: null,
   learningSteps: null, scheduledDays: null, lastReview: null, ...o,
-});
-
-/** Ollama finto: restituisce `replies` in ordine, uno per chiamata. */
-async function withJudge<T>(replies: string[], fn: () => Promise<T>): Promise<T> {
-  const original = globalThis.fetch;
-  let i = 0;
-  globalThis.fetch = async () => Response.json({ message: { content: replies[Math.min(i++, replies.length - 1)] } });
-  try { return await fn(); } finally { globalThis.fetch = original; }
-}
-const judge = (quality: number) => JSON.stringify({ quality, correct: quality >= 3, feedback: "ok" });
-
-test("voto 0–5 → rating FSRS (temporaneo, fino alla Fase 2)", () => {
-  assert.deepEqual([0, 1, 2, 3, 4, 5].map(ratingFromQuality),
-    [Rating.Again, Rating.Again, Rating.Again, Rating.Hard, Rating.Good, Rating.Easy]);
 });
 
 test("carta nuova + Good → scadenza nel futuro, reps = 1", () => {
@@ -87,7 +74,7 @@ test("override → stesso stato di una review fatta subito con il rating giusto"
     scheduled_days, last_review, due_at FROM cards WHERE id = 20`).get() as Record<string, number>;
   const card0 = sm2Row({ ease: 2.3, intervalDays: 8, repetitions: 3, dueAt: new Date(0) });
 
-  await withJudge([judge(1)], () => reviewCard(20, "non ricordo", 1));
+  await withJudge([verdictJson("wrong")], () => reviewCard(20, "non ricordo", 1));
   const [judged] = sqlite.prepare("SELECT * FROM review_logs WHERE card_id = 20").all() as Record<string, number>[];
   assert.equal(judged.rating, Rating.Again);
 

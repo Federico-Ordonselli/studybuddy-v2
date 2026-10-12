@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { gradingMetrics, parseGradingCases, verdictFromGrade, type GradingOutcome } from "@/lib/evals/grading";
 
-test("grade-v1 → verdetto: 4–5 correct, 3 partial, 0–2 wrong", () => {
-  const v = (quality: number) => verdictFromGrade({ quality, correct: quality >= 3, feedback: "" });
-  assert.deepEqual([0, 1, 2, 3, 4, 5].map(v), ["wrong", "wrong", "wrong", "partial", "correct", "correct"]);
+test("grade-v2 → verdetto: lettura diretta", () => {
+  for (const verdict of ["wrong", "partial", "correct"] as const)
+    assert.equal(verdictFromGrade({ verdict, required: [], present: [], missing: [], errors: [], feedback: "" }), verdict);
 });
 
 test("parseGradingCases: righe valide, commenti e righe vuote saltati, errori con il numero di riga", () => {

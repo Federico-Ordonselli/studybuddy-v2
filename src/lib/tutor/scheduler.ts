@@ -1,5 +1,6 @@
 import { createEmptyCard, fsrs, Rating, State, type Card, type Grade } from "ts-fsrs";
 import { srs } from "@/lib/config";
+import type { Verdict } from "./grade";
 
 /**
  * Scheduler FSRS: unico punto che importa ts-fsrs. Funzioni pure (niente DB): `cards.ts`
@@ -118,9 +119,9 @@ export function scheduleFrom(before: FsrsFields, rating: Grade, now: Date): Fsrs
   return fromFsrsCard(f.next(toFsrsCard(before), now, rating).card);
 }
 
-/** Voto 0–5 del giudice → rating. Temporaneo: lo toglie la Fase 2 (verdetti a 3 livelli). */
-export function ratingFromQuality(quality: number): Grade {
-  return quality <= 2 ? Rating.Again : quality === 3 ? Rating.Hard : quality === 4 ? Rating.Good : Rating.Easy;
+/** Verdetto del giudice → rating. Easy non viene dal giudice: lo deciderà la fiducia (Fase 6). */
+export function toRating(verdict: Verdict): Grade {
+  return verdict === "correct" ? Rating.Good : verdict === "partial" ? Rating.Hard : Rating.Again;
 }
 
 export const isGrade = (r: unknown): r is Grade => r === 1 || r === 2 || r === 3 || r === 4;

@@ -36,17 +36,18 @@ async function runGrading(args: string[]) {
     console.log(`  attenzione: ${unconfirmed} casi con verdetto non ancora confermato ("confirmed": true)`);
   }
   const started = Date.now();
-  const rows: (GradingOutcome & { quality: number | null; feedback: string; ms: number; error?: string })[] = [];
+  const rows: (GradingOutcome & { missing: string[]; errors: string[]; feedback: string; ms: number; error?: string })[] = [];
   for (const [i, c] of cases.entries()) {
     const t0 = Date.now();
     try {
-      const g = await gradeAnswer(c.question, c.expected, c.answer);
+      const g = await gradeAnswer(c.question, c.expected, c.answer, c.source);
       const model = verdictFromGrade(g);
-      rows.push({ id: c.id, human: c.verdict, model, tags: c.tags, quality: g.quality, feedback: g.feedback, ms: Date.now() - t0 });
+      rows.push({ id: c.id, human: c.verdict, model, tags: c.tags, missing: g.missing, errors: g.errors, feedback: g.feedback, ms: Date.now() - t0 });
       const mark = model === c.verdict ? "=" : "≠";
-      console.log(`  ${String(i + 1).padStart(2)} ${mark} ${c.id.padEnd(14)} umano ${c.verdict.padEnd(7)} modello ${model.padEnd(7)} (q${g.quality})`);
+      console.log(`  ${String(i + 1).padStart(2)} ${mark} ${c.id.padEnd(14)} umano ${c.verdict.padEnd(7)} modello ${model.padEnd(7)}`);
+      if (model !== c.verdict) console.log(`    mancava: ${g.missing.join("; ") || "—"} · errori: ${g.errors.join("; ") || "—"}`);
     } catch (e) {
-      rows.push({ id: c.id, human: c.verdict, model: null, tags: c.tags, quality: null, feedback: "", ms: Date.now() - t0, error: String(e) });
+      rows.push({ id: c.id, human: c.verdict, model: null, tags: c.tags, missing: [], errors: [], feedback: "", ms: Date.now() - t0, error: String(e) });
       console.log(`  ${String(i + 1).padStart(2)} ! ${c.id.padEnd(14)} errore del giudice`);
     }
   }

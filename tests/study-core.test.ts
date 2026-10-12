@@ -31,8 +31,8 @@ test('chunkTranscript: timestamp del primo e ultimo cue e budget ordinario',()=>
 test('gradeChoice e normalizeOption: spazi, maiuscole e scelta errata',()=>{
  assert.equal(normalizeOption('  A   B\nC '),'a b c');
  const q={type:'mcq' as const,question:'Scegli',answer:'Prima opzione',options:['Prima opzione','Seconda'],rationale:'Motivo'};
- assert.equal(gradeChoice(q,' PRIMA  OPZIONE ').quality,5);
- assert.equal(gradeChoice(q,'Seconda').quality,1);assert.equal(gradeChoice(q,'Seconda').correct,false);
+ assert.equal(gradeChoice(q,' PRIMA  OPZIONE ').verdict,'correct');
+ assert.equal(gradeChoice(q,'Seconda').verdict,'wrong');assert.deepEqual(gradeChoice(q,'Seconda').missing,[]);
  assert.match(gradeChoice(q,'Seconda').feedback,/Prima opzione/);
 });
 test('toCitations: numero, breadcrumb, snippet e video al secondo corretto',()=>{

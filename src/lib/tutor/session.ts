@@ -59,14 +59,15 @@ export async function gradeTurn(
 
 /**
  * Le mcq hanno una sola risposta giusta: confronto esatto, niente LLM-as-judge
- * (che premiava opzioni sbagliate ma "concettualmente vicine"). Errata = 1 per SM-2.
+ * (che premiava opzioni sbagliate ma "concettualmente vicine"). Mai partial.
  */
 export function gradeChoice(q: QuizQuestion, chosen: string): Grade {
   const correct = normalizeOption(chosen) === normalizeOption(q.answer);
   const why = q.rationale?.trim() ? ` ${q.rationale.trim()}` : "";
+  const empty = { required: [], present: [], missing: [], errors: [] };
   return correct
-    ? { quality: 5, correct: true, feedback: `Corretto.${why}` }
-    : { quality: 1, correct: false, feedback: `Non è corretta. Risposta giusta: «${q.answer}».${why}` };
+    ? { verdict: "correct", ...empty, feedback: `Corretto.${why}` }
+    : { verdict: "wrong", ...empty, feedback: `Non è corretta. Risposta giusta: «${q.answer}».${why}` };
 }
 
 /** Il seguito resta ancorato all'ultima domanda e risposta, senza una chiamata LLM. */

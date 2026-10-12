@@ -1,13 +1,11 @@
-import type { Grade } from "@/lib/tutor/grade";
+import { VERDICTS, type Grade, type Verdict } from "@/lib/tutor/grade";
+export { VERDICTS, type Verdict };
 
 /**
  * Set di valutazione del giudice (Fase 0 del piano): casi fissi domanda / attesa /
  * risposta con il verdetto umano, da rigirare a ogni modifica del prompt.
  * Logica pura: lo script `scripts/eval.ts` legge i file e chiama il modello.
  */
-
-export const VERDICTS = ["wrong", "partial", "correct"] as const;
-export type Verdict = (typeof VERDICTS)[number];
 
 export interface GradingCase {
   id: string;
@@ -16,7 +14,7 @@ export interface GradingCase {
   answer: string;
   verdict: Verdict;         // il verdetto di chi studia: è la verità del set
   tags: string[];           // es. perfect, partial, long-wrong, empty, it-en, synonym
-  source?: string;          // passaggio sorgente (lo userà il giudice della Fase 2)
+  source?: string;          // passaggio sorgente: lo riceve il giudice
   cardId?: number;
   confirmed: boolean;       // false = verdetto proposto, ancora da rivedere a mano
 }
@@ -59,12 +57,9 @@ export function parseGradingCases(text: string): GradingCase[] {
   return out;
 }
 
-/**
- * Giudice grade-v1 (voto 0–5) → verdetto a 3 livelli, con la stessa soglia che la
- * Fase 1 usa per i rating: 0–2 Again (wrong), 3 Hard (partial), 4–5 Good/Easy (correct).
- */
+/** Il giudice dà già il verdetto a 3 livelli (grade-v2). */
 export function verdictFromGrade(g: Grade): Verdict {
-  return g.quality >= 4 ? "correct" : g.quality === 3 ? "partial" : "wrong";
+  return g.verdict;
 }
 
 export interface GradingMetrics {
