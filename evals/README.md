@@ -28,10 +28,12 @@ Una riga JSON per caso (righe vuote e `//` ignorate):
 | `cardId` | carta da cui viene il caso |
 | `confirmed` | `true` dopo la revisione; finché è `false` il verdetto è solo una proposta |
 
-Rubrica (la stessa del giudice della Fase 2):
-- **wrong**: manca l'idea centrale, c'è un errore proprio sul punto centrale, oppure è vuota / "non so".
-- **partial**: l'idea centrale c'è, ma manca un elemento essenziale o c'è un errore su un dettaglio.
-- **correct**: ci sono tutti i fatti essenziali, anche con parole diverse o in un'altra lingua.
+Criterio dei verdetti (quello con cui sono stati confermati i casi; il prompt del giudice della Fase 2 deve seguirlo):
+**si valuta ciò che la domanda richiede**, non tutto ciò che la risposta attesa contiene.
+- **correct**: risponde a ciò che è chiesto, anche con parole diverse o in un'altra lingua. Un dettaglio secondario omesso non impedisce correct (es. un "perché" non richiede anche il "come mitigare").
+- **partial**: manca, o è sbagliato, un elemento che la domanda richiede (anche un'aggiunta falsa attribuita a ciò che è chiesto). Negli elenchi e negli abbinamenti, una parte corretta vale partial: niente tutto-o-niente.
+- **wrong**: sbaglia la proprietà centrale (es. "rileva dopo" al posto di "blocca prima", un flag che non fa ciò che distingue il comando), oppure è vuota / "non so".
+- Se la risposta attesa della carta è imprecisa, conta la realtà (e la carta va corretta).
 
 Metriche: accordo esatto, accordo entro 1 (wrong < partial < correct), matrice di confusione
 e numero di casi `long-wrong` promossi a `correct` (obiettivo della Fase 2: 0, con accordo esatto ≥ 80%).
