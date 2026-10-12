@@ -49,15 +49,17 @@ const SYSTEM = [
 const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
 
 /**
- * Accetta solo un giudizio ben formato. Un `correct` con mancanze o errori elencati è incoerente:
- * vale `partial` (rete contro le risposte lunghe e sbagliate promosse a corrette).
+ * Accetta solo un giudizio ben formato. Un `correct` con errori elencati è incoerente: vale
+ * `partial` (rete contro le risposte lunghe e sbagliate promosse a corrette). Le sole mancanze
+ * non declassano: il modello vi mette spesso dettagli dell'attesa che la domanda non chiede, e
+ * un dettaglio secondario omesso non impedisce `correct`.
  */
 export function parseGrade(raw: string): Grade | null {
   try {
     const g = JSON.parse(raw);
     if (!(VERDICTS as readonly unknown[]).includes(g?.verdict) || typeof g.feedback !== "string") return null;
     if (![g.required, g.present, g.missing, g.errors].every(strings)) return null;
-    const verdict: Verdict = g.verdict === "correct" && (g.missing.length || g.errors.length) ? "partial" : g.verdict;
+    const verdict: Verdict = g.verdict === "correct" && g.errors.length ? "partial" : g.verdict;
     return { verdict, required: g.required, present: g.present, missing: g.missing, errors: g.errors, feedback: g.feedback };
   } catch {
     return null;

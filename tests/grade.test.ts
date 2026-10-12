@@ -22,9 +22,9 @@ test("parseGrade: rifiuta output malformati", () => {
   ]) assert.equal(parseGrade(raw), null, raw);
 });
 
-test("parseGrade: correct con mancanze o errori viene declassato a partial", () => {
+test("parseGrade: correct con errori viene declassato a partial, con sole mancanze resta correct", () => {
   assert.equal(parseGrade(verdictJson("correct", { errors: ["dice che blocca dopo"] }))?.verdict, "partial");
-  assert.equal(parseGrade(verdictJson("correct", { missing: ["il flag -p"] }))?.verdict, "partial");
+  assert.equal(parseGrade(verdictJson("correct", { missing: ["un dettaglio secondario"] }))?.verdict, "correct");
   assert.equal(parseGrade(verdictJson("correct"))?.verdict, "correct");
   assert.equal(parseGrade(verdictJson("wrong", { errors: ["x"] }))?.verdict, "wrong");
 });
