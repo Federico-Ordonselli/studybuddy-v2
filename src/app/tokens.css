@@ -136,6 +136,9 @@
   --on-danger:      light-dark(var(--white),     var(--navy-950));
   --danger-soft:    light-dark(var(--red-100),   var(--red-950));
   --on-danger-soft: light-dark(var(--red-800),   var(--red-200));
+  /* parziale (verdetto del giudice): ambra del brand, solo come pillola soft con testo + icona */
+  --warning-soft:    light-dark(var(--brand-100), var(--brand-950));
+  --on-warning-soft: light-dark(var(--brand-800), var(--brand-200));
 
   /* velo sotto modali e drawer */
   --scrim:          light-dark(oklch(18% 0.035 276.8 / 0.45), oklch(0% 0 0 / 0.6));
@@ -201,6 +204,7 @@
    @check --danger          on --bg-page    : text
    @check --on-danger       on --danger-solid : text
    @check --on-danger-soft  on --danger-soft : text
+   @check --on-warning-soft on --warning-soft : text
    @check --menu-ink        on --sidebar-bg : text
    @check --menu-ink        on --menu-bg    : text
    @check --selected-ink    on --menu-selected : text
