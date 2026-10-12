@@ -30,7 +30,7 @@ export default function VerdictPanel({ grade, expected, source, onPlay, children
         {children}
       </div>
       <p style={{ margin: "10px 0 0", lineHeight: 1.5 }}>{grade.feedback}</p>
-      <Items title="Mancava" items={grade.missing} />
+      <Items title={grade.verdict === "correct" ? "Potevi aggiungere" : "Mancava"}items={grade.missing} />
       <Items title="Da correggere" items={grade.errors} />
       {expected && <div style={{ marginTop: 10, fontSize: 13, color: "var(--muted)" }}>Risposta attesa: {expected}</div>}
       {source && (
