@@ -32,24 +32,31 @@ test("una review scrive esattamente una riga di log, nella stessa operazione del
   const [log] = rows;
   assert.equal(log.answer, "punta al commit attuale");
   assert.equal(log.legacy_quality, 4);
-  assert.equal(log.rating, null);       // il rating 1–4 arriva con FSRS (Fase 1)
+  assert.equal(log.rating, 3);          // voto 4 → Good (mappatura temporanea della Fase 1)
   assert.equal(log.confidence, null);   // la fiducia arriva con la Fase 6
   assert.equal(log.grader_rationale, "Manca il dettaglio sul detached HEAD.");
   assert.equal(log.grader_model, models.grade.model);
   assert.equal(log.prompt_version, PROMPT_VERSION);
   assert.equal(log.overridden, 0);
-  assert.deepEqual(JSON.parse(String(log.state_before)), { ease: 2.5, intervalDays: 6, repetitions: 2 });
-  assert.equal(log.scheduled_days, result.intervalDays);
-  const card = sqlite.prepare("SELECT interval_days FROM cards WHERE id = 1").get() as { interval_days: number };
-  assert.equal(card.interval_days, result.intervalDays);
+  // stato prima: carta SM-2 (intervallo 6, ease 2.5) convertita al volo in Review
+  const before = JSON.parse(String(log.state_before));
+  assert.equal(before.fsrsState, 2);
+  assert.equal(before.stability, 6);
+  assert.equal(before.difficulty, 5);
+  const card = sqlite.prepare("SELECT fsrs_state, stability, difficulty, scheduled_days, due_at FROM cards WHERE id = 1").get() as Record<string, number>;
+  assert.equal(log.stability, card.stability);
+  assert.equal(log.difficulty, card.difficulty);
+  assert.equal(log.scheduled_days, card.scheduled_days);
+  assert.equal(card.due_at * 1000, result.dueAt);
+  assert.equal(result.rating, 3);
   assert.ok(Math.abs(Number(log.reviewed_at) - Date.now() / 1000) < 60);
 });
 
 test("un giudizio non valido (anche al retry) non produce righe né cambia la carta", async () => {
   await assert.rejects(withJudge(["non è JSON", "{\"quality\": 9}"], () => reviewCard(2, "boh", 1)));
   assert.equal(logs(2).length, 0);
-  const card = sqlite.prepare("SELECT repetitions, interval_days FROM cards WHERE id = 2").get();
-  assert.deepEqual(card, { repetitions: 0, interval_days: 0 });
+  const card = sqlite.prepare("SELECT fsrs_state, due_at FROM cards WHERE id = 2").get();
+  assert.deepEqual(card, { fsrs_state: null, due_at: 0 });
 });
 
 test("i log seguono la carta: eliminarla elimina il suo storico", async () => {

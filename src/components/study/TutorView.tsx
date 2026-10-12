@@ -148,7 +148,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
                   )}
                   {m.grade && (
                     <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted)" }}>
-                      Qualità SM-2: <b style={{ color: m.grade.correct ? "var(--color-ok)" : "var(--color-danger)" }}>{m.grade.quality}/5</b>
+                      Voto: <b style={{ color: m.grade.correct ? "var(--color-ok)" : "var(--color-danger)" }}>{m.grade.quality}/5</b>
                     </div>
                   )}
                   {m.grade && m.grade.quality < 3 && m.reviewQuiz && (

@@ -111,3 +111,14 @@ export const rag = {
   dedupThreshold: 0.6,
   rrfK: 60,        // costante della Reciprocal Rank Fusion
 };
+
+/**
+ * Spaced repetition (FSRS via ts-fsrs, `tutor/scheduler.ts`). Il fuzz sposta di poco gli
+ * intervalli, così le carte create insieme non scadono tutte lo stesso giorno. Learning step
+ * di default (1 e 10 minuti): una carta nuova o sbagliata torna nella stessa sessione.
+ */
+export const srs = {
+  requestRetention: 0.9,
+  maximumInterval: 365, // giorni
+  enableFuzz: true,
+};

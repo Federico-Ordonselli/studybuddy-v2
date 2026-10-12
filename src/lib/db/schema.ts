@@ -84,11 +84,20 @@ export const cards = sqliteTable("cards", {
   answer: text("answer").notNull(),
   sourceChunkId: integer("source_chunk_id").references(() => chunks.id),
   suspended: integer("suspended", {mode:"boolean"}).notNull().default(false),
-  // stato SM-2
+  // stato SM-2 (non più aggiornato: resta per la conversione, via a fine Fase 1)
   ease: real("ease").notNull().default(2.5),
   intervalDays: integer("interval_days").notNull().default(0),
   repetitions: integer("repetitions").notNull().default(0),
   dueAt: integer("due_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  // stato FSRS (`tutor/scheduler.ts`). NULL = carta SM-2 non ancora convertita (`convertCardsToFsrs`)
+  fsrsState: integer("fsrs_state").$defaultFn(() => 0), // 0 New · 1 Learning · 2 Review · 3 Relearning
+  stability: real("stability").$defaultFn(() => 0),
+  difficulty: real("difficulty").$defaultFn(() => 0),
+  reps: integer("reps").$defaultFn(() => 0),
+  lapses: integer("lapses").$defaultFn(() => 0),
+  learningSteps: integer("learning_steps").$defaultFn(() => 0),
+  scheduledDays: integer("scheduled_days").$defaultFn(() => 0),
+  lastReview: integer("last_review", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
@@ -96,8 +105,10 @@ export const cards = sqliteTable("cards", {
  * Storico delle review: una riga per ripasso, scritta nella stessa transazione
  * dell'update della carta e mai modificata dopo (tranne `overridden`, dalla Fase 1).
  * Serve all'ottimizzazione di FSRS e alla calibrazione del giudice e della fiducia.
- * Le colonne FSRS (`rating`, `stability`, `difficulty`) restano NULL finché lo
- * scheduler è SM-2; `legacy_quality` è il voto 0–5 del giudice attuale.
+ * `state_before` è lo stato FSRS completo prima della review (serve alla correzione del voto);
+ * `stability`/`difficulty`/`scheduled_days` sono i valori dopo. `legacy_quality` è il voto 0–5
+ * del giudice finché non passa ai verdetti (Fase 2). Una correzione segna `overridden = 1` e
+ * aggiunge una riga con il rating manuale (`grader_model = "manual"`).
  */
 export const reviewLogs = sqliteTable("review_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),

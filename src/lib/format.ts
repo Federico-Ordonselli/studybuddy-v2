@@ -24,3 +24,14 @@ export function greeting(hour: number): string {
 export function todayLabel(d = new Date()): string {
   return d.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
 }
+
+/** Prossimo ripasso: "tra 10 min", "tra 5 h", "tra 3 giorni" (con FSRS i learning step sono in minuti). */
+export function timeUntil(epochMs: number, now = new Date()): string {
+  const min = Math.round((epochMs - now.getTime()) / 60000);
+  if (min < 1) return "tra meno di un minuto";
+  if (min < 60) return `tra ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `tra ${h} h`;
+  const d = Math.round(h / 24);
+  return `tra ${d} ${d === 1 ? "giorno" : "giorni"}`;
+}

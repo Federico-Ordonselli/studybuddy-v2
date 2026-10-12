@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { relativeTime, greeting, todayLabel } from "@/lib/format";
+import { relativeTime, greeting, todayLabel, timeUntil } from "@/lib/format";
 
 const now = new Date("2026-10-09T12:00:00Z");
 const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
@@ -25,4 +25,14 @@ test("greeting: fasce orarie", () => {
 
 test("todayLabel: giorno della settimana, giorno e mese in italiano", () => {
   assert.equal(todayLabel(new Date(2026, 9, 9)), "venerdì 9 ottobre");
+});
+
+test("timeUntil: prossimo ripasso in minuti, ore o giorni", () => {
+  const at = (ms: number) => now.getTime() + ms;
+  assert.equal(timeUntil(at(20_000), now), "tra meno di un minuto");
+  assert.equal(timeUntil(at(-5_000), now), "tra meno di un minuto");
+  assert.equal(timeUntil(at(10 * 60_000), now), "tra 10 min");
+  assert.equal(timeUntil(at(5 * 3_600_000), now), "tra 5 h");
+  assert.equal(timeUntil(at(86_400_000), now), "tra 1 giorno");
+  assert.equal(timeUntil(at(3.4 * 86_400_000), now), "tra 3 giorni");
 });

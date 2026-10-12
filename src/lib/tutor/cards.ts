@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { db, sqlite } from "@/lib/db";
 import { LibraryError } from "@/lib/errors";
 import { jaccard, wordShingles } from "@/lib/rag/pipeline";
@@ -8,11 +8,11 @@ import { resolveScope } from "@/lib/rag/store";
 import { generateQuiz } from "./quiz";
 import { gradeAnswer, PROMPT_VERSION, type Grade } from "./grade";
 import { models } from "@/lib/config";
-import { sm2, nextDue } from "./sm2";
+import { fromSnapshot, isGrade, ratingFromQuality, scheduleFrom, schedule, toSnapshot, type FsrsFields, type Grade as Rating } from "./scheduler";
 
 /**
  * Carte di studio per lo spaced repetition. Le domande si generano dal materiale
- * (riuso di `generateQuiz`) e si persistono in `cards`; il ripasso applica SM-2.
+ * (riuso di `generateQuiz`) e si persistono in `cards`; il ripasso le rischedula con FSRS (`scheduler.ts`).
  */
 
 export interface ReviewCard {
@@ -23,7 +23,7 @@ export interface ReviewCard {
 export interface ReviewResult {
   grade: Grade;
   expected: string;
-  intervalDays: number;
+  rating: Rating;    // 1 Again · 2 Hard · 3 Good · 4 Easy
   dueAt: number;     // epoch ms della prossima scadenza
   remaining: number; // carte ancora in scadenza per il dominio
 }
@@ -80,7 +80,7 @@ export function nextDueCard(domainId: number): ReviewCard | null {
 }
 
 /**
- * Valuta la risposta a una carta, riprogramma con SM-2 e registra la review in `review_logs`. `scopeDomainId` è il dominio
+ * Valuta la risposta a una carta, riprogramma con FSRS e registra la review in `review_logs`. `scopeDomainId` è il dominio
  * selezionato in UI (può essere il macro): serve per contare le carte rimaste in coda.
  */
 export async function reviewCard(cardId: number, answer: string, scopeDomainId?: number): Promise<ReviewResult | null> {
@@ -88,38 +88,64 @@ export async function reviewCard(cardId: number, answer: string, scopeDomainId?:
   if (!card || card.suspended) return null;
 
   const grade = await gradeAnswer(card.question, card.answer, answer);
-  const next = sm2(
-    { ease: card.ease, intervalDays: card.intervalDays, repetitions: card.repetitions },
-    grade.quality
-  );
-  const due = nextDue(next.intervalDays);
+  const rating = ratingFromQuality(grade.quality);
+  // al secondo, come `reviewed_at`: la correzione del voto rischedula con la stessa ora (il fuzz ne dipende)
+  const now = new Date(Math.floor(Date.now() / 1000) * 1000);
+  const { before, update } = schedule(card, rating, now);
   // Carta e log insieme: niente review registrata senza riprogrammazione, né il contrario.
   sqlite.transaction(() => {
-    db.update(cards)
-      .set({ ease: next.ease, intervalDays: next.intervalDays, repetitions: next.repetitions, dueAt: due })
-      .where(eq(cards.id, cardId))
-      .run();
+    db.update(cards).set(update).where(eq(cards.id, cardId)).run();
     db.insert(reviewLogs).values({
       cardId,
+      reviewedAt: now,
+      rating,
       answer,
       legacyQuality: grade.quality,
       graderRationale: grade.feedback,
-      stateBefore: { ease: card.ease, intervalDays: card.intervalDays, repetitions: card.repetitions },
-      scheduledDays: next.intervalDays,
+      ...logState(before, update),
       graderModel: models.grade.model,
       promptVersion: PROMPT_VERSION,
     }).run();
   })();
 
-  const scope = scopeDomainId ?? card.domainId;
-  return {
-    grade,
-    expected: card.answer,
-    intervalDays: next.intervalDays,
-    dueAt: due.getTime(),
-    remaining: scope ? dueCount(scope) : 0,
-  };
+  return { grade, expected: card.answer, rating, dueAt: update.dueAt.getTime(), remaining: remainingFor(scopeDomainId ?? card.domainId) };
 }
+
+/**
+ * Correzione manuale del voto dell'ultima review della carta: riparte dallo stato salvato in
+ * `state_before` e rischedula con `rating` alla stessa ora, come se il giudice avesse dato quel voto.
+ * Il log originale resta (con `overridden = 1`) e se ne aggiunge uno manuale: così il set di
+ * valutazione del giudice ha i casi in cui ha sbagliato. Si può correggere di nuovo la correzione.
+ */
+export function overrideLastReview(cardId: number, rating: Rating, scopeDomainId?: number) {
+  if (!isGrade(rating)) throw new LibraryError("rating: serve 1 (Again), 2 (Hard), 3 (Good) o 4 (Easy)");
+  const card = requireCard(cardId);
+  const last = db.select().from(reviewLogs).where(eq(reviewLogs.cardId, cardId)).orderBy(desc(reviewLogs.id)).limit(1).get();
+  if (!last) throw new LibraryError("Nessuna review da correggere", 404);
+  const before = fromSnapshot(last.stateBefore);
+  if (!before) throw new LibraryError("Review precedente a FSRS: non si può correggere", 409);
+
+  const update = scheduleFrom(before, rating, last.reviewedAt);
+  sqlite.transaction(() => {
+    db.update(cards).set(update).where(eq(cards.id, cardId)).run();
+    db.update(reviewLogs).set({ overridden: 1 }).where(eq(reviewLogs.id, last.id)).run();
+    db.insert(reviewLogs).values({
+      cardId,
+      reviewedAt: last.reviewedAt,
+      rating,
+      answer: last.answer,
+      ...logState(before, update),
+      graderModel: "manual",
+    }).run();
+  })();
+  return { rating, dueAt: update.dueAt.getTime(), remaining: remainingFor(scopeDomainId ?? card.domainId) };
+}
+
+function logState(before: FsrsFields, after: FsrsFields) {
+  return { stateBefore: toSnapshot(before), stability: after.stability, difficulty: after.difficulty, scheduledDays: after.scheduledDays };
+}
+
+const remainingFor = (domainId: number | null) => (domainId ? dueCount(domainId) : 0);
 
 export function listCards(domainId: number, filter: "due" | "all" = "all") {
   return db.select().from(cards).where(filter === "due" ? dueIn(domainId) : inArray(cards.domainId,resolveScope(domainId) ?? [domainId])).orderBy(asc(cards.dueAt),asc(cards.id)).all();

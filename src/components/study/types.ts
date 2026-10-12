@@ -32,7 +32,11 @@ export interface Msg {
 }
 
 export interface ReviewCard { id: number; question: string }
-export interface ReviewResult { grade: Grade; expected: string; intervalDays: number; dueAt: number; remaining: number }
+/** Rating FSRS (1–4) con le etichette della UI. */
+export type Rating = 1 | 2 | 3 | 4;
+export const RATING_LABEL: Record<Rating, string> = { 1: "Di nuovo", 2: "Difficile", 3: "Bene", 4: "Facile" };
+export interface ReviewResult { grade: Grade; expected: string; rating: Rating; dueAt: number; remaining: number }
+export interface OverrideResult { rating: Rating; dueAt: number; remaining: number }
 
 export interface SlideT { title: string; bullets: string[]; imagePrompt: string; image?: { format: string; content: string } }
 
