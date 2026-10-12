@@ -6,7 +6,9 @@ import { post } from "@/lib/client/api";
 import { timeUntil } from "@/lib/format";
 import CardManager from "./CardManager";
 import { S } from "./styles";
-import { RATING_LABEL, type OverrideResult, type Rating, type ReviewCard, type ReviewResult } from "./types";
+import VerdictPanel from "./VerdictPanel";
+import VideoPanel from "./VideoPanel";
+import { RATING_LABEL, type OverrideResult, type PlayingVideo, type Rating, type ReviewCard, type ReviewResult } from "./types";
 
 /** Ripasso FSRS: coda delle carte in scadenza (figli inclusi se è un macro) + generazione carte. */
 export default function ReviewView({ domainId }: { domainId: number }) {
@@ -21,11 +23,12 @@ export default function ReviewView({ domainId }: { domainId: number }) {
   const [corrected, setCorrected] = useState(false);
   const [genTopic, setGenTopic] = useState("");
   const [busy, setBusy] = useState(false);
+  const [video, setVideo] = useState<PlayingVideo | null>(null);
   const [loaded, setLoaded] = useState(false); // senza, al primo render compariva «nessuna carta»
 
   async function loadDue(d: number) {
     const r = await fetch(`/api/review?domainId=${d}`).then((x) => x.json());
-    setDue(r.due ?? 0); setCard(r.card ?? null); setResult(null); setError(""); setFixing(false); setCorrected(false); setAnswer(""); setLoaded(true);
+    setDue(r.due ?? 0); setCard(r.card ?? null); setResult(null); setError(""); setFixing(false); setCorrected(false); setAnswer(""); setVideo(null); setLoaded(true);
   }
 
   async function generateCards() {
@@ -77,6 +80,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
 
   return (
     <div style={S.review}>
+      <VideoPanel video={video} onClose={() => setVideo(null)} />
       <div style={S.reviewBar}>
         <span>🗂 <b>{loaded ? due : "…"}</b> {due === 1 ? "carta in scadenza" : "carte in scadenza"}</span>
         <div style={{ display: "flex", gap: 8, flex: 1, justifyContent: "flex-end" }}>
@@ -105,21 +109,14 @@ export default function ReviewView({ domainId }: { domainId: number }) {
               <button onClick={submitReview} disabled={busy || !answer.trim()} style={{ ...S.send, marginTop: 10, padding: "10px 18px" }}>
                 {busy ? <span className="spin" /> : "Valuta"}
               </button>
-              {error && <p role="alert" style={{ color: "var(--color-danger)", margin: "10px 0 0" }}>{error}</p>}
+              {error && <p role="alert" style={{ color: "var(--danger)", margin: "10px 0 0" }}>{error}</p>}
             </>
           ) : (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 14 }}>
-                Esito: <b style={{ color: result.grade.correct ? "var(--color-ok)" : "var(--color-danger)" }}>
-                  {result.grade.quality}/5 {result.grade.correct ? "✓" : "✗"}
-                </b>
-                {" · "}<b>{RATING_LABEL[result.rating]}</b>{corrected && " (corretto da te)"}
-                <span style={{ color: "var(--muted)" }}> · prossimo ripasso {timeUntil(result.dueAt)}</span>
-              </div>
-              <p style={{ margin: "10px 0", lineHeight: 1.5 }}>{result.grade.feedback}</p>
-              {result.expected && (
-                <div style={{ fontSize: 13, color: "var(--muted)" }}>Risposta attesa: {result.expected}</div>
-              )}
+              <VerdictPanel grade={result.grade} expected={result.expected} source={result.source} onPlay={setVideo}>
+                <span>· <b>{RATING_LABEL[result.rating]}</b>{corrected && " (corretto da te)"}
+                  <span style={{ color: "var(--muted)" }}> · prossimo ripasso {timeUntil(result.dueAt)}</span></span>
+              </VerdictPanel>
               {fixing ? (
                 <div role="group" aria-label="Voto corretto" style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
                   <span style={{ fontSize: 13, color: "var(--muted)" }}>Voto corretto:</span>
@@ -136,7 +133,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
                   Il voto è sbagliato
                 </button>
               )}
-              {error && <p role="alert" style={{ color: "var(--color-danger)", margin: "10px 0 0" }}>{error}</p>}
+              {error && <p role="alert" style={{ color: "var(--danger)", margin: "10px 0 0" }}>{error}</p>}
               <div>
                 <button onClick={nextCard} disabled={busy} style={{ ...S.send, marginTop: 12, padding: "10px 18px" }}>
                   {due > 0 ? "Prossima carta" : "Fine ripasso"}
