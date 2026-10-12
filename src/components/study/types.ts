@@ -21,7 +21,7 @@ export interface QuizQuestion {
 export type Verdict = "wrong" | "partial" | "correct";
 export interface Grade { verdict: Verdict; required: string[]; present: string[]; missing: string[]; errors: string[]; feedback: string }
 /** Il verdetto ha sempre testo e icona, non solo colore. */
-export const VERDICT_LABEL: Record<Verdict, string> = { correct: "✓ Corretta", partial: "◐ Parziale", wrong: "✗ Sbagliata" };
+export const VERDICT_LABEL: Record<Verdict, string> = { correct: "✓ Corretta", partial: "≈ Parziale", wrong: "✗ Sbagliata" };
 export interface PlayingVideo { path: string; startSec: number; label: string }
 
 export interface Msg {
