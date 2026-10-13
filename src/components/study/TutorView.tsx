@@ -5,11 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { decodedSse } from "@/lib/client/sse";
 import { post } from "@/lib/client/api";
 import CitationChip from "./CitationChip";
+import ConfidencePicker from "./ConfidencePicker";
 import Markdown from "./Markdown";
 import { S } from "./styles";
 import VerdictPanel from "./VerdictPanel";
 import VideoPanel from "./VideoPanel";
-import { sessionKey, type Citation, type Grade, type Msg, type PlayingVideo, type QuizQuestion } from "./types";
+import { sessionKey, type Citation, type Confidence, type Grade, type Msg, type PlayingVideo, type QuizQuestion } from "./types";
 
 async function chat(body: Record<string, unknown>) {
   return post<{ reply: string; citations?: Citation[]; question?: QuizQuestion; grade?: Grade; source?: Citation; sessionId?: number }>("/api/chat", body);
@@ -24,6 +25,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
   const [input, setInput] = useState(initialInput);
   const [loading, setLoading] = useState(false);
   const [pendingQ, setPendingQ] = useState<QuizQuestion | null>(null);
+  const [confidence, setConfidence] = useState<Confidence | null>(null); // per le domande aperte del quiz
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [video, setVideo] = useState<PlayingVideo | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -47,13 +49,13 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
   }, [msgs, loading]);
 
-  async function submitAnswer(ans: string, q: QuizQuestion) {
+  async function submitAnswer(ans: string, q: QuizQuestion, conf?: Confidence) {
     if (loading) return;
     setMsgs((m) => [...m, { role: "user", content: ans }]);
-    setPendingQ(null); setLoading(true);
+    setPendingQ(null); setConfidence(null); setLoading(true);
     try {
       const turn = await chat({ mode: "review", domainId, question: q, answer: ans });
-      setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Valutazione", grade: turn.grade, source: turn.source, reviewQuiz: q }]);
+      setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Valutazione", grade: turn.grade, source: turn.source, reviewQuiz: q, confidence: conf }]);
     } catch (e) {
       setMsgs((m) => [...m, { role: "assistant", content: `Errore: ${e}` }]);
     } finally { setLoading(false); }
@@ -62,8 +64,11 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
+    if (mode === "quiz" && pendingQ) {
+      if (needsConfidence && !confidence) return; // «Invia» è disattivo finché non scegli la fiducia: la risposta resta
+      setInput(""); await submitAnswer(text, pendingQ, confidence ?? undefined); return;
+    }
     setInput("");
-    if (mode === "quiz" && pendingQ) { await submitAnswer(text, pendingQ); return; }
     setMsgs((m) => [...m, { role: "user", content: text }]);
     setLoading(true);
     let streamPlaceholder = false;
@@ -111,6 +116,8 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     } catch(e) {setCardError(String(e));} finally {setAdding(false);}
   }
 
+  // fiducia solo sulle domande aperte: le mcq si rispondono con un clic sull'opzione
+  const needsConfidence = mode === "quiz" && pendingQ?.type === "open";
   const placeholder = mode === "socratic"
     ? "Fai una domanda sul materiale…"
     : pendingQ ? "Scrivi la tua risposta…" : "Argomento su cui generare una domanda…";
@@ -140,7 +147,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
                     </div>
                   )}
                   {m.grade && (
-                    <div style={{ marginTop: 4 }}><VerdictPanel grade={m.grade} source={m.source} onPlay={setVideo} /></div>
+                    <div style={{ marginTop: 4 }}><VerdictPanel grade={m.grade} source={m.source} confidence={m.confidence} expected={m.confidence === 3 && m.grade.verdict === "wrong" ? m.reviewQuiz?.answer : undefined} onPlay={setVideo} /></div>
                   )}
                   {m.grade && m.grade.verdict !== "correct" && m.reviewQuiz && (
                     <button style={S.ghost} disabled={adding || m.addedToReview} onClick={()=>addToReview(i,m.reviewQuiz!)}>
@@ -159,11 +166,12 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
           </div>
 
           {cardError && <p role="alert" style={{color:"var(--danger)"}}>{cardError}</p>}
+          {needsConfidence && <ConfidencePicker value={confidence} onChange={setConfidence} disabled={loading} />}
           <div style={S.inputBar}>
             <textarea value={input} onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               placeholder={placeholder} rows={1} style={S.textarea} disabled={!domainId} />
-            <button onClick={send} disabled={loading || !domainId || !input.trim()} style={S.send}>Invia</button>
+            <button onClick={send} disabled={loading || !domainId || !input.trim() || (needsConfidence && !confidence)} style={S.send}>Invia</button>
           </div>
     </>
   );

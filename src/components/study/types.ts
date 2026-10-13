@@ -1,4 +1,6 @@
 /** Tipi condivisi dalle viste dell'area studio (spostati da app/page.tsx). */
+import type { Confidence } from "@/lib/client/confidence";
+export type { Confidence };
 export interface Citation {
   n: number;
   documentId: number;
@@ -34,13 +36,15 @@ export interface Msg {
   reviewQuiz?: QuizQuestion;
   addedToReview?: boolean;
   question?: QuizQuestion;
+  confidence?: Confidence; // fiducia dichiarata sulla risposta valutata
 }
 
 export interface ReviewCard { id: number; question: string }
 /** Rating FSRS (1–4) con le etichette della UI. */
 export type Rating = 1 | 2 | 3 | 4;
 export const RATING_LABEL: Record<Rating, string> = { 1: "Di nuovo", 2: "Difficile", 3: "Bene", 4: "Facile" };
-export interface ReviewResult { grade: Grade; expected: string; rating: Rating; dueAt: number; remaining: number; source?: Citation }
+export interface ReviewResult { grade: Grade; expected: string; rating: Rating; confidence?: Confidence; dueAt: number; remaining: number; source?: Citation }
+export const CONFIDENCE_LABEL: Record<Confidence, string> = { 1: "Non sicuro", 2: "Abbastanza", 3: "Sicuro" };
 export interface OverrideResult { rating: Rating; dueAt: number; remaining: number }
 
 export interface SlideT { title: string; bullets: string[]; imagePrompt: string; image?: { format: string; content: string } }

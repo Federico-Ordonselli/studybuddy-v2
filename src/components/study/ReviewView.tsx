@@ -5,10 +5,11 @@ import { useEffect, useState } from "react";
 import { post } from "@/lib/client/api";
 import { timeUntil } from "@/lib/format";
 import CardManager from "./CardManager";
+import ConfidencePicker from "./ConfidencePicker";
 import { S } from "./styles";
 import VerdictPanel from "./VerdictPanel";
 import VideoPanel from "./VideoPanel";
-import { RATING_LABEL, type OverrideResult, type PlayingVideo, type Rating, type ReviewCard, type ReviewResult } from "./types";
+import { RATING_LABEL, type Confidence, type OverrideResult, type PlayingVideo, type Rating, type ReviewCard, type ReviewResult } from "./types";
 
 /** Ripasso FSRS: coda delle carte in scadenza (figli inclusi se è un macro) + generazione carte. */
 export default function ReviewView({ domainId }: { domainId: number }) {
@@ -17,6 +18,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
   const [due, setDue] = useState(0);
   const [card, setCard] = useState<ReviewCard | null>(null);
   const [answer, setAnswer] = useState("");
+  const [confidence, setConfidence] = useState<Confidence | null>(null); // obbligatoria prima di «Valuta»
   const [result, setResult] = useState<ReviewResult | null>(null);
   const [error, setError] = useState("");
   const [fixing, setFixing] = useState(false);   // pannello «Il voto è sbagliato» aperto
@@ -28,7 +30,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
 
   async function loadDue(d: number) {
     const r = await fetch(`/api/review?domainId=${d}`).then((x) => x.json());
-    setDue(r.due ?? 0); setCard(r.card ?? null); setResult(null); setError(""); setFixing(false); setCorrected(false); setAnswer(""); setVideo(null); setLoaded(true);
+    setDue(r.due ?? 0); setCard(r.card ?? null); setResult(null); setError(""); setFixing(false); setCorrected(false); setAnswer(""); setConfidence(null); setVideo(null); setLoaded(true);
   }
 
   async function generateCards() {
@@ -47,10 +49,10 @@ export default function ReviewView({ domainId }: { domainId: number }) {
   }
 
   async function submitReview() {
-    if (!card || !answer.trim() || busy) return;
+    if (!card || !answer.trim() || !confidence || busy) return;
     setBusy(true); setError("");
     try {
-      const r = await post<ReviewResult>("/api/review", { cardId: card.id, answer: answer.trim(), domainId });
+      const r = await post<ReviewResult>("/api/review", { cardId: card.id, answer: answer.trim(), domainId, confidence });
       setResult(r); setDue(r.remaining);
       router.refresh(); // aggiorna i badge della sidebar
     } catch (e) {
@@ -106,14 +108,16 @@ export default function ReviewView({ domainId }: { domainId: number }) {
             <>
               <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} rows={3}
                 placeholder="La tua risposta…" style={{ ...S.textarea, marginTop: 14 }} />
-              <button onClick={submitReview} disabled={busy || !answer.trim()} style={{ ...S.send, marginTop: 10, padding: "10px 18px" }}>
+              <ConfidencePicker value={confidence} onChange={setConfidence} disabled={busy} />
+              <button onClick={submitReview} disabled={busy || !answer.trim() || !confidence} style={{ ...S.send, marginTop: 10, padding: "10px 18px" }}>
                 {busy ? <span className="spin" /> : "Valuta"}
               </button>
+              {answer.trim() && !confidence && <span style={{ marginLeft: 10, fontSize: 13, color: "var(--muted)" }}>Scegli prima quanto sei sicuro.</span>}
               {error && <p role="alert" style={{ color: "var(--danger)", margin: "10px 0 0" }}>{error}</p>}
             </>
           ) : (
             <div style={{ marginTop: 14 }}>
-              <VerdictPanel grade={result.grade} expected={result.expected} source={result.source} onPlay={setVideo}>
+              <VerdictPanel grade={result.grade} expected={result.expected} source={result.source} confidence={result.confidence} onPlay={setVideo}>
                 <span>· <b>{RATING_LABEL[result.rating]}</b>{corrected && " (corretto da te)"}
                   <span style={{ color: "var(--muted)" }}> · prossimo ripasso {timeUntil(result.dueAt)}</span></span>
               </VerdictPanel>
