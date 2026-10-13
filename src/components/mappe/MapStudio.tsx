@@ -211,8 +211,8 @@ export default function MapStudio({ domainId, onAskTutor }: { domainId?: number;
       )}
 
       {current
-        ? <div style={S.studio}>
-            <div ref={host} style={{ ...S.host, display: overlay ? "none" : undefined }} />
+        ? <div style={levels.length ? S.studio : S.studioFree}>
+            <div ref={host} style={{ ...(levels.length ? S.host : S.hostFree), display: overlay ? "none" : undefined }} />
             {overlay && <div ref={overlayHost} style={S.host} />}
             {ed && levels.length > 0 && current && domainId && (
               <MapExercise editor={ed} mapId={current.id} domainId={domainId} levels={levels}
@@ -242,7 +242,11 @@ const S: Record<string, React.CSSProperties> = {
   // con il pannello e le bolle finirebbero fuori vista. Sotto i ~880px il pannello va a capo.
   studio: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" },
   check: { display: "flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 13 },
+  // Esercizio: tela ad altezza propria, così il pannello che si allunga non la stira (e non manda le bolle fuori vista).
   host: { flex: "1 1 520px", minWidth: 0, height: STUDIO_HEIGHT, minHeight: 520 },
+  // Mappa normale: la tela riempie lo spazio disponibile, come prima della Fase 5.
+  studioFree: { flex: 1, minHeight: 0, display: "flex" },
+  hostFree: { flex: 1, minWidth: 0, minHeight: 520 },
   empty: { color: "var(--muted)", textAlign: "center", margin: "auto", maxWidth: 520, lineHeight: 1.6 },
   source: { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 10 },
   sourceHead: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 },

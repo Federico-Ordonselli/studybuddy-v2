@@ -26,3 +26,32 @@ test("check e reveal: mappa inesistente 404 con messaggio", async () => {
   assert.match((await r.json()).error, /mappa inesistente/);
   assert.equal((await reveal.POST(post("/api/maps/exercise/reveal", { mapId: "nessuna", spaceId: "x" }))).status, 404);
 });
+
+const raw = (url: string, body: string) => new NextRequest(`http://localhost${url}`, { method: "POST", body, headers: { "content-type": "application/json" } });
+
+test("JSON malformato o non-oggetto: 400 con {error} su tutte le POST", async () => {
+  const routes = await Promise.all(["", "/expand", "/check", "/reveal", "/complete", "/card"].map((p) => import(`@/app/api/maps/exercise${p}/route`)));
+  for (const r of routes) for (const body of ["{non json", "null", "[1,2]"]) {
+    const res = await r.POST(raw("/api/maps/exercise", body));
+    assert.equal(res.status, 400, body);
+    assert.ok((await res.json()).error);
+  }
+});
+
+test("GET livelli di una mappa-esercizio: nessuna soluzione nella risposta", async () => {
+  const { withJudge } = await import("./helpers/judge");
+  const { sqlite } = await import("@/lib/db");
+  sqlite.prepare("INSERT OR IGNORE INTO domains (id, name) VALUES (1, 'Corso')").run();
+  const { createExercise } = await import("@/lib/mapExercise");
+  const FOUND = [{ chunkId: 10, documentId: 1, content: "Lo state provoca il rendering.", distance: 0, source: null, docKind: "text", docMeta: { fileHash: "h" } }];
+  const reply = JSON.stringify({
+    center: { title: "React", definition: "Libreria UI.", explanation: "SPIEGAZIONE-SEGRETA", sources: [1] },
+    concepts: [{ title: "State", definition: "Dati locali.", explanation: "SPIEGAZIONE-SEGRETA", sources: [1], verb: "VERBO-SEGRETO" }],
+    relations: [], focus_question: "Come?",
+  });
+  const { map } = await withJudge([reply], () => createExercise(1, "React", FOUND));
+  const res = await list.GET(new NextRequest(`http://localhost/api/maps/exercise?mapId=${map.id}`));
+  const text = await res.text();
+  assert.match(text, /"focusQuestion":"Come\?"/);
+  assert.doesNotMatch(text, /SEGRET|proposal|chunkIds/);
+});

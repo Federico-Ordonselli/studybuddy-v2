@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createExercise, exerciseLevels } from "@/lib/mapExercise";
-import { exerciseResponse, str } from "@/lib/mapExerciseHttp";
+import { badBody, exerciseResponse, readBody, str } from "@/lib/mapExerciseHttp";
 
 export const runtime = "nodejs";
 
@@ -13,7 +13,9 @@ export async function GET(req: NextRequest) {
 
 /** Esercizio nuovo «costruisci tu» su un argomento. */
 export async function POST(req: NextRequest) {
-  const { domainId, topic } = await req.json();
-  if (!Number.isSafeInteger(domainId) || !str(topic)) return NextResponse.json({ error: "domainId e topic richiesti" }, { status: 400 });
+  const body = await readBody(req);
+  if (!body) return badBody();
+  const domainId = body.domainId, topic = str(body.topic);
+  if (typeof domainId !== "number" || !Number.isSafeInteger(domainId) || !topic) return NextResponse.json({ error: "domainId e topic richiesti" }, { status: 400 });
   return exerciseResponse(() => createExercise(domainId, topic.trim()));
 }
