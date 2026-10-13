@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { sessions } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/providers";
 import type { Citation } from "@/lib/rag/pipeline";
+import { LibraryError } from "@/lib/errors";
+import { afterSolution, canReveal, initialHint, nextHint, REVEAL_AFTER, type HintState } from "./hints";
 
 /**
  * Persistenza dello stato del tutor in `sessions.state`.
@@ -12,23 +14,39 @@ import type { Citation } from "@/lib/rag/pipeline";
  * implicita nella tabella `cards` (vedi `tutor/cards.ts`).
  */
 
-/** Turno salvato: le risposte dell'assistente tengono le citazioni, per mostrarle alla ripresa. */
+export type SocraticAction = "reply" | "solution";
+/** Messaggio dello studente salvato quando chiede la soluzione col pulsante. */
+export const SOLUTION_MESSAGE = "Mostra la soluzione";
+
+/** Turno salvato: le risposte dell'assistente tengono le citazioni (e l'etichetta, es. «Soluzione») per la ripresa. */
 export interface TutorMessage extends ChatMessage {
   citations?: Citation[];
+  tag?: string;
 }
 
 export interface SocraticState {
   history: TutorMessage[];
+  hint?: HintState; // assente nelle sessioni salvate prima della Fase 4
 }
 
-/** History dopo un turno socratico (le sessioni salvate prima delle citazioni restano valide). */
-export function appendTurn(
-  history: TutorMessage[],
-  message: string,
-  reply: string,
-  citations: Citation[] = []
-): TutorMessage[] {
-  return [...history, { role: "user", content: message }, { role: "assistant", content: reply, citations }];
+export function appendTurn(history: TutorMessage[], message: string, reply: string, citations: Citation[] = [], tag?: string): TutorMessage[] {
+  return [...history, { role: "user", content: message }, { role: "assistant", content: reply, citations, ...(tag ? { tag } : {}) }];
+}
+
+/** Livello di indizio da usare per questo turno. La soluzione si sblocca solo dopo `REVEAL_AFTER` tentativi. */
+export function beginTurn(state: SocraticState | null, message: string, action: SocraticAction): HintState {
+  const before = state?.hint ?? initialHint();
+  if (action === "reply") return nextHint(before, message);
+  if (!canReveal(before)) throw new LibraryError(`La soluzione si sblocca dopo ${REVEAL_AFTER} tentativi.`, 409);
+  return before;
+}
+
+/** Stato dopo un turno riuscito: dopo la soluzione si riparte dal livello 1. */
+export function endTurn(state: SocraticState | null, hint: HintState, action: SocraticAction, message: string, reply: string, citations: Citation[], blocked: number): SocraticState {
+  return {
+    history: appendTurn(state?.history ?? [], message, reply, citations, action === "solution" ? "Soluzione" : undefined),
+    hint: action === "solution" ? afterSolution(hint) : { ...hint, leaksBlocked: hint.leaksBlocked + blocked },
+  };
 }
 
 /** Al modello vanno solo i turni: le citazioni sono per la UI. */

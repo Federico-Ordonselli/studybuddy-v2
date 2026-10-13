@@ -4,7 +4,8 @@ import { LibraryError } from "@/lib/errors";
 import { socraticResponse } from "@/lib/tutor/stream";
 import { NextRequest, NextResponse } from "next/server";
 import { socraticTurn, quizTurn, gradeTurn } from "@/lib/tutor/session";
-import { appendTurn, forModel, getOrCreateSession, saveState } from "@/lib/tutor/sessions";
+import { beginTurn, endTurn, forModel, getOrCreateSession, saveState, SOLUTION_MESSAGE } from "@/lib/tutor/sessions";
+import { initialHint, publicHint, resetProblem } from "@/lib/tutor/hints";
 
 export const runtime = "nodejs";
 
@@ -19,14 +20,23 @@ export async function POST(req: NextRequest) {
 
   const domainId = positiveId(body.domainId, "domainId");
     if (mode === "socratic") {
-      const message = text(body.message, "message");
-      // Stato conversazione persistito in sessions.state (single source of truth).
+      const action = body.action ?? "reply";
+      if (!["reply", "solution", "new-problem"].includes(action as string)) throw new LibraryError("action non valida");
+      // il messaggio si valida prima di creare la sessione: niente righe orfane per un body sbagliato
+      const message = action === "reply" ? text(body.message, "message") : SOLUTION_MESSAGE;
       const session = await getOrCreateSession("socratic", domainId, sessionId);
-      if (body.stream === true) return await socraticResponse(session, message, domainId, req.signal);
-      const history = session.state?.history ?? [];
-      const turn = await socraticTurn(forModel(history), message, domainId);
-      saveState(session.id, { history: appendTurn(history, message, turn.reply, turn.citations) });
-      return NextResponse.json({ ...turn, sessionId: session.id });
+      if (action === "new-problem") {
+        const hint = resetProblem(session.state?.hint ?? initialHint());
+        saveState(session.id, { history: session.state?.history ?? [], hint });
+        return NextResponse.json({ sessionId: session.id, hint: publicHint(hint) });
+      }
+      const act = action as "reply" | "solution";
+      if (body.stream === true) return await socraticResponse(session, message, domainId, req.signal, act);
+      const hint = beginTurn(session.state, message, act);
+      const turn = await socraticTurn(forModel(session.state?.history ?? []), message, hint, domainId, act);
+      const next = endTurn(session.state, hint, act, message, turn.reply, turn.citations, turn.blocked);
+      saveState(session.id, next);
+      return NextResponse.json({ ...turn, sessionId: session.id, hint: publicHint(next.hint!) });
     }
     if (mode === "quiz") {
       return NextResponse.json(await quizTurn(text(body.topic ?? body.message, "message"), domainId));
