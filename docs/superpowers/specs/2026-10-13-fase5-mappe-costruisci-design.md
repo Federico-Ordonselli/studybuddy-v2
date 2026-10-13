@@ -146,4 +146,6 @@ Risultato finale dell'eval: maps-v3 84,7% su due run con il contesto di produzio
 
 I verbi generici **fuori** dalla lista fissa di `isGenericVerb` («ha un rapporto con», «è in relazione con»…) li giudica il modello, che nell'eval li sbaglia (uno `valid`, uno `wrong` invece di `imprecise`). Si può allargare la lista con le forme generiche comuni; i due esempi del set sono stati visti durante la misura, quindi un'estensione andrebbe verificata con proposizioni vaghe nuove. Da decidere: allargare la lista (e con quali forme) o lasciarla com'è.
 
+**Decisione dell'utente (2026-10-13): allargare.** `isGenericVerb` ora riconosce famiglie di forme IT/EN («è in relazione/rapporto con», «ha un rapporto/legame/collegamento con», «correlato a», «si lega a», «is associated with», «has a relationship with»…), con un test a tabella che tiene fuori i verbi che dicono il rapporto («dipende da», «è un tipo di», «interagisce con»). Eval non ancora rimisurato (GPU occupata): da rilanciare aggiungendo proposizioni vaghe con forme non viste.
+
 Altri limiti noti, non bloccanti: la tela delle mappe ha ora un'altezza fissa (`min(75vh, 760px)`) anche fuori dall'esercizio; in un sottolivello un arco aggiunto da «Completa» su un altro livello resta visibile se collega due concetti presenti anche lì.
