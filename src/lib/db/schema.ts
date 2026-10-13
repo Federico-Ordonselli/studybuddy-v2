@@ -153,6 +153,23 @@ export const conceptMaps = sqliteTable("concept_maps", {
 });
 
 /**
+ * Esercizi «costruisci tu» sulle mappe (Fase 5): una riga per livello (`root` o l'id del concetto
+ * proprietario della tela). `proposal` è la soluzione generata, per titolo: non va mai al browser
+ * prima di «Mostra soluzione». `last_check` = esito dell'ultima verifica. Date in secondi.
+ */
+export const mapExercises = sqliteTable("map_exercises", {
+  mapId: text("map_id").notNull(),
+  levelKey: text("level_key").notNull(),
+  focusQuestion: text("focus_question").notNull(),
+  proposal: text("proposal").notNull(),
+  lastCheck: text("last_check"),
+  createdAt: integer("created_at").notNull(),
+  checkedAt: integer("checked_at"),
+  revealedAt: integer("revealed_at"),
+  completedAt: integer("completed_at"),
+}, (t) => [primaryKey({ columns: [t.mapId, t.levelKey] })]);
+
+/**
  * Modulo SF6 (codice in F5, da `learning-vault@439b105`): combo e consigli per personaggio,
  * con le colonne del vault. Le tabelle nascono in F4 perché l'import del vault le popola.
  * `character_slug` è una stringa: il roster sta nel codice del modulo.

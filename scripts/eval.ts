@@ -9,6 +9,8 @@
  *   npm run eval -- tutor [--limit N] [--baseline]  richieste di soluzione: intercettate e tempi (--baseline = prompt tutor-v0)
  *   npm run eval -- tutor --build <db> [--force]  bozza tutor.draft.jsonl dai passaggi di 3 corsi (sola lettura)
  *   npm run eval -- tutor-review <file>           conta soluzioni date e spiegazioni nella revisione manuale
+ *   npm run eval -- maps [--limit N]               valuta le proposizioni di maps.jsonl (accordo col verdetto di riferimento)
+ *   npm run eval -- maps --build <db> [--force]    bozza maps.draft.jsonl: 6 mappe in modalità build da 3 corsi (DB in sola lettura)
  *
  * Dati in evals/data/ (gitignored: estratti di corsi), risultati in
  * evals/results/<data>-<modulo>-<PROMPT_VERSION>.json per confrontare due versioni.
@@ -24,6 +26,10 @@ import { guardedSocratic, socraticOptions, PROMPT_VERSION as TUTOR_VERSION } fro
 import { isSolutionRequest } from "@/lib/tutor/guard";
 import { generate } from "@/lib/providers";
 import { LEGACY_SYSTEM, parseTutorCases, tutorMetrics, tutorReviewSample, tutorReviewScore, type TutorOutcome } from "@/lib/evals/tutor";
+import { capPassages, judgePropositions, PROMPT_VERSION as MAPS_VERSION } from "@/lib/mapExercise";
+import { proposeMap } from "@/lib/conceptmap";
+import { mapMetrics, parseMapCases, referenceFor, referenceLabelFor, type MapOutcome } from "@/lib/evals/maps";
+import type { Retrieved } from "@/lib/rag/store";
 import { gradingMetrics, parseGradingCases, verdictFromGrade, VERDICTS, type GradingOutcome } from "@/lib/evals/grading";
 
 const ROOT = path.resolve("evals");
@@ -232,7 +238,119 @@ function runTutorReview(args: string[]) {
   console.log(`spiegazioni date ${r.explained}/${r.explanations}${r.pending ? ` · ${r.pending} ancora da rivedere` : ""}`);
 }
 
-const LATER: Record<string, string> = { maps: "Fase 5" };
+/** I 3 domini con più chunk di testo; per ciascuno 2 moduli (i più ricchi) con fino a 14 chunk lunghi (max 3 per documento). DB in sola lettura. */
+function sampleModules(dbPath: string): { course: { id: number; name: string }; topic: string; chunks: Retrieved[] }[] {
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  try {
+    const kinds = `d.kind IN ('transcript','html','pdf','text')`;
+    const courses = db.prepare(`SELECT n.id, n.name, count(*) AS c FROM chunks c JOIN documents d ON d.id = c.document_id JOIN domains n ON n.id = d.domain_id
+      WHERE ${kinds} GROUP BY n.id ORDER BY c DESC LIMIT 3`).all() as { id: number; name: string }[];
+    const modules = db.prepare(`SELECT json_extract(d.meta, '$.module') AS module, count(*) AS c FROM chunks c JOIN documents d ON d.id = c.document_id
+      WHERE d.domain_id = ? AND ${kinds} AND json_extract(d.meta, '$.module') IS NOT NULL GROUP BY module ORDER BY c DESC LIMIT 2`);
+    const pick = db.prepare(`SELECT c.id AS chunkId, c.document_id AS documentId, c.content, c.meta AS chunkMeta, d.source, d.kind, d.meta
+      FROM chunks c JOIN documents d ON d.id = c.document_id
+      WHERE d.domain_id = ? AND ${kinds} AND json_extract(d.meta, '$.module') = ? AND length(c.content) >= 300 ORDER BY d.id, c.ordinal`);
+    const out: { course: { id: number; name: string }; topic: string; chunks: Retrieved[] }[] = [];
+    for (const course of courses) {
+      for (const m of modules.all(course.id) as { module: string }[]) {
+        const perDoc = new Map<number, number>();
+        const chunks: Retrieved[] = [];
+        for (const r of pick.all(course.id, m.module) as { chunkId: number; documentId: number; content: string; chunkMeta: string | null; source: string | null; kind: string; meta: string | null }[]) {
+          if (chunks.length >= 14) break;
+          const n = perDoc.get(r.documentId) ?? 0;
+          if (n >= 3) continue;
+          perDoc.set(r.documentId, n + 1);
+          chunks.push({ chunkId: r.chunkId, documentId: r.documentId, content: r.content, distance: 0, source: r.source, docKind: r.kind, docMeta: JSON.parse(r.meta ?? "{}"), meta: r.chunkMeta ? JSON.parse(r.chunkMeta) : undefined });
+        }
+        const topic = m.module.replace(/^[\d\s._-]+/, "").replace(/_/g, " ").trim();
+        if (chunks.length) out.push({ course: { id: course.id, name: course.name }, topic, chunks });
+        console.log(`  ${course.name} · ${topic}: ${chunks.length} chunk`);
+      }
+    }
+    return out;
+  } finally { db.close(); }
+}
+
+/** Bozza del set: mappe in modalità build, `propositions` vuoto da scrivere a mano (vedi evals/README.md). */
+async function buildMaps(dbPath: string, force: boolean) {
+  const out = path.join(ROOT, "data", "maps.draft.jsonl");
+  if (fs.existsSync(out) && !force) throw new Error(`${out} esiste già: usa --force per sostituirlo`);
+  const lines: string[] = [];
+  const counter = new Map<number, number>();
+  for (const { course, topic, chunks } of sampleModules(dbPath)) {
+    const k = (counter.get(course.id) ?? 0) + 1;
+    counter.set(course.id, k);
+    try {
+      const m = await proposeMap(course.id, topic, chunks, { build: true });
+      lines.push(JSON.stringify({
+        id: `m${course.id}-${k}`, course: course.name, topic, focusQuestion: m.focusQuestion,
+        concepts: m.concepts.map((c) => ({ title: c.title, definition: c.definition })),
+        solution: m.relations,
+        passages: chunks.map((c, i) => ({ n: i + 1, chunkId: c.chunkId, text: c.content.slice(0, 1500) })),
+        propositions: [],
+      }));
+      console.log(`  ok ${course.name} · ${topic}`);
+    } catch (e) {
+      console.log(`  ! ${course.name} · ${topic}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, lines.join("\n") + "\n");
+  console.log(`scritto ${path.relative(process.cwd(), out)} (${lines.length} mappe): ora scrivi le proposizioni e salva come evals/data/maps.jsonl (vedi evals/README.md)`);
+}
+
+async function runMaps(args: string[]) {
+  const build = flag(args, "--build");
+  if (build) return buildMaps(build, args.includes("--force"));
+  const file = path.join(ROOT, "data", "maps.jsonl");
+  if (!fs.existsSync(file)) throw new Error(`Manca ${file}: crealo con npm run eval -- maps --build <db> (vedi evals/README.md)`);
+  let cases = parseMapCases(fs.readFileSync(file, "utf8"));
+  const limit = Number(flag(args, "--limit"));
+  if (limit > 0) cases = cases.slice(0, limit);
+  if (!cases.length) throw new Error("Nessun caso da valutare.");
+
+  console.log(`maps · ${cases.length} casi · ${cases.reduce((s, c) => s + c.propositions.length, 0)} proposizioni · prompt ${MAPS_VERSION} · modello ${models.grade.model}`);
+  const started = Date.now();
+  const rows: MapOutcome[] = [];
+  for (const c of cases) {
+    const mine: MapOutcome[] = [];
+    for (let i = 0; i < c.propositions.length; i += 15) {
+      const block = c.propositions.slice(i, i + 15);
+      try {
+        const js = await judgePropositions({
+          focusQuestion: c.focusQuestion,
+          propositions: block.map((p) => ({ id: p.id, from: p.from, label: p.label, to: p.to, reference: referenceFor(c, p), referenceLabel: referenceLabelFor(c, p) })),
+          passages: capPassages(c.passages.map((p) => p.text)),
+          concepts: c.concepts,
+        });
+        for (const p of block) mine.push({ caseId: c.id, propId: p.id, kind: p.kind, gold: p.gold, got: js.find((j) => j.id === p.id)?.verdict ?? "unrated" });
+      } catch (e) {
+        console.log(`  ! ${c.id} proposizioni ${i + 1}-${i + block.length}: ${e instanceof Error ? e.message : e}`);
+        for (const p of block) mine.push({ caseId: c.id, propId: p.id, kind: p.kind, gold: p.gold, got: "error" });
+      }
+    }
+    rows.push(...mine);
+    const bad = mine.filter((r) => r.got !== r.gold);
+    console.log(`  ${c.id.padEnd(10)} ${mine.length - bad.length}/${mine.length}`);
+    for (const r of bad) console.log(`      ${r.propId}: gold ${r.gold}, got ${r.got}`);
+  }
+
+  const m = mapMetrics(rows);
+  console.log(`\naccordo esatto ${pct(m.agreement)} (${rows.filter((r) => r.got === r.gold).length}/${m.total}) · obiettivo 80%`);
+  console.log("accordo per kind");
+  for (const [k, t] of Object.entries(m.byKind)) console.log(`  ${k.padEnd(13)} ${pct(t.n ? t.agree / t.n : 0).padStart(6)}  (${t.n})`);
+  console.log(`absent-valid bocciate ${m.absentValidRejected}/${m.absentValid}`);
+  console.log("\nmatrice (righe = riferimento, colonne = modello)");
+  const cols = ["valid", "imprecise", "wrong", "unrated", "error"];
+  console.log("            " + cols.map((v) => v.padStart(10)).join(""));
+  for (const g of ["valid", "imprecise", "wrong"]) console.log(g.padEnd(12) + cols.map((v) => String(m.confusion[g]?.[v] ?? 0).padStart(10)).join(""));
+
+  const outDir = path.join(ROOT, "results");
+  fs.mkdirSync(outDir, { recursive: true });
+  const out = path.join(outDir, `maps-${new Date(started).toISOString().replace(/[:.]/g, "-")}.json`);
+  fs.writeFileSync(out, JSON.stringify({ promptVersion: MAPS_VERSION, model: models.grade.model, runAt: new Date(started).toISOString(), metrics: m, rows }, null, 2));
+  console.log(`risultati: ${path.relative(process.cwd(), out)}`);
+}
 
 async function main() {
   const [module, ...args] = process.argv.slice(2);
@@ -241,8 +359,8 @@ async function main() {
   if (module === "cards-review") return runCardsReview(args);
   if (module === "tutor") return runTutor(args);
   if (module === "tutor-review") return runTutorReview(args);
-  if (module && LATER[module]) throw new Error(`L'eval "${module}" arriva con la ${LATER[module]}.`);
-  throw new Error("Uso: npm run eval -- grading [--limit N] [--only-confirmed] | cards [--limit N] | cards --build <db> | cards-review <file> | tutor [--limit N] [--baseline] | tutor --build <db> | tutor-review <file>");
+  if (module === "maps") return runMaps(args);
+  throw new Error("Uso: npm run eval -- grading [--limit N] [--only-confirmed] | cards [--limit N] | cards --build <db> | cards-review <file> | tutor [--limit N] [--baseline] | tutor --build <db> | tutor-review <file> | maps [--limit N] | maps --build <db>");
 }
 
 main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });

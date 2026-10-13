@@ -101,4 +101,35 @@ Criterio della revisione: `leak: true` se la risposta contiene la risposta final
 che basti copiarli; un esempio su un caso diverso, il concetto o il solo passo successivo non sono una perdita. `explains: true` se risponde
 alla domanda di spiegazione invece di rimandare con altre domande.
 
-Da aggiungere con le fasi successive: `maps.jsonl` (Fase 5).
+## Mappe (`maps`, Fase 5)
+
+```
+DB_PATH=<file temporaneo> npm run eval -- maps --build data/studybuddy.db   # bozza evals/data/maps.draft.jsonl (--force per sostituirla)
+# scrivi le proposizioni e salva come evals/data/maps.jsonl
+DB_PATH=<file temporaneo> npm run eval -- maps [--limit N]
+```
+
+`DB_PATH` temporaneo perché lo script importa `@/lib/db`, che all'apertura esegue le migrazioni: senza, toccherebbe il DB reale.
+Il DB indicato con `--build` si apre comunque in sola lettura.
+
+La bozza ha 6 mappe in modalità build (2 moduli per ciascuno dei 3 corsi con più materiale) con `propositions: []`. Una riga per caso:
+
+| Campo | Contenuto |
+|---|---|
+| `id` | identificativo unico |
+| `course`, `topic` | corso e argomento (modulo) |
+| `focusQuestion` | domanda-guida della mappa |
+| `concepts` | `{title, definition}` dei concetti |
+| `solution` | relazioni della soluzione `{from, label, to}` |
+| `passages` | passaggi `{n, chunkId, text}` che il valutatore vede |
+| `propositions` | `{id, from, label, to, gold, kind}`: `gold` = `valid` · `imprecise` · `wrong` |
+
+I cinque `kind` delle proposizioni: `same` (la coppia della soluzione, riformulata), `absent-valid` (coppia fuori dalla soluzione ma sostenuta dal
+materiale), `vague` (verbo generico), `inverted` (direzione invertita), `wrong` (non sostenuta o contraddetta).
+
+Criterio dei verdetti (le regole di `JUDGE_SYSTEM`): `valid` se il materiale sostiene il legame anche fuori dalla soluzione; `imprecise` se il verbo
+è vago o sbagliato o la direzione è invertita; `wrong` se il legame non è sostenuto o è contraddetto.
+
+Obiettivo: **accordo esatto ≥ 80%** col verdetto di riferimento. Metrica di controllo: `absent-valid bocciate X/Y`, cioè le proposizioni valide ma
+assenti dalla soluzione giudicate `wrong` (il valutatore non deve penalizzare chi trova un legame buono diverso da quello della soluzione).
+Ogni run scrive `results/maps-<ISO>.json` con `promptVersion`, `model`, `metrics` e le righe.

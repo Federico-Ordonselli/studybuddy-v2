@@ -3,7 +3,7 @@ import { assertMapDocument } from "./formato-mappa.js";
 
 /** Documento mappa v1 (validato da formato-mappa.js). */
 export type MapDocument = ReturnType<typeof assertMapDocument> & { id: string; title: string; revision: number };
-export interface MapSummary { id: string; title: string; revision: number; updatedAt: number }
+export interface MapSummary { id: string; title: string; revision: number; updatedAt: number; exercise: boolean }
 
 export class RevisionConflict extends Error {}
 
@@ -24,9 +24,12 @@ function ensureTable() {
 
 export function listMaps(domainId: number): MapSummary[] {
   ensureTable();
-  return sqlite
-    .prepare("SELECT id, title, revision, updated_at AS updatedAt FROM concept_maps WHERE domain_id = ? ORDER BY updated_at DESC")
-    .all(domainId) as MapSummary[];
+  const rows = sqlite
+    .prepare(`SELECT id, title, revision, updated_at AS updatedAt,
+        EXISTS (SELECT 1 FROM map_exercises e WHERE e.map_id = concept_maps.id) AS exercise
+      FROM concept_maps WHERE domain_id = ? ORDER BY updated_at DESC`)
+    .all(domainId) as (Omit<MapSummary, "exercise"> & { exercise: number })[];
+  return rows.map((r) => ({ ...r, exercise: r.exercise === 1 }));
 }
 
 export function getMap(id: string): { domainId: number; doc: MapDocument } | null {
@@ -58,7 +61,11 @@ export function saveMap(domainId: number, document: unknown, expectedRevision: n
   })();
 }
 
+/** Elimina la mappa e le righe del suo esercizio, insieme. */
 export function deleteMap(id: string) {
   ensureTable();
-  sqlite.prepare("DELETE FROM concept_maps WHERE id = ?").run(id);
+  sqlite.transaction(() => {
+    sqlite.prepare("DELETE FROM map_exercises WHERE map_id = ?").run(id);
+    sqlite.prepare("DELETE FROM concept_maps WHERE id = ?").run(id);
+  })();
 }

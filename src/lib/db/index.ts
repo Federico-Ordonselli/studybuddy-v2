@@ -108,7 +108,7 @@ export function convertCardsToFsrs(): number {
 }
 
 /**
- * Hub su un DB esistente: crea le tabelle `areas`, `notes`, `sf6_combos`, `sf6_tips` e `review_logs`, le colonne `sessions.updated_at` e FSRS di `cards`
+ * Hub su un DB esistente: crea le tabelle `areas`, `notes`, `sf6_combos`, `sf6_tips`, `review_logs` e `map_exercises`, le colonne `sessions.updated_at` e FSRS di `cards`
  * con lo stesso SQL di un DB nuovo, converte le carte SM-2 a FSRS e una volta i nomi liberi di `domains.areas` in slug.
  * Idempotente. Caso comune (tutto già fatto): solo letture, nessun lock di scrittura.
  */
@@ -120,6 +120,7 @@ export function ensureHubSchema() {
   ensureTable("sf6_combos");
   ensureTable("sf6_tips");
   ensureTable("review_logs");
+  ensureTable("map_exercises");
   ensureColumn("cards", "suspended", "integer NOT NULL DEFAULT 0");
   ensureColumn("sessions", "updated_at", "integer");
   for (const [column, type] of FSRS_COLUMNS) ensureColumn("cards", column, type);
