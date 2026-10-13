@@ -5,7 +5,7 @@ import { applyMapCommands } from "@/lib/mappe/comandi.js";
 import { createConcept, createPlacement, createRelation } from "@/lib/mappe/modello.js";
 import {
   comparePairs, completionCommands, exerciseDocument, levelConcepts, levelKeyOf, levelPropositions,
-  overlayDocument, pairKey, resolveSolution, stripProposal, type ExerciseDoc, type Solution,
+  overlayDocument, pairKey, resolveSolution, seededShuffle, stripProposal, type ExerciseDoc, type Solution,
 } from "@/lib/mapExerciseCore";
 
 const ref = (chunkId: string) => ({ documentId: "1", documentRevision: "h", chunkId });
@@ -49,6 +49,21 @@ test("exerciseDocument: documento valido, nessun arco, bolle uguali in griglia s
   assert.deepEqual(order(again), order(doc));
 });
 
+test("exerciseDocument: l'ordine dei concetti è quello rimescolato dal seme, non quello della proposta", () => {
+  const titles = SOLUTION.concepts.map((c) => c.title);
+  // Un seme per cui il rimescolamento sposta il centro («Rendering», primo della proposta).
+  const seed = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"].find((x) => seededShuffle(titles, x)[0] !== titles[0])!;
+  assert.ok(seed, "nessun seme sposta il centro");
+  const doc = exerciseDocument("React", SOLUTION, { seed });
+  const expected = seededShuffle(titles, seed);
+  assert.notDeepEqual(expected, titles);
+  assert.deepEqual(doc.concepts.map((c) => c.title), expected);
+  assert.notEqual(doc.concepts[0].title, "Rendering");
+  const rootOrder = doc.placements.filter((p) => p.spaceId === doc.rootSpaceId).map((p) => doc.concepts.find((c) => c.id === p.conceptId)!.title);
+  assert.deepEqual(rootOrder, expected, "anche l'ordine delle bolle segue il rimescolamento");
+  assert.deepEqual(seededShuffle(titles, seed), expected, "deterministico");
+});
+
 test("levelKeyOf: root per la tela iniziale, concetto proprietario per le altre", () => {
   const doc = exerciseDocument("React", SOLUTION, { seed: "s1" });
   assert.equal(levelKeyOf(doc, doc.rootSpaceId), "root");
@@ -59,6 +74,18 @@ test("levelPropositions e levelConcepts: solo ciò che sta nella tela", () => {
   const doc = withRelations(exerciseDocument("React", SOLUTION, { seed: "s1" }), [["State", "causa", "Rendering"]]);
   assert.equal(levelConcepts(doc, doc.rootSpaceId).length, 4);
   assert.deepEqual(levelPropositions(doc, doc.rootSpaceId).map((r) => r.label), ["causa"]);
+});
+
+test("levelPropositions: gli archi di «Completa la mappa» (origin llm) non sono proposizioni dello studente", () => {
+  const doc = withRelations(exerciseDocument("React", SOLUTION, { seed: "s1" }), [["State", "causa", "Rendering"]]);
+  const llm = createRelation(idOf(doc, "Rendering"), idOf(doc, "Props"), "riceve", { provenance: { origin: "llm" } });
+  const withLlm = applyMapCommands(doc, [{ type: "addRelation", relation: llm }]) as ExerciseDoc;
+  assert.deepEqual(levelPropositions(withLlm, withLlm.rootSpaceId).map((r) => r.label), ["causa"]);
+  // Completare non duplica la coppia già coperta dall'arco llm.
+  const cmds = completionCommands(withLlm, withLlm.rootSpaceId, SOLUTION).filter((c) => c.type === "addRelation");
+  assert.equal(cmds.length, 1);
+  const done = applyMapCommands(withLlm, completionCommands(withLlm, withLlm.rootSpaceId, SOLUTION)) as ExerciseDoc;
+  assert.deepEqual(levelPropositions(done, done.rootSpaceId).map((r) => r.label), ["causa"], "dopo il completamento restano solo quelle dello studente");
 });
 
 test("comparePairs: direzione ignorata, comuni, solo tue, mancanti senza etichetta per la UI", () => {

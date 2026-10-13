@@ -16,10 +16,11 @@ export interface SolutionConcept {
   examples?: string[]; sourceRefs?: SourceRefLike[]; verb?: string;
 }
 export interface SolutionRelation { from: string; to: string; label: string }
-export interface Solution { concepts: SolutionConcept[]; relations: SolutionRelation[] }
+/** `chunkIds`: i chunk dati al modello per generare il livello, in ordine (contesto del valutatore). */
+export interface Solution { concepts: SolutionConcept[]; relations: SolutionRelation[]; chunkIds?: number[] }
 
 export interface DocConcept { id: string; title: string; definition: string; explanation: string; examples: string[]; sourceRefs: SourceRefLike[] }
-export interface DocRelation { id: string; sourceConceptId: string; targetConceptId: string; predicate: string; label: string; directed: boolean }
+export interface DocRelation { id: string; sourceConceptId: string; targetConceptId: string; predicate: string; label: string; directed: boolean; provenance?: { origin?: string } }
 interface DocPlacement { id: string; spaceId: string; conceptId: string; x: number; y: number; width: number; height: number; childSpaceId?: string }
 interface DocSpace { id: string; title: string; ownerConceptId?: string }
 export interface ExerciseDoc {
@@ -56,16 +57,27 @@ function random(seed: string) {
   };
 }
 
+/** Rimescolamento deterministico (stesso seme, stesso ordine): non rivela l'ordine della proposta. */
+export function seededShuffle<T>(items: readonly T[], seed: string): T[] {
+  const next = random(seed);
+  return items.map((x) => ({ x, k: next() })).sort((a, b) => a.k - b.k).map((e) => e.x);
+}
+
+/** Tetto di concetti di `mapFromProposal`: si rimescola solo ciò che entrerebbe nella mappa. */
+const MAX_CONCEPTS = 14;
+
 /**
  * Documento dell'esercizio: i concetti della proposta con la sola definizione, nessun arco,
- * tutte le bolle della stessa misura in una griglia rimescolata. La disposizione radiale e la
- * bolla grande del centro tradirebbero quale concetto è l'hub.
+ * tutte le bolle della stessa misura in una griglia. L'ordine dei concetti è rimescolato prima di
+ * costruire il documento: il centro della proposta è il primo, e resterebbe il primo nei menu
+ * «Da…/A…», nell'indice del motore e nella griglia. La disposizione radiale e la bolla grande del
+ * centro tradirebbero quale concetto è l'hub.
  */
 export function exerciseDocument(title: string, p: Solution, opts: { seed?: string; provenance?: Record<string, unknown> } = {}): ExerciseDoc {
-  const base = mapFromProposal(title, stripProposal(p), opts.provenance ? { provenance: opts.provenance as { origin: string } } : {}) as ExerciseDoc;
-  const placements = base.placements.filter((pl) => pl.spaceId === base.rootSpaceId);
-  const next = random(opts.seed ?? title);
-  const order = placements.map((pl) => ({ pl, k: next() })).sort((a, b) => a.k - b.k).map((x) => x.pl);
+  const stripped = stripProposal(p);
+  const concepts = seededShuffle(stripped.concepts.slice(0, MAX_CONCEPTS), opts.seed ?? title);
+  const base = mapFromProposal(title, { ...stripped, concepts }, opts.provenance ? { provenance: opts.provenance as { origin: string } } : {}) as ExerciseDoc;
+  const order = base.placements.filter((pl) => pl.spaceId === base.rootSpaceId);
   const cols = Math.min(COLUMNS, order.length);
   const width = cols * BUBBLE.width + (cols - 1) * GAP.x;
   const commands = order.map((pl, i) => ({
@@ -98,10 +110,19 @@ export function levelConcepts(doc: ExerciseDoc, spaceId: string): DocConcept[] {
   return doc.concepts.filter((c) => ids.has(c.id));
 }
 
-/** Le proposizioni dello studente nella tela: relazioni fra due concetti visibili, distinti. */
-export function levelPropositions(doc: ExerciseDoc, spaceId: string): DocRelation[] {
+/** Relazioni fra due concetti visibili e distinti della tela, di chiunque siano. */
+function levelRelations(doc: ExerciseDoc, spaceId: string): DocRelation[] {
   const ids = visibleIds(doc, spaceId);
   return doc.relations.filter((r) => r.sourceConceptId !== r.targetConceptId && ids.has(r.sourceConceptId) && ids.has(r.targetConceptId));
+}
+
+/**
+ * Le proposizioni dello studente nella tela. Gli archi aggiunti da «Completa la mappa» (anche su un
+ * altro livello che mostra gli stessi concetti) hanno `provenance.origin = "llm"` e non contano;
+ * quelli dello studente sono `manual` (default del motore).
+ */
+export function levelPropositions(doc: ExerciseDoc, spaceId: string): DocRelation[] {
+  return levelRelations(doc, spaceId).filter((r) => r.provenance?.origin !== "llm");
 }
 
 /** Coppia non ordinata: la direzione non conta nel confronto. */
@@ -164,7 +185,9 @@ export function overlayDocument(doc: ExerciseDoc, spaceId: string, solution: Sol
 
 /** «Completa la mappa»: archi mancanti e spiegazioni/esempi dei concetti della tela che li hanno vuoti. */
 export function completionCommands(doc: ExerciseDoc, spaceId: string, solution: Solution): MapCommand[] {
-  const commands: MapCommand[] = comparePairs(doc, spaceId, solution).missing.map((m) => ({
+  // Una coppia già coperta da un arco completato altrove non si duplica.
+  const covered = new Set(levelRelations(doc, spaceId).map((r) => pairKey(r.sourceConceptId, r.targetConceptId)));
+  const commands: MapCommand[] = comparePairs(doc, spaceId, solution).missing.filter((m) => !covered.has(pairKey(m.sourceId, m.targetId))).map((m) => ({
     type: "addRelation",
     relation: createRelation(m.sourceId, m.targetId, predicate(m.label), { provenance: { origin: "llm" } }),
   }));
