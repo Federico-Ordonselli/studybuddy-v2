@@ -100,3 +100,103 @@ test("expandExercise: mappa non-esercizio 409, concetto inesistente 404", async 
   sqlite.prepare("DELETE FROM map_exercises WHERE map_id = ?").run(map.id);
   await assert.rejects(ex.expandExercise(map.id, 1, id, req, FOUND), (e: unknown) => e instanceof ex.ExerciseError && e.status === 409 && /non è un esercizio/.test(e.message));
 });
+
+const { applyMapCommands } = await import("@/lib/mappe/comandi.js");
+const { createConcept, createPlacement, createRelation } = await import("@/lib/mappe/modello.js");
+const { saveMap } = await import("@/lib/mappe/store");
+
+const judged = (items: unknown[]) => JSON.stringify({ items });
+
+test("parseJudgements: id sconosciuti scartati, verdetti fuori enum rifiutati, fix svuotato sui valid", () => {
+  const ids = ["P1", "P2"];
+  assert.deepEqual(ex.parseJudgements(judged([
+    { id: "P1", reason: "ok", verdict: "valid", fix: "inutile" },
+    { id: "P9", reason: "x", verdict: "wrong", fix: "y" },
+  ]), ids), [{ id: "P1", reason: "ok", verdict: "valid", fix: "" }]);
+  assert.equal(ex.parseJudgements("non json", ids), null);
+  assert.equal(ex.parseJudgements(JSON.stringify({ nope: [] }), ids), null);
+  assert.deepEqual(ex.parseJudgements(judged([{ id: "P2", reason: "r", verdict: "forse", fix: "" }]), ids), []);
+});
+
+test("judgePropositions: oltre 15 lancia; un retry poi errore", async () => {
+  const many = Array.from({ length: 16 }, (_, i) => ({ id: `P${i + 1}`, from: "A", label: "x", to: "B" }));
+  await assert.rejects(ex.judgePropositions({ focusQuestion: "D?", propositions: many, passages: [] }), /15/);
+  const one = [{ id: "P1", from: "State", label: "provoca", to: "Rendering", reference: "State provoca Rendering" }];
+  const bodies: Record<string, unknown>[] = [];
+  const r = await withJudge(["rotto", judged([{ id: "P1", reason: "Il materiale lo dice.", verdict: "valid", fix: "" }])],
+    () => ex.judgePropositions({ focusQuestion: "D?", propositions: one, passages: ["Lo state provoca il rendering."] }), bodies);
+  assert.equal(r[0].verdict, "valid");
+  assert.equal(bodies.length, 2);
+  const prompt = JSON.stringify(bodies[0]);
+  assert.match(prompt, /una possibile, non l'unica/);
+  assert.match(prompt, /\[1\] Lo state provoca il rendering\./);
+  await assert.rejects(withJudge(["rotto"], () => ex.judgePropositions({ focusQuestion: "D?", propositions: one, passages: [] })), /valutazione valida/);
+});
+
+test("levelPassages: chunk dei concetti del livello, deduplicati, tagliati a 1500 e 10000 in tutto", () => {
+  sqlite.prepare("INSERT INTO documents (id, domain_id, title, kind) VALUES (1, 1, 'Doc', 'text')").run();
+  sqlite.prepare("INSERT INTO chunks (id, document_id, ordinal, content) VALUES (10, 1, 0, ?)").run("a".repeat(2000));
+  sqlite.prepare("INSERT INTO chunks (id, document_id, ordinal, content) VALUES (11, 1, 1, 'Le props arrivano dal genitore.')").run();
+  const ref = (chunkId: string) => ({ documentId: "1", documentRevision: "h", chunkId });
+  const sol = { concepts: [
+    { title: "State", sourceRefs: [ref("10"), ref("11")] },
+    { title: "Props", sourceRefs: [ref("11")] },
+    { title: "Altro", sourceRefs: [ref("99")] },
+  ], relations: [] };
+  const ps = ex.levelPassages(sol, ["State", "props"]);
+  assert.deepEqual(ps.map((p) => p.length), [1500, "Le props arrivano dal genitore.".length]);
+});
+
+test("evaluateLevel: legge il documento salvato, voci mancanti unrated, coppie mancanti per nome, last_check salvato", async () => {
+  const { map } = await withJudge([MAP_REPLY], () => ex.createExercise(1, "React", FOUND));
+  const id = (t: string) => (map.concepts as { id: string; title: string }[]).find((c) => c.title === t)!.id;
+  const withRels = applyMapCommands(map, [
+    { type: "addRelation", relation: createRelation(id("State"), id("React"), "è gestito da") },
+    { type: "addRelation", relation: createRelation(id("Props"), id("State"), "diventano") },
+  ]);
+  saveMap(1, withRels, map.revision);
+  const r = await withJudge([judged([{ id: "P1", reason: "Giusta.", verdict: "valid", fix: "" }])], () => ex.evaluateLevel(map.id, map.rootSpaceId));
+  assert.deepEqual(r.verdicts.map((v) => [v.label, v.verdict, v.inSolution]), [["è gestito da", "valid", true], ["diventano", "unrated", true]]);
+  assert.deepEqual(r.missing.map((m) => [m.a, m.b].sort()), [["Props", "React"]]);
+  assert.equal(ex.exerciseLevels(map.id)[0].lastCheck?.verdicts.length, 2);
+});
+
+test("evaluateLevel: senza proposizioni → ExerciseError 400", async () => {
+  const { map } = await withJudge([MAP_REPLY], () => ex.createExercise(1, "React-vuota", FOUND));
+  await assert.rejects(ex.evaluateLevel(map.id, map.rootSpaceId), (e: unknown) => e instanceof ex.ExerciseError && e.status === 400);
+});
+
+test("relationCardDraft: risposta dalla soluzione se la coppia c'è, altrimenti dal fix della verifica", async () => {
+  const { map } = await withJudge([MAP_REPLY], () => ex.createExercise(1, "React", FOUND));
+  const id = (t: string) => (map.concepts as { id: string; title: string }[]).find((c) => c.title === t)!.id;
+  const inSol = createRelation(id("State"), id("Props"), "è uguale a");
+  const outSol = createRelation(id("React"), id("Props"), "ignora");
+  const saved = saveMap(1, applyMapCommands(map, [{ type: "addRelation", relation: inSol }, { type: "addRelation", relation: outSol }]), map.revision);
+  await withJudge([judged([
+    { id: "P1", reason: "No.", verdict: "wrong", fix: "Lo state differisce dalle props." },
+    { id: "P2", reason: "No.", verdict: "wrong", fix: "React riceve le props." },
+  ])], () => ex.evaluateLevel(saved.id, saved.rootSpaceId));
+  const a = ex.relationCardDraft(saved.id, saved.rootSpaceId, inSol.id);
+  assert.equal(a.question, "Che relazione c'è tra «State» e «Props»?");
+  assert.equal(a.answer, "State differisce da Props");
+  assert.equal(a.sourceChunkId, 10);
+  assert.deepEqual(a.issues, []);
+  const b = ex.relationCardDraft(saved.id, saved.rootSpaceId, outSol.id);
+  assert.equal(b.answer, "React riceve Props");
+});
+
+test("relationCardDraft: coppia fuori soluzione → risposta = fix della verifica", async () => {
+  const { map } = await withJudge([MAP_REPLY], () => ex.createExercise(1, "React-fix", FOUND));
+  const id = (t: string) => (map.concepts as { id: string; title: string }[]).find((c) => c.title === t)!.id;
+  const extra = createConcept("Redux");
+  const rel = createRelation(id("State"), extra.id, "sostituisce");
+  const saved = saveMap(1, applyMapCommands(map, [
+    { type: "addConcept", concept: extra, placement: createPlacement(map.rootSpaceId, extra.id) },
+    { type: "addRelation", relation: rel },
+  ]), map.revision);
+  await withJudge([judged([{ id: "P1", reason: "No.", verdict: "wrong", fix: "Redux gestisce lo state globale." }])], () => ex.evaluateLevel(saved.id, saved.rootSpaceId));
+  const d = ex.relationCardDraft(saved.id, saved.rootSpaceId, rel.id);
+  assert.equal(d.answer, "Redux gestisce lo state globale.");
+  assert.equal(d.sourceChunkId, 10);
+});
+

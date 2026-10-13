@@ -8,7 +8,10 @@ import { expandConcept, proposeMap, provenance, type BuildResult } from "@/lib/c
 import { getMap, saveMap, type MapDocument } from "@/lib/mappe/store";
 import type { Retrieved } from "@/lib/rag/store";
 import { titleKey } from "@/lib/mappe/proposte.js";
-import { exerciseDocument, levelKeyOf, stripProposal, type ExerciseDoc, type Solution, type SolutionRelation } from "@/lib/mapExerciseCore";
+import { comparePairs, exerciseDocument, levelConcepts, levelKeyOf, levelPropositions, pairKey, resolveSolution, stripProposal, type ExerciseDoc, type Solution, type SolutionRelation } from "@/lib/mapExerciseCore";
+import { generate } from "@/lib/providers";
+import { checkCard } from "@/lib/tutor/cardQuality";
+import type { CardDraft } from "@/lib/tutor/cardGen";
 
 export const PROMPT_VERSION = "maps-v1";
 export const MAX_PROPOSITIONS = 15;
@@ -117,4 +120,175 @@ export function completeLevel(mapId: string, spaceId: string): Solution {
   const t = now();
   sqlite.prepare("UPDATE map_exercises SET revealed_at = COALESCE(revealed_at, ?), completed_at = ? WHERE map_id = ? AND level_key = ?").run(t, t, mapId, levelKey);
   return solution;
+}
+
+const VERDICTS = ["valid", "imprecise", "wrong"] as const;
+const PASSAGE_CHARS = 1500;
+const PASSAGES_TOTAL = 10000;
+
+export interface JudgeProposition { id: string; from: string; label: string; to: string; reference?: string }
+export interface Judgement { id: string; reason: string; verdict: Verdict; fix: string }
+
+/** Ordine delle proprietà = ordine di generazione: il motivo prima del verdetto. */
+const JUDGE_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          reason: { type: "string" },
+          verdict: { type: "string", enum: VERDICTS },
+          fix: { type: "string" },
+        },
+        required: ["id", "reason", "verdict", "fix"],
+      },
+    },
+  },
+  required: ["items"],
+} as const;
+
+const JUDGE_SYSTEM = [
+  "Valuti le proposizioni di una mappa concettuale costruita da uno studente. Ogni proposizione è «concetto A — verbo → concetto B».",
+  "Giudica se il MATERIALE fornito sostiene il legame che la proposizione afferma, non se coincide con una mappa di riferimento.",
+  "Per ogni proposizione, in quest'ordine:",
+  "1. reason: una o due frasi in italiano: cosa dice il materiale sul legame fra A e B.",
+  "2. verdict:",
+  "- valid: il materiale sostiene il legame, anche se è formulato con altre parole o non compare nella formulazione di riferimento. Non esiste una sola mappa giusta.",
+  "- imprecise: i due concetti sono davvero legati, ma il verbo è vago (es. «è collegato a», «riguarda»), sbagliato nel tipo di rapporto, oppure la direzione è invertita.",
+  "- wrong: il materiale non sostiene il legame o lo contraddice.",
+  "3. fix: per imprecise e wrong, una frase che enuncia la relazione corretta fra A e B secondo il materiale; vuoto per valid.",
+  "La «formulazione di riferimento», quando c'è, è UNA formulazione possibile, non l'unica: usala per capire il legame atteso, non per bocciare formulazioni diverse ma corrette.",
+  "Valuta tutte le proposizioni, con lo stesso id.",
+].join("\n");
+
+const block = (label: string, text: string) => `${label}:\n"""\n${text}\n"""`;
+
+/** Giudizi ben formati per gli id attesi; null se il JSON non è valido o manca `items`. */
+export function parseJudgements(raw: string, ids: string[]): Judgement[] | null {
+  let data: unknown;
+  try { data = JSON.parse(raw); } catch { return null; }
+  const items = (data as { items?: unknown })?.items;
+  if (!Array.isArray(items)) return null;
+  const wanted = new Set(ids), out: Judgement[] = [];
+  for (const it of items as Record<string, unknown>[]) {
+    if (!it || typeof it.id !== "string" || !wanted.has(it.id)) continue;
+    if (!(VERDICTS as readonly unknown[]).includes(it.verdict) || typeof it.reason !== "string") continue;
+    const verdict = it.verdict as Verdict;
+    out.push({ id: it.id, reason: it.reason.trim(), verdict, fix: verdict === "valid" ? "" : String(it.fix ?? "").trim() });
+    wanted.delete(it.id);
+  }
+  return out;
+}
+
+/**
+ * Una chiamata per tutte le proposizioni (massimo 15). Un retry su JSON invalido, poi errore:
+ * nessun verdetto inventato. Le proposizioni senza voce restano «non valutate» per il chiamante.
+ */
+export async function judgePropositions(input: { focusQuestion: string; propositions: JudgeProposition[]; passages: string[] }): Promise<Judgement[]> {
+  const { focusQuestion, propositions, passages } = input;
+  if (!propositions.length) return [];
+  if (propositions.length > MAX_PROPOSITIONS) throw new ExerciseError(`massimo ${MAX_PROPOSITIONS} proposizioni per verifica`);
+  const content = [
+    `Domanda focale della mappa: ${focusQuestion}`,
+    block("Materiale", passages.length ? passages.map((p, i) => `[${i + 1}] ${p}`).join("\n\n") : "(nessun passaggio disponibile)"),
+    "Proposizioni dello studente:\n" + propositions.map((p) =>
+      `${p.id}: «${p.from}» — ${p.label} → «${p.to}»` +
+      (p.reference ? `\n   formulazione di riferimento (una possibile, non l'unica): ${p.reference}` : "")).join("\n"),
+    "Valuta ogni proposizione (JSON).",
+  ].join("\n\n");
+  const ids = propositions.map((p) => p.id);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = await generate("grade", {
+      system: JUDGE_SYSTEM, json: true, schema: JUDGE_SCHEMA as unknown as Record<string, unknown>,
+      temperature: 0, messages: [{ role: "user", content }],
+    });
+    const parsed = parseJudgements(raw, ids);
+    if (parsed) return parsed;
+  }
+  throw new Error("Il modello non ha prodotto una valutazione valida delle proposizioni. Riprova.");
+}
+
+/** Passaggi sorgente dei concetti del livello (per titolo), deduplicati, ≤ 1500 caratteri l'uno e 10 000 in tutto. */
+export function levelPassages(solution: Solution, titles: string[]): string[] {
+  const keys = new Set(titles.map(titleKey));
+  const ids: number[] = [];
+  for (const c of solution.concepts) {
+    if (!keys.has(titleKey(c.title))) continue;
+    for (const r of c.sourceRefs ?? []) {
+      const n = Number(r.chunkId);
+      if (Number.isSafeInteger(n) && !ids.includes(n)) ids.push(n);
+    }
+  }
+  const get = sqlite.prepare("SELECT content FROM chunks WHERE id = ?");
+  const out: string[] = [];
+  let total = 0;
+  for (const id of ids) {
+    const row = get.get(id) as { content: string } | undefined;
+    if (!row) continue;
+    const text = row.content.slice(0, PASSAGE_CHARS);
+    if (total + text.length > PASSAGES_TOTAL) break;
+    out.push(text); total += text.length;
+  }
+  return out;
+}
+
+/** Verifica del livello: confronto delle coppie in codice + una chiamata LLM; l'esito resta in `last_check`. */
+export async function evaluateLevel(mapId: string, spaceId: string): Promise<CheckResult> {
+  const { doc, levelKey, row, solution } = loadLevel(mapId, spaceId);
+  const props = levelPropositions(doc, spaceId);
+  if (!props.length) throw new ExerciseError("nessuna proposizione da verificare: aggiungine almeno una");
+  if (props.length > MAX_PROPOSITIONS) throw new ExerciseError(`massimo ${MAX_PROPOSITIONS} proposizioni per verifica: togline qualcuna`);
+  const title = new Map(doc.concepts.map((c) => [c.id, c.title]));
+  const reference = new Map<string, string>();
+  for (const r of resolveSolution(doc, spaceId, solution)) {
+    const k = pairKey(r.sourceId, r.targetId);
+    if (!reference.has(k)) reference.set(k, `${title.get(r.sourceId)} ${r.label} ${title.get(r.targetId)}`);
+  }
+  const propositions: JudgeProposition[] = props.map((r, i) => ({
+    id: `P${i + 1}`, from: title.get(r.sourceConceptId) ?? "", label: r.label || r.predicate, to: title.get(r.targetConceptId) ?? "",
+    reference: reference.get(pairKey(r.sourceConceptId, r.targetConceptId)),
+  }));
+  const passages = levelPassages(solution, levelConcepts(doc, spaceId).map((c) => c.title));
+  const judged = new Map((await judgePropositions({ focusQuestion: row.focus_question, propositions, passages })).map((j) => [j.id, j]));
+  const result: CheckResult = {
+    verdicts: props.map((r, i) => {
+      const j = judged.get(`P${i + 1}`);
+      return {
+        relationId: r.id, sourceId: r.sourceConceptId, targetId: r.targetConceptId, label: r.label || r.predicate,
+        verdict: j?.verdict ?? "unrated", reason: j?.reason ?? "", fix: j?.fix ?? "",
+        inSolution: reference.has(pairKey(r.sourceConceptId, r.targetConceptId)),
+      };
+    }),
+    missing: comparePairs(doc, spaceId, solution).missing.map((m) => ({ a: title.get(m.sourceId) ?? "", b: title.get(m.targetId) ?? "" })),
+    checkedAt: Math.floor(Date.now() / 1000),
+  };
+  sqlite.prepare("UPDATE map_exercises SET last_check = ?, checked_at = ? WHERE map_id = ? AND level_key = ?")
+    .run(JSON.stringify(result), result.checkedAt, mapId, levelKey);
+  return result;
+}
+
+/**
+ * Bozza di carta da una proposizione sbagliata: «Che relazione c'è tra X e Y?», risposta dalla
+ * soluzione se la coppia c'è, altrimenti dalla correzione dell'ultima verifica. Passa da checkCard.
+ */
+export function relationCardDraft(mapId: string, spaceId: string, relationId: string): CardDraft {
+  const { doc, row, solution } = loadLevel(mapId, spaceId);
+  const rel = doc.relations.find((r) => r.id === relationId);
+  if (!rel) throw new ExerciseError("relazione inesistente", 404);
+  const title = new Map(doc.concepts.map((c) => [c.id, c.title]));
+  const a = title.get(rel.sourceConceptId) ?? "", b = title.get(rel.targetConceptId) ?? "";
+  const k = pairKey(rel.sourceConceptId, rel.targetConceptId);
+  const ref = resolveSolution(doc, spaceId, solution).find((r) => pairKey(r.sourceId, r.targetId) === k);
+  const check = row.last_check ? JSON.parse(row.last_check) as CheckResult : null;
+  const fix = check?.verdicts.find((v) => v.relationId === relationId)?.fix ?? "";
+  const answer = ref ? `${title.get(ref.sourceId)} ${ref.label} ${title.get(ref.targetId)}` : fix;
+  if (!answer) throw new ExerciseError("nessuna risposta disponibile: verifica prima la mappa");
+  const keys = new Set([titleKey(a), titleKey(b)]);
+  const chunk = solution.concepts.filter((c) => keys.has(titleKey(c.title))).flatMap((c) => c.sourceRefs ?? [])
+    .map((r) => Number(r.chunkId)).find((n) => Number.isSafeInteger(n));
+  const question = `Che relazione c'è tra «${a}» e «${b}»?`;
+  return { question, answer, type: "qa", fact: answer, sourceChunkId: chunk ?? null, issues: checkCard({ question, answer }) };
 }
