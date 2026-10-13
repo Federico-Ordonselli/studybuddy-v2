@@ -136,7 +136,7 @@ test("judgePropositions: oltre 15 lancia; un retry poi errore", async () => {
   await assert.rejects(withJudge(["rotto"], () => ex.judgePropositions({ focusQuestion: "D?", propositions: one, passages: [] })), /valutazione valida/);
 });
 
-test("levelPassages: chunk dei concetti del livello, deduplicati, tagliati a 1500 e 10000 in tutto", () => {
+test("levelPassages: chunk dei concetti del livello, deduplicati, tagliati a 1500 l'uno, con il tetto totale", () => {
   sqlite.prepare("INSERT INTO documents (id, domain_id, title, kind) VALUES (1, 1, 'Doc', 'text')").run();
   sqlite.prepare("INSERT INTO chunks (id, document_id, ordinal, content) VALUES (10, 1, 0, ?)").run("a".repeat(2000));
   sqlite.prepare("INSERT INTO chunks (id, document_id, ordinal, content) VALUES (11, 1, 1, 'Le props arrivano dal genitore.')").run();
@@ -157,12 +157,16 @@ test("levelPassages: con chunkIds usa i chunk della generazione, in ordine, non 
   assert.deepEqual(ps.map((p) => p.length), ["Le props arrivano dal genitore.".length, 1500]);
 });
 
-test("capPassages: ogni passaggio ≤ 1500, ≤ 10000 in tutto, un passaggio troppo lungo si salta ma i corti dopo entrano", () => {
+test("capPassages: ogni passaggio ≤ 1500, ≤ 21000 in tutto (i 14 chunk della generazione), un passaggio troppo lungo si salta ma i corti dopo entrano", () => {
   assert.deepEqual(ex.capPassages(["x".repeat(2000)]).map((p) => p.length), [1500]);
-  const ps = ex.capPassages([...Array(6).fill("a".repeat(1500)), "b".repeat(1200), "c".repeat(900)]);
-  // 6 × 1500 = 9000; 1200 sforerebbe (10200), 900 entra (9900).
-  assert.deepEqual(ps.map((p) => p.length), [1500, 1500, 1500, 1500, 1500, 1500, 900]);
-  assert.ok(ps.join("").length <= 10000);
+  assert.equal(ex.capPassages(Array(14).fill("a".repeat(1500))).length, 14);
+  const ps = ex.capPassages([...Array(13).fill("a".repeat(1500)), "b".repeat(1200), "c".repeat(900)]);
+  // 13 × 1500 = 19500; 1200 sforerebbe (20700 ok) → entra; poi 900 sforerebbe (21600) e si salta.
+  assert.deepEqual(ps.map((p) => p.length), [...Array(13).fill(1500), 1200]);
+  const qs = ex.capPassages([...Array(13).fill("a".repeat(1500)), "b".repeat(1600), "c".repeat(900)]);
+  // il 14° (tagliato a 1500) porterebbe a 21000: entra; il 15° no.
+  assert.equal(qs.join("").length, 21000);
+  assert.ok(ps.join("").length <= 21000);
 });
 
 test("evaluateLevel: legge il documento salvato, voci mancanti unrated, coppie mancanti per nome, last_check salvato", async () => {

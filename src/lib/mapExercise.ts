@@ -128,7 +128,8 @@ export function completeLevel(mapId: string, spaceId: string): Solution {
 
 const VERDICTS = ["valid", "imprecise", "wrong"] as const;
 const PASSAGE_CHARS = 1500;
-const PASSAGES_TOTAL = 10000;
+/** 14 passaggi da 1500 (quelli dati al modello per generare): ~6k token, larghi nei 16k di num_ctx. */
+const PASSAGES_TOTAL = 21000;
 
 /** `reference` = «A verbo B» della soluzione per la stessa coppia; `referenceLabel` = il suo solo verbo. */
 export interface JudgeProposition { id: string; from: string; label: string; to: string; reference?: string; referenceLabel?: string }
@@ -243,7 +244,7 @@ export async function judgePropositions(input: {
 }
 
 /**
- * Tetto del materiale per il valutatore: ogni passaggio ≤ 1500 caratteri, ≤ 10 000 in tutto. Un
+ * Tetto del materiale per il valutatore: ogni passaggio ≤ 1500 caratteri, ≤ 21 000 in tutto. Un
  * passaggio che sforerebbe il totale si salta, ma i successivi più corti possono ancora entrare.
  * Lo usano sia la verifica sia l'eval, così il contesto è lo stesso.
  */
