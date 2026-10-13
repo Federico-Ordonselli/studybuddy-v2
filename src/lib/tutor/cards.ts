@@ -108,16 +108,37 @@ export function dueCount(domainId: number): number {
   return row?.c ?? 0;
 }
 
-/** Prossima carta da ripassare (la più scaduta), o null se la coda è vuota. */
+/** Quante carte scadute considera l'interleaving (Fase 7.1, valore del piano). */
+const INTERLEAVE_WINDOW = 20;
+
+/**
+ * Modulo di una carta: corso + `meta.module` del documento della sua fonte. Lo stesso nome di modulo in
+ * due corsi è un modulo diverso; senza fonte (o senza modulo) il modulo è sconosciuto (null).
+ */
+const MODULE_OF = `CASE WHEN d.id IS NULL OR json_extract(CASE WHEN json_valid(d.meta) THEN d.meta END, '$.module') IS NULL THEN NULL
+  ELSE d.domain_id || ':' || json_extract(d.meta, '$.module') END`;
+
+/**
+ * Prossima carta da ripassare, con interleaving (Fase 7.1): fra le 20 più scadute dello scope sceglie la più
+ * scaduta di un modulo diverso da quello dell'ultima carta ripassata nello stesso scope, così chi studia deve
+ * distinguere argomenti vicini. Le carte di modulo sconosciuto non bloccano la scelta; se restano solo carte
+ * dello stesso modulo (o non c'è un ripasso precedente) vale la più scaduta. Null se la coda è vuota.
+ */
 export function nextDueCard(domainId: number): ReviewCard | null {
-  const row = db
-    .select({ id: cards.id, question: cards.question })
-    .from(cards)
-    .where(dueIn(domainId))
-    .orderBy(asc(cards.dueAt))
-    .limit(1)
-    .get();
-  return row ?? null;
+  const scope = resolveScope(domainId) ?? [domainId];
+  const marks = scope.map(() => "?").join(",");
+  const due = sqlite.prepare(`SELECT c.id, c.question, ${MODULE_OF} AS module
+    FROM cards c LEFT JOIN chunks ch ON ch.id = c.source_chunk_id LEFT JOIN documents d ON d.id = ch.document_id
+    WHERE c.suspended = 0 AND c.domain_id IN (${marks}) AND c.due_at <= ?
+    ORDER BY c.due_at, c.id LIMIT ${INTERLEAVE_WINDOW}`)
+    .all(...scope, Math.floor(Date.now() / 1000)) as { id: number; question: string; module: string | null }[];
+  if (!due.length) return null;
+  const last = sqlite.prepare(`SELECT ${MODULE_OF} AS module
+    FROM review_logs l JOIN cards c ON c.id = l.card_id LEFT JOIN chunks ch ON ch.id = c.source_chunk_id LEFT JOIN documents d ON d.id = ch.document_id
+    WHERE c.domain_id IN (${marks}) ORDER BY l.reviewed_at DESC, l.id DESC LIMIT 1`)
+    .get(...scope) as { module: string | null } | undefined;
+  const pick = (last?.module && due.find((c) => c.module !== last.module)) || due[0];
+  return { id: pick.id, question: pick.question };
 }
 
 /**
