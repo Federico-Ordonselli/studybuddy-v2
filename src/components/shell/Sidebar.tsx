@@ -4,6 +4,7 @@ import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
 import type { ShellData } from "@/lib/home";
 import { MODULES } from "@/lib/modules";
+import { quitDesktop, useDesktopMode } from "@/lib/client/desktop";
 
 function Badge({ n }: { n: number }) {
   return n > 0 ? <span className="ml-auto text-[10px] tabular bg-surface-2 border border-border rounded-full px-1.5 text-fg-muted">{n}</span> : null;
@@ -38,6 +39,7 @@ export default function Sidebar({ data, pathname, collapsed, onToggle, onCapture
 }) {
   const on = (p: string) => pathname === p || pathname.startsWith(`${p}/`);
   const moduleOn = (m: string | null) => !!m && Object.hasOwn(MODULES, m) && on(MODULES[m].href);
+  const desktop = useDesktopMode();
   return (
     <aside className={`menu-sidebar h-full shrink-0 flex flex-col ${collapsed ? "menu-collapsed w-16" : "w-60"}`}>
       <div className={`menu-brand flex items-center ${collapsed ? "justify-center py-4" : "justify-between px-5 pt-6 pb-4"}`}>
@@ -67,6 +69,13 @@ export default function Sidebar({ data, pathname, collapsed, onToggle, onCapture
             <span className="menu-symbol w-5 text-center text-base leading-none text-fg-dim group-hover:text-fg-muted">✎</span>
             {!collapsed && <><span className="flex-1 text-left">Appunto</span><kbd className="text-[10px] font-mono text-fg-dim">n</kbd><Badge n={data.inboxCount} /></>}
           </button>
+          {desktop && (
+            <button type="button" onClick={() => void quitDesktop()} title={collapsed ? "Chiudi StudyBuddy" : undefined}
+              className="menu-item group flex items-center gap-3 px-3 py-2 text-sm text-fg-muted hover:text-fg hover:bg-surface-2 transition-colors">
+              <span className="menu-symbol w-5 text-center text-base leading-none text-fg-dim group-hover:text-fg-muted">⏻</span>
+              {!collapsed && <span className="flex-1 text-left">Chiudi</span>}
+            </button>
+          )}
         </Section>
       </nav>
       <div className="menu-footer"><ThemeToggle collapsed={collapsed} /></div>
