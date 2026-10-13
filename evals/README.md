@@ -39,4 +39,26 @@ Metriche: accordo esatto, accordo entro 1 (wrong < partial < correct), matrice d
 e numero di casi `long-wrong` promossi a `correct` (obiettivo della Fase 2: 0, con accordo esatto ≥ 80%).
 Dalla Fase 2 il giudice (`grade-v2`) dà direttamente il verdetto, dopo aver elencato cosa chiede la domanda (`required`), cosa c'è (`present`), cosa manca (`missing`) e cosa è falso (`errors`); riceve il `source` del caso. `grade-v1` (voto 0–5) era convertito con 0–2 → wrong, 3 → partial, 4–5 → correct.
 
-Da aggiungere con le fasi successive: `cards.jsonl` (Fase 3), `tutor.jsonl` (Fase 4), `maps.jsonl` (Fase 5).
+## cards.jsonl (Fase 3)
+
+Passaggi di trascrizione da cui il generatore (`tutor/cardGen.ts`, `cards-v1`) crea carte.
+
+```bash
+npm run eval -- cards --build <db>        # 10 passaggi lunghi da ciascuno dei 3 corsi con più trascrizioni (DB aperto in sola lettura)
+npm run eval -- cards                     # genera e misura; --limit N per una prova veloce
+npm run eval -- cards-review <file>       # conta le carte tenute nella revisione manuale
+```
+
+| Campo | |
+|---|---|
+| `id` | univoco, es. `c3-7` |
+| `course` | nome del corso (per le metriche per corso) |
+| `content` | testo del chunk (le trascrizioni vengono ripulite da `cleanTranscript` prima di generare) |
+| `docKind` | default `transcript` |
+| `chunkId` | chunk di origine |
+
+Metriche: quota di carte che passano `checkCard` (obiettivo ≥ 85%), problemi per tipo, passaggi senza carte.
+Ogni run scrive anche `results/<data>-cards-<versione>-review.jsonl`: 20 carte valide distribuite sul set con `"keep": null`;
+metti `true` (da tenere senza modifiche) o `false` e lancia `cards-review` (obiettivo ≥ 17/20).
+
+Da aggiungere con le fasi successive: `tutor.jsonl` (Fase 4), `maps.jsonl` (Fase 5).
