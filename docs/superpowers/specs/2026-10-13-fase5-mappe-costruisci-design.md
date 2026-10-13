@@ -126,3 +126,24 @@ Logica pura in `src/lib/evals/maps.ts`, comando in `scripts/eval.ts`, dati e ris
 - Bloccare la rinomina dei concetti durante l'esercizio.
 - Statistiche o storico dei tentativi oltre all'ultima verifica.
 - Generazione di carte dalle proposizioni `imprecise`.
+
+## Decisioni prese durante l'esecuzione
+
+Prese da Claude in autonomia (l'utente ha chiesto di eseguire il piano da solo), ciascuna con il costo se si rivelasse sbagliata.
+
+1. **Vista soluzione a livello singolo.** `overlayDocument` costruisce un documento nuovo con le sole bolle della tela invece di navigare con `focusConcept`: altrimenti nei sottolivelli la vista si apriva sulla radice e la soluzione non si vedeva. Costo: nella vista mancano i portali verso altri livelli.
+2. **Verbi generici decisi in codice** (`isGenericVerb`/`capGeneric`). «è collegato a», «riguarda» e simili non dicono quale rapporto c'è: coppia in soluzione → `imprecise`; fuori soluzione un `valid` scende a `imprecise`, un `wrong` resta. Il modello oscillava su questi verbi (principio del piano «codice prima dell'LLM»). Costo: una coppia presente nella soluzione ma non sostenuta dal materiale esce `imprecise` invece di `wrong`.
+3. **Definizioni dei concetti al giudice** (`judgePropositions.concepts`): senza, bocciava il concetto centrale (che ha il nome dell'argomento) come «non presente nel materiale» e leggeva alla lettera i titoli composti. Costo: prompt più lungo.
+4. **Due verdetti di riferimento corretti** in `maps.jsonl` (m9-2 p6, p7 → `wrong`: il materiale non lega quei concetti), per coerenza con il criterio dichiarato. Il punteggio di maps-v3 è identico con i verdetti originali.
+5. **«Crea carta» solo sulle `wrong` con la coppia in soluzione**; `relationCardDraft` risponde 409 altrimenti. Fuori soluzione la risposta veniva dal `fix`, che descriveva altro (carta «Pigmenti–Stomi» con risposta sul ciclo di Calvin). Costo: meno carte.
+6. **Materiale del giudice = chunk della generazione, tetto 21 000 caratteri** (`chunkIds` nella soluzione, `capPassages` condivisa con l'eval). Con il contesto di produzione e il tetto originale a 10 000 il giudice vedeva metà dei passaggi: accordo 66–68% e 3–4 valide fuori soluzione bocciate. 14 × 1500 caratteri (~6k token) stanno nei 16k di `num_ctx`. Costo: verifica un po' più lenta.
+7. **Errore di caricamento dei livelli visibile** invece che ignorato: con l'esercizio non riconosciuto un approfondimento passerebbe da `/api/maps/expand`, che restituisce le relazioni (fuga della soluzione). Costo: un messaggio d'errore in più.
+8. **`src/lib/mappe/store.ts` modificato** (`listMaps` con `exercise`, `deleteMap` che cancella le righe dell'esercizio): è TypeScript dell'app, non del motore PolyForm, anche se sta in quella cartella.
+
+Risultato finale dell'eval: maps-v3 84,7% su due run con il contesto di produzione (87,0% senza le proposizioni vaghe), valide fuori soluzione bocciate 0/12.
+
+## Scelta aperta (per l'utente)
+
+I verbi generici **fuori** dalla lista fissa di `isGenericVerb` («ha un rapporto con», «è in relazione con»…) li giudica il modello, che nell'eval li sbaglia (uno `valid`, uno `wrong` invece di `imprecise`). Si può allargare la lista con le forme generiche comuni; i due esempi del set sono stati visti durante la misura, quindi un'estensione andrebbe verificata con proposizioni vaghe nuove. Da decidere: allargare la lista (e con quali forme) o lasciarla com'è.
+
+Altri limiti noti, non bloccanti: la tela delle mappe ha ora un'altezza fissa (`min(75vh, 760px)`) anche fuori dall'esercizio; in un sottolivello un arco aggiunto da «Completa» su un altro livello resta visibile se collega due concetti presenti anche lì.
