@@ -4,7 +4,7 @@ import { useTempDb } from "./helpers/db";
 import { verdictJson, withJudge } from "./helpers/judge";
 
 const { sqlite } = await useTempDb();
-const { reviewCard, deleteCard } = await import("@/lib/tutor/cards");
+const { reviewCard, deleteCard, overrideLastReview } = await import("@/lib/tutor/cards");
 const { PROMPT_VERSION } = await import("@/lib/tutor/grade");
 const { models } = await import("@/lib/config");
 
@@ -26,7 +26,7 @@ test("una review scrive esattamente una riga di log, nella stessa operazione del
   assert.equal(log.answer, "punta al commit attuale");
   assert.equal(log.legacy_quality, null);
   assert.equal(log.rating, 3);          // correct → Good
-  assert.equal(log.confidence, null);   // la fiducia arriva con la Fase 6
+  assert.equal(log.confidence, null);   // nessuna fiducia indicata
   assert.equal(JSON.parse(String(log.grader_rationale)).feedback, "Manca il dettaglio sul detached HEAD.");
   assert.equal(log.grader_model, models.grade.model);
   assert.equal(log.prompt_version, PROMPT_VERSION);
@@ -66,4 +66,24 @@ test("un correct con errori elencati non va a Good", async () => {
   const result = await withJudge([verdictJson("correct", { errors: ["dice che fa il commit"] })], () => reviewCard(3, "aggiunge a pezzi e fa il commit", 1));
   assert.equal(result?.grade.verdict, "partial");
   assert.equal(logs(3)[0].rating, 2); // Hard
+});
+
+test("la fiducia finisce nel log e decide Good/Easy su una risposta corretta", async () => {
+  sqlite.exec(`INSERT INTO cards (id, domain_id, question, answer, due_at) VALUES (4, 1, 'Cos''è un branch?', 'Un puntatore mobile a un commit', 0),
+    (5, 1, 'Cos''è un tag?', 'Un puntatore fisso a un commit', 0);`);
+  const sure = await withJudge([verdictJson("correct")], () => reviewCard(4, "un puntatore mobile", 1, 3));
+  assert.equal(sure?.rating, 4); // Easy
+  assert.equal(sure?.confidence, 3);
+  assert.equal(logs(4)[0].confidence, 3);
+  const unsure = await withJudge([verdictJson("correct")], () => reviewCard(5, "un puntatore fisso", 1, 1));
+  assert.equal(unsure?.rating, 3); // Good
+  assert.equal(logs(5)[0].confidence, 1);
+});
+
+test("la correzione del voto conserva la fiducia dichiarata", () => {
+  overrideLastReview(4, 2, 1);
+  const [orig, manual] = logs(4);
+  assert.equal(orig.overridden, 1);
+  assert.equal(manual.grader_model, "manual");
+  assert.equal(manual.confidence, 3);
 });

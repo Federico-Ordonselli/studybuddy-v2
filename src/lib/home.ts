@@ -33,6 +33,36 @@ export function recentCourses(limit = 4): RecentItem[] {
   return rows.map(({ last, ...r }) => ({ ...r, lastAt: new Date(last * 1000).toISOString() }));
 }
 
+export interface CalibrationLevel { confidence: 1 | 2 | 3; total: number; correct: number; pct: number | null }
+export interface Calibration { days: number; levels: CalibrationLevel[]; overconfident: boolean }
+
+/** Sotto questa precisione su «Sicuro», con almeno `CALIBRATION_MIN_SURE` review, la home lo fa notare (piano 6.3). */
+export const CALIBRATION_SURE_PCT = 70;
+export const CALIBRATION_MIN_SURE = 20;
+
+/**
+ * Calibrazione della fiducia (Fase 6) da `review_logs`: per ogni livello, la quota di risposte corrette
+ * (rating Good o Easy, cioè verdetto correct) negli ultimi `days` giorni. Le review corrette a mano contano
+ * con il voto corretto (l'originale ha `overridden = 1`). Senza `domainId` tutti i corsi; un macro include i figli.
+ */
+export function calibration(domainId?: number, days = 30): Calibration {
+  // stesso scope di `resolveScope` (dominio + figli), senza importare il layer RAG nel layout
+  const where = domainId ? "AND (c.domain_id = ? OR c.domain_id IN (SELECT id FROM domains WHERE parent_id = ?))" : "";
+  const rows = sqlite.prepare(
+    `SELECT l.confidence AS confidence, count(*) AS total, sum(l.rating >= 3) AS correct
+     FROM review_logs l JOIN cards c ON c.id = l.card_id
+     WHERE l.overridden = 0 AND l.confidence IS NOT NULL AND l.reviewed_at >= ? ${where}
+     GROUP BY l.confidence`
+  ).all(nowSec() - days * 86400, ...(domainId ? [domainId, domainId] : [])) as { confidence: number; total: number; correct: number }[];
+  const levels = ([1, 2, 3] as const).map((confidence) => {
+    const r = rows.find((x) => x.confidence === confidence);
+    const total = r?.total ?? 0, correct = r?.correct ?? 0;
+    return { confidence, total, correct, pct: total ? Math.round((correct / total) * 100) : null };
+  });
+  const sure = levels[2];
+  return { days, levels, overconfident: sure.total >= CALIBRATION_MIN_SURE && sure.pct! < CALIBRATION_SURE_PCT };
+}
+
 export function getShellData(): ShellData {
   return {
     areas: listAreas().map(({ slug, name, symbol, module }) => ({ slug, name, symbol, module })),

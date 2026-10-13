@@ -30,7 +30,7 @@ test("parseGrade: correct con errori viene declassato a partial, con sole mancan
 });
 
 test("toRating: wrong → Again, partial → Hard, correct → Good", () => {
-  assert.deepEqual((["wrong", "partial", "correct"] as const).map(toRating), [Rating.Again, Rating.Hard, Rating.Good]);
+  assert.deepEqual((["wrong", "partial", "correct"] as const).map((v) => toRating(v)), [Rating.Again, Rating.Hard, Rating.Good]);
 });
 
 test("rationaleJson: giudizio senza verdetto, per review_logs", () => {

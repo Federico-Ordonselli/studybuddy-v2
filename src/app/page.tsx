@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { dueByDomain, getShellData, recentCourses } from "@/lib/home";
+import { calibration, dueByDomain, getShellData, recentCourses } from "@/lib/home";
 import { listInbox } from "@/lib/notes";
 import { greeting, relativeTime, todayLabel } from "@/lib/format";
 import NoteComposer from "@/components/notes/NoteComposer";
 import NoteList from "@/components/notes/NoteList";
+import CalibrationPanel from "@/components/home/CalibrationPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export default function HomePage() {
   const due = dueByDomain();
   const recent = recentCourses();
   const inbox = listInbox();
+  const calib = calibration();
+  const hasCalib = calib.levels.some((l) => l.total > 0);
   const shell = getShellData();
   const name = process.env.STUDYBUDDY_USER_NAME?.trim();
   const now = new Date();
@@ -68,6 +71,12 @@ export default function HomePage() {
               </div>
             )}
           </div>
+        </Block>
+      )}
+
+      {hasCalib && (
+        <Block title="Calibrazione">
+          <CalibrationPanel data={calib} />
         </Block>
       )}
 
