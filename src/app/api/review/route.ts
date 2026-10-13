@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { dueCount, nextDueCard, reviewCard } from "@/lib/tutor/cards";
 import {handle, handleLlm, readJson, badJson} from "@/lib/http";
-import {positiveId,text} from "@/lib/validation";
+import {confidence,positiveId,text} from "@/lib/validation";
 import {LibraryError} from "@/lib/errors";
 export const runtime = "nodejs";
 export async function GET(req: NextRequest) {
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   return handleLlm(async()=>{
     const cardId=positiveId(body.cardId,"cardId",true)!;
     const answer=text(body.answer,"answer"),domainId=positiveId(body.domainId,"domainId");
-    const result=await reviewCard(cardId,answer,domainId);
+    const result=await reviewCard(cardId,answer,domainId,confidence(body.confidence));
     if(!result)throw new LibraryError("Carta non trovata",404);
     return result;
   });

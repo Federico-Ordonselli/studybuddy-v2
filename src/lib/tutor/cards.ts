@@ -10,7 +10,7 @@ import { gradingSource } from "./gradingSource";
 import type { Citation } from "@/lib/rag/pipeline";
 import { gradeAnswer, PROMPT_VERSION, rationaleJson, type Grade } from "./grade";
 import { models } from "@/lib/config";
-import { fromSnapshot, isGrade, toRating, scheduleFrom, schedule, toSnapshot, type FsrsFields, type Grade as Rating } from "./scheduler";
+import { fromSnapshot, isGrade, toRating, scheduleFrom, schedule, toSnapshot, type Confidence, type FsrsFields, type Grade as Rating } from "./scheduler";
 
 /**
  * Carte di studio per lo spaced repetition. Le domande si generano dal materiale
@@ -26,6 +26,7 @@ export interface ReviewResult {
   grade: Grade;
   expected: string;
   rating: Rating;    // 1 Again · 2 Hard · 3 Good · 4 Easy
+  confidence?: Confidence; // fiducia dichiarata prima di rispondere
   dueAt: number;     // epoch ms della prossima scadenza
   remaining: number; // carte ancora in scadenza per il dominio
   source?: Citation; // passaggio usato dal giudice
@@ -84,15 +85,16 @@ export function nextDueCard(domainId: number): ReviewCard | null {
 
 /**
  * Valuta la risposta a una carta, riprogramma con FSRS e registra la review in `review_logs`. `scopeDomainId` è il dominio
- * selezionato in UI (può essere il macro): serve per contare le carte rimaste in coda.
+ * selezionato in UI (può essere il macro): serve per contare le carte rimaste in coda. `confidence` (Fase 6) decide
+ * Good/Easy sulle risposte corrette e resta nel log per la calibrazione in home.
  */
-export async function reviewCard(cardId: number, answer: string, scopeDomainId?: number): Promise<ReviewResult | null> {
+export async function reviewCard(cardId: number, answer: string, scopeDomainId?: number, confidence?: Confidence): Promise<ReviewResult | null> {
   const card = db.select().from(cards).where(eq(cards.id, cardId)).get();
   if (!card || card.suspended) return null;
 
   const source = await gradingSource(card.question, card.sourceChunkId, card.domainId);
   const grade = await gradeAnswer(card.question, card.answer, answer, source?.text);
-  const rating = toRating(grade.verdict);
+  const rating = toRating(grade.verdict, confidence);
   // al secondo, come `reviewed_at`: la correzione del voto rischedula con la stessa ora (il fuzz ne dipende)
   const now = new Date(Math.floor(Date.now() / 1000) * 1000);
   const { before, update } = schedule(card, rating, now);
@@ -103,6 +105,7 @@ export async function reviewCard(cardId: number, answer: string, scopeDomainId?:
       cardId,
       reviewedAt: now,
       rating,
+      confidence,
       answer,
       graderRationale: rationaleJson(grade),
       ...logState(before, update),
@@ -111,7 +114,7 @@ export async function reviewCard(cardId: number, answer: string, scopeDomainId?:
     }).run();
   })();
 
-  return { grade, expected: card.answer, rating, dueAt: update.dueAt.getTime(), remaining: remainingFor(scopeDomainId ?? card.domainId), source: source?.citation };
+  return { grade, expected: card.answer, rating, confidence, dueAt: update.dueAt.getTime(), remaining: remainingFor(scopeDomainId ?? card.domainId), source: source?.citation };
 }
 
 /**
@@ -136,6 +139,7 @@ export function overrideLastReview(cardId: number, rating: Rating, scopeDomainId
       cardId,
       reviewedAt: last.reviewedAt,
       rating,
+      confidence: last.confidence,
       answer: last.answer,
       ...logState(before, update),
       graderModel: "manual",

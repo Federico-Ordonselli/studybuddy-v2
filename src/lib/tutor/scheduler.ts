@@ -119,9 +119,16 @@ export function scheduleFrom(before: FsrsFields, rating: Grade, now: Date): Fsrs
   return fromFsrsCard(f.next(toFsrsCard(before), now, rating).card);
 }
 
-/** Verdetto del giudice → rating. Easy non viene dal giudice: lo deciderà la fiducia (Fase 6). */
-export function toRating(verdict: Verdict): Grade {
-  return verdict === "correct" ? Rating.Good : verdict === "partial" ? Rating.Hard : Rating.Again;
+/** Fiducia dichiarata prima della risposta: 1 «Non sicuro» · 2 «Abbastanza» · 3 «Sicuro». */
+export type Confidence = 1 | 2 | 3;
+
+/**
+ * Verdetto del giudice (+ fiducia) → rating (tabella 6.2 del piano). Easy non viene mai dal giudice:
+ * solo una risposta corretta data con «Sicuro». La fiducia non tocca partial e wrong.
+ */
+export function toRating(verdict: Verdict, confidence?: Confidence): Grade {
+  if (verdict === "correct") return confidence === 3 ? Rating.Easy : Rating.Good;
+  return verdict === "partial" ? Rating.Hard : Rating.Again;
 }
 
 export const isGrade = (r: unknown): r is Grade => r === 1 || r === 2 || r === 3 || r === 4;

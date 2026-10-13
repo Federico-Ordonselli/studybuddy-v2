@@ -1,8 +1,15 @@
 import { LibraryError } from './errors';
 import type { QuizQuestion } from './tutor/quiz';
+import type { Confidence } from './tutor/scheduler';
 export function positiveId(value: unknown, name: string, required = false): number | undefined {
   if (value === undefined && !required) return undefined;
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) throw new LibraryError(`${name}: serve un intero positivo`);
+  return value;
+}
+/** Fiducia prima della risposta (Fase 6): 1 Non sicuro · 2 Abbastanza · 3 Sicuro. */
+export function confidence(value: unknown, required = false): Confidence | undefined {
+  if (value === undefined && !required) return undefined;
+  if (value !== 1 && value !== 2 && value !== 3) throw new LibraryError('confidence: serve 1 (Non sicuro), 2 (Abbastanza) o 3 (Sicuro)');
   return value;
 }
 export function text(value: unknown, name: string, max = 10000): string {
