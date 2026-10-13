@@ -10,7 +10,7 @@ import { checkCard, CLOZE_BLANK, isDuplicateQuestion, type CardIssue } from "./c
  */
 
 /** Versione del prompt: finisce nei risultati di `npm run eval -- cards`. */
-export const PROMPT_VERSION = "cards-v1";
+export const PROMPT_VERSION = "cards-v3";
 
 export interface CardChunk {
   chunkId: number;
@@ -55,20 +55,23 @@ const SCHEMA = {
 } as const;
 
 const SYSTEM = [
-  "Crei flashcard per il ripasso a intervalli, basate ESCLUSIVAMENTE sui passaggi forniti.",
+  "Crei flashcard per il ripasso a intervalli, basate ESCLUSIVAMENTE sui passaggi forniti. Chi ripassa vuole imparare la materia.",
   "Procedi in due passi:",
-  "1. facts: i fatti singoli utili da ricordare, una frase ciascuno. Concetti, definizioni, meccanismi, differenze, sintassi. Ignora la logistica del corso (moduli, lezioni, progetti, iscrizioni, obiettivi didattici).",
-  "2. cards: una carta per fatto, con `fact` = indice (da 0) del fatto in facts.",
+  "1. facts: i fatti singoli della materia utili da ricordare, una frase ciascuno: concetti, definizioni, meccanismi, differenze, sintassi, comportamenti di uno strumento.",
+  "   NON sono fatti della materia, quindi ignorali: la logistica del corso (moduli, lezioni, certificati, progetti, obiettivi didattici), statistiche e sondaggi citati per motivare, frasi promozionali (una tecnologia «veloce», «potente», «emergente», «che ridefinisce…»), le storie e i personaggi degli esempi (cosa fa Sarah o un team immaginario), i passi di una dimostrazione («apro il file», «salvo»).",
+  "   Le introduzioni e i riepiloghi di un corso di solito annunciano argomenti senza spiegarli: da lì crea carte solo per i fatti spiegati davvero, spesso nessuno.",
+  "   Riporta il fatto con le sue condizioni e eccezioni, senza generalizzare oltre ciò che dice il passaggio. Se un passaggio non contiene fatti della materia, non crearne.",
+  "2. cards: una carta per fatto, con `fact` = indice (da 0) del fatto in facts. Meglio poche carte buone che il numero massimo.",
   "Regole delle carte:",
   "- Una carta = un fatto. Una lista di N elementi diventa N carte, oppure nessuna: mai «elenca» o «quali sono i…».",
-  "- Una sola domanda per carta. Risposta di una frase, o un termine, o un frammento di codice.",
+  "- Una sola domanda per carta. Risposta precisa: una frase, un termine o un frammento di codice, mai vaga («quasi tutto», «vari modi»).",
+  "- La domanda nomina sempre il suo soggetto (lo strumento, il linguaggio, la proprietà, il metodo): chi ripassa non vede i passaggi e non sa di quale video si parla. Niente «secondo il testo», «nel passaggio», «i seguenti».",
   "- Mescola definizioni («cos'è…») e meccanismi («perché…», «cosa succede se…»): i secondi allenano la comprensione.",
   "- Niente domande sì/no o vero/falso: si indovinano.",
   `- type "cloze": question = la frase del fatto con UNA parola chiave sostituita da ${CLOZE_BLANK}, answer = la parola tolta. Solo se la parola tolta non si deduce dal resto della frase; altrimenti type "qa".`,
-  "- La domanda si capisce da sola: chi ripassa non vede i passaggi, quindi niente «secondo il testo», «nel passaggio», «i seguenti».",
   "- La risposta non deve comparire nella domanda.",
   "- source = il numero [n] del passaggio da cui viene il fatto.",
-  "Lingua: quella dei passaggi.",
+  "Lingua: scrivi fatti e carte in un italiano corretto e naturale; nomi di strumenti, proprietà, metodi e codice restano in originale. Un termine tecnico o si traduce tutto o resta tutto in originale («test di integrazione» o «integration testing», mai metà e metà).",
 ].join("\n");
 
 /** Passaggi numerati [n]; le trascrizioni ripulite dal parlato (solo per generare, l'indice resta com'è). */
