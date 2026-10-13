@@ -59,6 +59,11 @@ npm run eval -- cards-review <file>       # conta le carte tenute nella revision
 
 Metriche: quota di carte che passano `checkCard` (obiettivo ≥ 85%), problemi per tipo, passaggi senza carte.
 Ogni run scrive anche `results/<data>-cards-<versione>-review.jsonl`: 20 carte valide distribuite sul set con `"keep": null`;
-metti `true` (da tenere senza modifiche) o `false` e lancia `cards-review` (obiettivo ≥ 17/20).
+metti `true` (da tenere senza modifiche) o `false` (con una `note`) e lancia `cards-review` (obiettivo ≥ 17/20).
+
+Criterio della revisione: si tiene così com'è una carta **corretta rispetto al passaggio** (verificata sul testo),
+che **si capisce senza aver visto il video** (nomina lo strumento, il linguaggio, la proprietà), che riguarda
+**la materia** e non il corso (niente logistica, statistiche motivazionali, slogan, storie d'esempio),
+con una risposta precisa e un italiano corretto, e che **non serve riscrivere**.
 
 Da aggiungere con le fasi successive: `tutor.jsonl` (Fase 4), `maps.jsonl` (Fase 5).
