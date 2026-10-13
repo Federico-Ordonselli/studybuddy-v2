@@ -1,7 +1,6 @@
 import { sqlite } from "@/lib/db";
 import { listAreas } from "@/lib/areas";
 import { countInbox } from "@/lib/notes";
-import { resolveScope } from "@/lib/rag/store";
 
 /** Dati della home («Oggi») e della shell (sidebar, quick capture). Solo letture. */
 const nowSec = () => Math.floor(Date.now() / 1000);
@@ -47,14 +46,14 @@ export const CALIBRATION_MIN_SURE = 20;
  * con il voto corretto (l'originale ha `overridden = 1`). Senza `domainId` tutti i corsi; un macro include i figli.
  */
 export function calibration(domainId?: number, days = 30): Calibration {
-  const scope = resolveScope(domainId);
-  const where = scope ? `AND c.domain_id IN (${scope.map(() => "?").join(",")})` : "";
+  // stesso scope di `resolveScope` (dominio + figli), senza importare il layer RAG nel layout
+  const where = domainId ? "AND (c.domain_id = ? OR c.domain_id IN (SELECT id FROM domains WHERE parent_id = ?))" : "";
   const rows = sqlite.prepare(
     `SELECT l.confidence AS confidence, count(*) AS total, sum(l.rating >= 3) AS correct
      FROM review_logs l JOIN cards c ON c.id = l.card_id
      WHERE l.overridden = 0 AND l.confidence IS NOT NULL AND l.reviewed_at >= ? ${where}
      GROUP BY l.confidence`
-  ).all(nowSec() - days * 86400, ...(scope ?? [])) as { confidence: number; total: number; correct: number }[];
+  ).all(nowSec() - days * 86400, ...(domainId ? [domainId, domainId] : [])) as { confidence: number; total: number; correct: number }[];
   const levels = ([1, 2, 3] as const).map((confidence) => {
     const r = rows.find((x) => x.confidence === confidence);
     const total = r?.total ?? 0, correct = r?.correct ?? 0;
