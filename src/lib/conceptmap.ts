@@ -52,6 +52,19 @@ const SCHEMA = {
   required: ["center", "concepts", "relations"],
 } as const;
 
+/** Modalità «costruisci tu» (Fase 5): stesso schema più la domanda focale, chiesta per ultima (dopo i concetti). */
+const BUILD_SCHEMA = {
+  ...SCHEMA,
+  properties: { ...SCHEMA.properties, focus_question: { type: "string" } },
+  required: [...SCHEMA.required, "focus_question"],
+} as const;
+
+const BUILD_NOTE =
+  " `focus_question`: una domanda, per chi studia, a cui questa mappa risponde (es. \"Come decide React quando " +
+  "ridisegnare un componente?\"); una sola frase, nella lingua del materiale.";
+
+export interface BuildResult extends Proposal { focusQuestion?: string }
+
 const FIELDS =
   "Per ogni concetto: `title` breve (2-5 parole), `definition` in una frase, `explanation` di 2-4 frasi " +
   "che spieghi il concetto come farebbe un buon tutor, `examples` concreti dal materiale (anche codice o formule, se ci sono), " +
@@ -78,18 +91,18 @@ async function diverseSearch(query: string, k: number, domainId: number, perDoc 
  * il livello (l'argomento della mappa, o la bolla in cui si entra): gli archi
  * centro→concetto vengono dal campo `verb` di ciascun concetto.
  */
-async function propose(system: string, user: string, found: Retrieved[], centerTitle?: string, centerName?: string): Promise<Proposal> {
+async function propose(system: string, user: string, found: Retrieved[], centerTitle?: string, centerName?: string, build = false): Promise<BuildResult> {
   // Tetto per passaggio: alcuni chunk HTML sono enormi (fino a ~270k caratteri) e
   // sforerebbero num_ctx, che Ollama tronca in silenzio lasciando il JSON a metà.
   const ctx = found.map((c, i) => `[${i + 1}] ${c.content.slice(0, PASSAGE_CHARS)}`).join("\n\n");
   type Raw = ProposedConcept & { sources?: number[] };
-  let parsed: { center?: Raw; concepts?: Raw[]; relations?: Proposal["relations"] } | undefined;
+  let parsed: { center?: Raw; concepts?: Raw[]; relations?: Proposal["relations"]; focus_question?: string } | undefined;
   // Un retry: con spiegazioni ed esempi di codice l'output può finire troncato a metà JSON.
   for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
     const raw = await generate("summarize", {
-      system,
+      system: build ? system + BUILD_NOTE : system,
       json: true,
-      schema: SCHEMA as unknown as Record<string, unknown>,
+      schema: (build ? BUILD_SCHEMA : SCHEMA) as unknown as Record<string, unknown>,
       temperature: 0.3,
       maxTokens: 6000,
       messages: [{ role: "user", content: `${user}\n\nMateriale:\n${ctx}` }],
@@ -116,7 +129,10 @@ async function propose(system: string, user: string, found: Retrieved[], centerT
     const verb = c.verb?.trim() ?? "";
     relations.push({ from: center, to: c.title, label: verb && verb.length <= 40 && !/[/:]/.test(verb) ? verb : "include" });
   }
-  return { concepts, relations };
+  const focusQuestion = build
+    ? (parsed.focus_question?.trim() || `Come si collegano fra loro i concetti di «${centerName ?? centerTitle ?? center ?? ""}»?`)
+    : undefined;
+  return focusQuestion === undefined ? { concepts, relations } : { concepts, relations, focusQuestion };
 }
 
 function sourceRef(c: Retrieved, cite: Citation): SourceRef {
@@ -134,10 +150,10 @@ function sourceRef(c: Retrieved, cite: Citation): SourceRef {
   return ref;
 }
 
-const provenance = () => ({ origin: "llm", model: models.summarize.model, createdAt: new Date().toISOString() });
+export const provenance = () => ({ origin: "llm", model: models.summarize.model, createdAt: new Date().toISOString() });
 
-/** Mappa nuova su un argomento: il primo concetto è il centro, poi 6-10 concetti chiave. */
-export async function generateMap(domainId: number, topic: string, sourceChunks?: Retrieved[]): Promise<MapDocument> {
+/** Proposta per una mappa nuova su un argomento: il primo concetto è il centro, poi 6-10 concetti chiave. */
+export async function proposeMap(domainId: number, topic: string, sourceChunks?: Retrieved[], opts: { build?: boolean } = {}): Promise<BuildResult> {
   const found = sourceChunks ?? await diverseSearch(topic, 14, domainId);
   if (!found.length) throw new Error("nessun materiale trovato per questo argomento");
   const proposal = await propose(
@@ -148,9 +164,16 @@ export async function generateMap(domainId: number, topic: string, sourceChunks?
     `Argomento: ${topic}`,
     found,
     undefined,
-    topic
+    topic,
+    opts.build
   );
   if (!proposal.concepts.length) throw new Error("il modello non ha estratto concetti");
+  return proposal;
+}
+
+/** Mappa nuova su un argomento (modalità normale). */
+export async function generateMap(domainId: number, topic: string, sourceChunks?: Retrieved[]): Promise<MapDocument> {
+  const proposal = await proposeMap(domainId, topic, sourceChunks);
   return mapFromProposal(topic, proposal, { provenance: provenance() }) as MapDocument;
 }
 
@@ -165,10 +188,11 @@ export async function expandConcept(
   concept: { title: string; definition?: string },
   path: string[],
   existing: string[],
-  present: string[] = []
-): Promise<Proposal> {
+  present: string[] = [],
+  opts: { build?: boolean; sourceChunks?: Retrieved[] } = {}
+): Promise<BuildResult> {
   const query = [concept.title, concept.definition].filter(Boolean).join(" — ");
-  const found = await diverseSearch(query, 12, domainId);
+  const found = opts.sourceChunks ?? await diverseSearch(query, 12, domainId);
   if (!found.length) throw new Error("nessun materiale trovato su questo concetto");
   const known = existing.filter((t) => t !== concept.title).slice(0, 150);
   return propose(
@@ -182,7 +206,9 @@ export async function expandConcept(
       (known.length ? `\nConcetti già nella mappa: ${known.join("; ")}` : "") +
       (present.length ? `\nGià in questo livello (proponi aspetti DIVERSI da questi): ${present.join("; ")}` : ""),
     found,
-    concept.title
+    concept.title,
+    undefined,
+    opts.build
   );
 }
 
