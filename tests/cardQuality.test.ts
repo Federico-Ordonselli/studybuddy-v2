@@ -44,6 +44,7 @@ test("domande sì/no o vero/falso", () => {
   assert.ok(codes("Il metodo map modifica l'array originale?", "No, non lo cambia.").includes("yesno"));
   assert.ok(codes("Il metodo map modifica l'array originale?", "Crea sempre un array nuovo").includes("yesno"));
   assert.ok(codes("Spiega il ruolo di map", "Yes, it maps").includes("yesno"));
+  assert.deepEqual(codes("Il valore ____ della proprietà white-space impedisce al testo di andare a capo.", "no-wrap"), []);
   for (const q of ["Qual è il comportamento di filter?", "In che modo reduce usa l'accumulatore?", "A cosa serve useEffect?", "Quanti argomenti riceve la callback di map?", "Which hook manages state?", "Dove viene dichiarata una variabile di blocco?"]) {
     assert.ok(!codes(q, "Una risposta").includes("yesno"), q);
   }
@@ -58,6 +59,16 @@ test("risposta già contenuta nella domanda", () => {
 test("riferimenti al contesto che lo studente non vede", () => {
   assert.ok(codes("Secondo il testo, cosa fa useEffect?", "Esegue effetti collaterali").includes("context"));
   assert.ok(codes("In the passage, what is hoisting?", "Moving declarations to the top").includes("context"));
+  assert.ok(codes("Cosa dice il testo?", "x").includes("context"));
+  // «il testo del post», «il passaggio da C++ a Java»: parole normali, non rimandi
+  assert.deepEqual(codes("Dove viene inserito il testo del post del blog?", "In un paragrafo sotto il titolo."), []);
+  assert.deepEqual(codes("Quale compito della Generative AI facilita il passaggio da un linguaggio come C++ a Java?", "La migrazione del codice."), []);
+  assert.deepEqual(codes("How do you change the text of a button?", "Set its textContent."), []);
+  assert.deepEqual(codes("Il valore ____ della proprietà text-overflow aggiunge tre punti per rappresentare il testo tagliato.", "ellipsis"), []);
+  assert.deepEqual(codes("Which siblings does the general sibling selector target among the following elements of h1?", "Subsequent ones"), []);
+  for (const q of ["Quale dei seguenti è un tipo primitivo?", "Which of the following is a primitive?", "Nel passaggio, cosa fa map?", "According to the text, what does map do?", "Considera i seguenti: quale è immutabile?"]) {
+    assert.ok(codes(q, "x").includes("context"), q);
+  }
 });
 
 test("cloze: un solo spazio vuoto", () => {

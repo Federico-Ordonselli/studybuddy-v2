@@ -17,10 +17,19 @@ export interface CardIssue {
 export const MAX_ANSWER_WORDS = 25;
 
 /**
- * Domande che rimandano a qualcosa che lo studente non vede («secondo il testo», «i seguenti»).
- * Condivisa con il quiz, che le scarta.
+ * Domande che rimandano a qualcosa che lo studente non vede («secondo il testo», «quale dei seguenti»).
+ * Condivisa con il quiz, che le scarta. Solo le forme che rimandano davvero: «il testo del post»,
+ * «il testo tagliato», «the following siblings» o «il passaggio da C++ a Java» sono parole normali.
  */
-export const REFERS_TO_HIDDEN = /\b(seguent[ie]|following|(nel|il|del|secondo il) (testo|contesto|passaggio)|(in|the) (text|context|passage))\b/i;
+export const REFERS_TO_HIDDEN = new RegExp([
+  "\\b(?:secondo|in base a|come (?:indicato|descritto) nel|nel|dal) (?:il |al )?(?:testo|contesto|passaggio|brano)(?!\\s+(?:d[aei]|dal|dall[aoe']?|del|dell[aoe']?|degli|dei)\\b)",
+  "\\bil (?:testo|contesto|passaggio|brano)\\s*(?:[?.,:;]|$)",
+  "\\b(?:dei|delle|tra i|tra le|i|le) seguenti\\b",
+  "\\bseguent[ie]\\s*[:?]",
+  "(?:of|from) the following\\b",
+  "\\bthe following\\s*[:?]",
+  "\\b(?:in|from|according to) the (?:text|context|passage)\\b(?!\\s+(?:of|from)\\b)",
+].join("|"), "i");
 
 export const CLOZE_BLANK = "____";
 
@@ -28,7 +37,7 @@ const ENUM_QUESTION = /\b(elenca|elencare|enumera|quali sono (?:i|gli|le)|list|n
 const YES_NO = /^(?:è vero che|è possibile|si può|is it|is there|are there|is|are|does|do|did|can|could|will|would|should|has|have|was|were)\s/i;
 const TRUE_FALSE = /\b(vero o falso|true or false)\b/i;
 /** Risposta che comincia con sì/no: la domanda era chiusa. */
-const YES_NO_ANSWER = /^(?:sì|si|no|yes)(?![\p{L}\p{N}])/iu;
+const YES_NO_ANSWER = /^(?:sì|si|no|yes)(?![\p{L}\p{N}-])/iu; // «no-wrap» non è un «no»
 /** Interrogativi IT/EN: una domanda con «?» che non ne contiene nessuno è chiusa (in italiano il sì/no non inverte l'ausiliare). */
 const WH_WORD = /(?<![\p{L}\p{N}])(?:cosa|cos|che|come|perch[eé]|qual[ei]?|quant[oaie]|quando|dove|chi|what|why|how|which|when|where|who|whom|whose)(?![\p{L}\p{N}])/iu;
 const SECOND_QUESTION = /\b(?:and|e|ed)\s+(?:how|why|what|when|where|which|who|come|perch[eé]|cosa|quando|dove|quale|quali|chi)(?![\p{L}\p{N}])/iu; // \b non vede la «é» di «perché»
