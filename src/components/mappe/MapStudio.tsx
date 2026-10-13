@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { mount, type MapDoc, type MapEditor, type SourceRef } from "./editor.js";
 import { download } from "./dom.js";
 
-interface MapSummary { id: string; title: string; revision: number; updatedAt: number }
+interface MapSummary { id: string; title: string; revision: number; updatedAt: number; exercise?: boolean }
 interface SourceView {
   label: string; snippet: string; kind: string;
   video?: { path: string; startSec: number };
