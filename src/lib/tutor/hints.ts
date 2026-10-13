@@ -31,6 +31,7 @@ const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
 /** Tentativo: codice, oppure una proposta di almeno 8 parole che non è una domanda né una richiesta di soluzione. */
 export function isAttempt(message: string): boolean {
+  if (message.trim().endsWith("?") && !message.includes("`")) return false;
   if (isSolutionRequest(message)) return hasCode(message);
   if (hasCode(message)) return true;
   return words(message) >= 8 && !message.trim().endsWith("?");

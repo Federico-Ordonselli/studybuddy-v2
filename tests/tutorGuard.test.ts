@@ -99,3 +99,16 @@ test("checkLeak: schema e temperature 0; JSON non valido due volte → nessun bl
     assert.equal(bodies[0].options.temperature, 0);
   } finally { globalThis.fetch = original; console.warn = warn; }
 });
+
+test("hasCode: la prosa con parole come function/let/return non è codice", () => {
+  for (const m of ["I think the function should return the array", "let me try again", "che differenza c'è tra let e const?", "Ho provato prima A;"])
+    assert.equal(hasCode(m), false, m);
+  for (const m of ["const x = 1", "function foo(a) {", "if (x) {", "return a + b;", "def f(x):"]) assert.equal(hasCode(m), true, m);
+});
+
+test("isSolutionRequest: verbo + oggetto vicini; più formule, meno falsi positivi", () => {
+  for (const m of ["Dimmi se la mia risposta è corretta", "dimmi cosa fa il codice", "just tell me what flexbox does"])
+    assert.equal(isSolutionRequest(m), false, m);
+  for (const m of ["puoi darmi la soluzione?", "mi dai la soluzione", "fammi vedere la soluzione", "mi scrivi il codice?", "just tell me the answer", "dimmi direttamente la risposta"])
+    assert.equal(isSolutionRequest(m), true, m);
+});

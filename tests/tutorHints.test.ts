@@ -33,3 +33,8 @@ test("canReveal dopo 2 tentativi; afterSolution e resetProblem tornano al livell
   assert.deepEqual(shown, { level: 1, attempts: 0, turns: 0, leaksBlocked: 2, solutionsShown: 1 });
   assert.deepEqual(resetProblem(h), { ...h, level: 1, attempts: 0, turns: 0 });
 });
+
+test("isAttempt: una domanda senza codice non è mai un tentativo", () => {
+  assert.equal(isAttempt("che differenza c'è tra let e const?"), false);
+  assert.equal(isAttempt("I think the function should return the array?"), false);
+});

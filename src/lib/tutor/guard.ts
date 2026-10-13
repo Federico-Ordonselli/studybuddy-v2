@@ -7,7 +7,7 @@ import { generate } from "@/lib/providers";
 
 /** Richieste esplicite della soluzione. Verbo + oggetto, non la parola da sola: «la mia soluzione è…» è un tentativo. */
 const SOLUTION_REQUEST = [
-  /\b(dammi|dimmi|mostrami|scrivimi|passami)\b[^.?!]{0,20}\b(soluzion[ei]|rispost[ae]|codice)\b/i,
+  /\b(dammi|darmi|dimmi|dirmi|mostrami|mostrarmi|scrivimi|scrivermi|passami|mi\s+dai|mi\s+dici|mi\s+scrivi|fammi\s+vedere)\s+(pure\s+|subito\s+|direttamente\s+)?(la\s+|il\s+|lo\s+)?(soluzion[ei]|rispost[ae]|codice)\b/i,
   /\bqual\s*(è|e'|e)\s+la\s+(soluzione|risposta)\b/i,
   /\bscrivi(mi)?\s+(tu\s+)?il\s+codice\b/i,
   /\b(fammelo|risolvilo|fallo)\s+tu\b/i,
@@ -16,7 +16,7 @@ const SOLUTION_REQUEST = [
   /\b(give|tell|show|send)\s+me\s+(the\s+)?(answer|solution|code)\b/i,
   /\bwhat('s|\s+is)\s+the\s+(answer|solution)\b/i,
   /\bwrite\s+(me\s+)?the\s+code\b|\bwrite\s+the\s+code\s+for\s+me\b/i,
-  /\bjust\s+tell\s+me\b/i,
+  /\bjust\s+tell\s+me\s+(the\s+)?(answer|solution|it)\b/i,
   /\bsolve\s+it\s+for\s+me\b/i,
 ];
 
@@ -27,7 +27,7 @@ export function isSolutionRequest(message: string): boolean {
 /** Codice nel messaggio: blocco recintato, codice inline o una riga con la forma tipica del codice. */
 export function hasCode(text: string): boolean {
   if (/```|`[^`\n]+`/.test(text)) return true;
-  return /=>|[;{}]\s*$|\b(const|let|var|function|def|return)\s+\w|\w+\.\w+\([^)]*\)/m.test(text);
+  return /=>|[{}]\s*$|[)\]]\s*;\s*$|\b(const|let|var)\s+[\w$]+\s*=|\bfunction\s*[\w$]*\s*\(|\bdef\s+\w+\s*\(|\breturn\s+\S.*;\s*$|\w+\.\w+\([^)]*\)/m.test(text);
 }
 
 /** Perdita certa senza LLM: un blocco di codice recintato con più di `maxLines` righe non vuote. */
