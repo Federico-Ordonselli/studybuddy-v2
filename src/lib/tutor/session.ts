@@ -103,10 +103,10 @@ export function solutionOptions(history: ChatMessage[], userMessage: string, con
 }
 
 /** Turno a rischio: genera senza streaming e controlla la risposta (vedi `guard.ts`). */
-export function guardedSocratic(history: ChatMessage[], message: string, context: string, level: number, signal?: AbortSignal): Promise<GuardResult> {
+export function guardedSocratic(history: ChatMessage[], message: string, context: string, level: number, signal?: AbortSignal, problem?: string): Promise<GuardResult> {
   return guardedReply({
     generate: (note) => generate("chat", socraticOptions(history, message, context, level, signal, note)),
-    judge: (reply) => checkLeak(buildRetrievalQuery(history, message), context, reply, signal),
+    judge: (reply) => checkLeak(problem ? `${problem}\n${buildRetrievalQuery(history, message)}` : buildRetrievalQuery(history, message), context, reply, signal),
   });
 }
 
@@ -115,7 +115,7 @@ export type Prepared =
   | { citations: Citation[]; guarded: true; reply: () => Promise<GuardResult> };
 
 /** Retrieval e scelta del percorso: soluzione in streaming, turno a rischio controllato, altrimenti streaming. */
-export async function prepareSocratic(history: ChatMessage[], message: string, domainId: number | undefined, hint: HintState, action: "reply" | "solution", signal?: AbortSignal, stream = true): Promise<Prepared> {
+export async function prepareSocratic(history: ChatMessage[], message: string, domainId: number | undefined, hint: HintState, action: "reply" | "solution", signal?: AbortSignal, stream = true, problem?: string): Promise<Prepared> {
   signal?.throwIfAborted();
   const chunks = await retrieve(buildRetrievalQuery(history, message), domainId);
   signal?.throwIfAborted();
@@ -125,13 +125,13 @@ export async function prepareSocratic(history: ChatMessage[], message: string, d
   const tokens = (o: GenerateOptions): AsyncIterable<string> =>
     stream ? generateStream("chat", o) : (async function* () { yield await generate("chat", o); })();
   if (action === "solution") return { citations, guarded: false, tokens: tokens(solutionOptions(history, message, context, signal)) };
-  if (isSolutionRequest(message)) return { citations, guarded: true, reply: () => guardedSocratic(history, message, context, hint.level, signal) };
+  if (isSolutionRequest(message)) return { citations, guarded: true, reply: () => guardedSocratic(history, message, context, hint.level, signal, problem) };
   return { citations, guarded: false, tokens: tokens(socraticOptions(history, message, context, hint.level, signal)) };
 }
 
 /** Turno socratico senza SSE (route JSON). */
-export async function socraticTurn(history: ChatMessage[], message: string, hint: HintState, domainId?: number, action: "reply" | "solution" = "reply") {
-  const p = await prepareSocratic(history, message, domainId, hint, action, undefined, false);
+export async function socraticTurn(history: ChatMessage[], message: string, hint: HintState, domainId?: number, action: "reply" | "solution" = "reply", problem?: string) {
+  const p = await prepareSocratic(history, message, domainId, hint, action, undefined, false, problem);
   if (p.guarded) {
     const r = await p.reply();
     return { reply: r.reply, citations: p.citations, guarded: true, blocked: r.blocked };

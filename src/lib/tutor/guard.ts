@@ -10,7 +10,7 @@ const SOLUTION_REQUEST = [
   /\b(dammi|darmi|dimmi|dirmi|mostrami|mostrarmi|scrivimi|scrivermi|passami|mi\s+dai|mi\s+dici|mi\s+scrivi|fammi\s+vedere)\s+(pure\s+|subito\s+|direttamente\s+)?(la\s+|il\s+|lo\s+)?(soluzion[ei]|rispost[ae]|codice)\b/i,
   /\bqual\s*(è|e'|e)\s+la\s+(soluzione|risposta)\b/i,
   /\bscrivi(mi)?\s+(tu\s+)?il\s+codice\b/i,
-  /\b(fammelo|risolvilo|fallo)\s+tu\b/i,
+  /\b(fammelo|risolvilo|fallo|correggilo|correggimelo|correggi)\s+tu\b/i,
   /\bdimmelo\s+e\s+basta\b/i,
   /^\s*(la\s+)?soluzione\s*\??\s*$/i,
   /\b(give|tell|show|send)\s+me\s+(the\s+)?(answer|solution|code)\b/i,

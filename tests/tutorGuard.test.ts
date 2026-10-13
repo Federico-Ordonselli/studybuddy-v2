@@ -112,3 +112,8 @@ test("isSolutionRequest: verbo + oggetto vicini; più formule, meno falsi positi
   for (const m of ["puoi darmi la soluzione?", "mi dai la soluzione", "fammi vedere la soluzione", "mi scrivi il codice?", "just tell me the answer", "dimmi direttamente la risposta"])
     assert.equal(isSolutionRequest(m), true, m);
 });
+
+test("isSolutionRequest: «correggilo tu» è una richiesta, «correggi il mio codice: …?» no", () => {
+  for (const m of ["correggilo tu", "correggimelo tu per favore", "correggi tu"]) assert.equal(isSolutionRequest(m), true, m);
+  assert.equal(isSolutionRequest("correggi il mio codice: ho dimenticato un punto e virgola?"), false);
+});

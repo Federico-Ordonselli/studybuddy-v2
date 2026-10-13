@@ -19,11 +19,11 @@ const state = (id: number) => JSON.parse((sqlite.prepare("SELECT state FROM sess
 
 /** Ollama finto: embed a zero, chat dalla coda `replies` (non in streaming), giudice da `leaks`. */
 function fakeOllama(replies: string[], leaks: boolean[] = []) {
-  const calls = { chat: 0, judge: 0, stream: 0 };
+  const calls = { chat: 0, judge: 0, stream: 0, judgeBodies: [] as string[] };
   globalThis.fetch = (async (url: unknown, opts: RequestInit) => {
     if (String(url).endsWith("/api/embed")) return Response.json({ embeddings: [Array(EMBED_DIM).fill(0)] });
     const b = JSON.parse(opts.body as string);
-    if (b.format) { calls.judge++; return Response.json({ message: { content: JSON.stringify({ reason: "x", gives_solution: leaks.shift() ?? false }) } }); }
+    if (b.format) { calls.judge++; calls.judgeBodies.push(opts.body as string); return Response.json({ message: { content: JSON.stringify({ reason: "x", gives_solution: leaks.shift() ?? false }) } }); }
     if (b.stream) { calls.stream++; return new Response('{"message":{"content":"Indizio"},"done":true}\n'); }
     calls.chat++; return Response.json({ message: { content: replies.shift() ?? "?" } });
   }) as typeof fetch;
@@ -112,5 +112,20 @@ test("abort durante un turno a rischio: fetch abortita, nessun turno salvato", a
     await reader.cancel();
     assert.ok(signal?.aborted);
     assert.deepEqual(state(sessionId).history, []);
+  } finally { globalThis.fetch = original; }
+});
+
+test("il giudice vede l'enunciato del problema anche dopo più scambi", async () => {
+  const original = globalThis.fetch;
+  const calls = fakeOllama([]);
+  const statement = "Esercizio: scrivi una funzione che inverte una stringa senza usare reverse";
+  const attempt = "secondo me bisogna salvare lo stato prima del render e poi aggiornarlo";
+  try {
+    let ev = await events(await POST(req({ message: statement })));
+    const sessionId = ev[0].data.sessionId;
+    await events(await POST(req({ message: attempt, sessionId })));
+    await events(await POST(req({ message: "dammi la soluzione", sessionId })));
+    assert.equal(calls.judge, 1);
+    assert.ok(calls.judgeBodies[0].includes("senza usare reverse"), "l'enunciato è nella richiesta al giudice");
   } finally { globalThis.fetch = original; }
 });

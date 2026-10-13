@@ -38,3 +38,8 @@ test("isAttempt: una domanda senza codice non è mai un tentativo", () => {
   assert.equal(isAttempt("che differenza c'è tra let e const?"), false);
   assert.equal(isAttempt("I think the function should return the array?"), false);
 });
+
+test("isAttempt: codice incollato con una domanda finale è un tentativo", () => {
+  assert.equal(isAttempt("ho scritto const x = arr.map(f); va bene?"), true);
+  assert.equal(isAttempt("function inverti(s) { return s; } è giusto?"), true);
+});

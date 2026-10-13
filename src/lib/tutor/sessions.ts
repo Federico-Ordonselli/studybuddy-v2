@@ -49,6 +49,13 @@ export function endTurn(state: SocraticState | null, hint: HintState, action: So
   };
 }
 
+/** Enunciato del problema corrente: `turns` conta i messaggi dello studente sul problema, compreso quello in arrivo (non ancora in `history`). */
+export function problemStatement(history: TutorMessage[], turns: number): string | undefined {
+  if (turns <= 1) return undefined;
+  const users = history.filter((m) => m.role === "user");
+  return users[users.length - (turns - 1)]?.content;
+}
+
 /** Al modello vanno solo i turni: le citazioni sono per la UI. */
 export function forModel(history: TutorMessage[], turns = rag.historyTurns, budget = rag.historyChars): ChatMessage[] {
   const selected: ChatMessage[] = [];

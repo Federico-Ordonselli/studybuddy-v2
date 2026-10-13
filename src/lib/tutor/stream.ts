@@ -1,7 +1,7 @@
 import { OllamaUnavailableError } from '@/lib/errors';
 import { publicHint } from './hints';
 import { prepareSocratic } from './session';
-import { beginTurn, endTurn, forModel, saveState, type SessionRow, type SocraticAction } from './sessions';
+import { beginTurn, endTurn, forModel, problemStatement, saveState, type SessionRow, type SocraticAction } from './sessions';
 
 /** La cronologia viene salvata solo quando il provider ha terminato con successo. I turni a rischio arrivano come un solo token, già controllati. */
 export async function socraticResponse(session: SessionRow, message: string, domainId: number | undefined, requestSignal: AbortSignal, action: SocraticAction = 'reply'): Promise<Response> {
@@ -12,7 +12,7 @@ export async function socraticResponse(session: SessionRow, message: string, dom
   if (requestSignal.aborted) onAbort();
   const history = session.state?.history ?? [];
   let prepared;
-  try { prepared = await prepareSocratic(forModel(history), message, domainId, hint, action, abort.signal); }
+  try { prepared = await prepareSocratic(forModel(history), message, domainId, hint, action, abort.signal, true, problemStatement(history, hint.turns)); }
   catch (e) { requestSignal.removeEventListener('abort', onAbort); throw e; }
   const {citations} = prepared;
   const encoder = new TextEncoder();

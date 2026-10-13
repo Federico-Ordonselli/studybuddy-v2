@@ -153,7 +153,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
             {msgs.length === 0 && (
               <div style={S.empty}>
                 {mode === "socratic"
-                  ? "Modalità socratica: alle domande di spiegazione il tutor risponde citando il materiale; sugli esercizi ti guida un indizio alla volta. Dopo 2 tentativi puoi chiedere la soluzione."
+                  ? "Modalità socratica: alle domande di spiegazione il tutor risponde citando il materiale; sugli esercizi ti guida un indizio alla volta. Dopo 2 tentativi puoi chiedere la soluzione. Prima di un esercizio diverso premi «Nuovo problema»."
                   : "Modalità quiz: dai un argomento, rispondi alla domanda, ricevi una valutazione."}
               </div>
             )}

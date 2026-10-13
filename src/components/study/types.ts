@@ -40,6 +40,7 @@ export interface Msg {
 }
 
 /** Stato della scala di indizi (Fase 4) come lo manda il server. */
+// Rispecchia PublicHint in src/lib/tutor/hints.ts (duplicato apposta: il codice client non importa moduli server).
 export interface PublicHint { level: number; attempts: number; canReveal: boolean }
 
 export interface ReviewCard { id: number; question: string }
