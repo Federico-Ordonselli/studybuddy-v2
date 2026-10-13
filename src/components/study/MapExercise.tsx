@@ -14,6 +14,10 @@ import CardPreview from "./CardPreview";
 type ExerciseEditor = MapEditor & { applyCommands(commands: unknown[]): unknown };
 
 const MAX = 15;
+/** Altezza della tela in MapStudio e tetto del pannello: i due restano indipendenti. */
+export const STUDIO_HEIGHT = "min(75vh, 760px)";
+/** Attesa massima di un salvataggio automatico in corso prima di verificare o completare. */
+const SAVE_WAIT_MS = 10_000;
 const TONE: Record<PropositionVerdict["verdict"], { background: string; color: string; label: string }> = {
   valid: { background: "var(--success-soft)", color: "var(--on-success-soft)", label: "✓ Valida" },
   imprecise: { background: "var(--warning-soft)", color: "var(--on-warning-soft)", label: "≈ Imprecisa" },
@@ -23,7 +27,8 @@ const TONE: Record<PropositionVerdict["verdict"], { background: string; color: s
 
 async function call<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const j = await r.json();
+  let j: { error?: string };
+  try { j = await r.json(); } catch { throw new Error(`HTTP ${r.status}`); }
   if (!r.ok || j.error) throw new Error(j.error ?? `HTTP ${r.status}`);
   return j as T;
 }
@@ -52,7 +57,8 @@ export default function MapExercise({ editor, mapId, domainId, levels, onLevelsC
 
   const levelKey = useMemo(() => { try { return levelKeyOf(doc, spaceId); } catch { return null; } }, [doc, spaceId]);
   const level = levels.find((l) => l.levelKey === levelKey) ?? null;
-  const concepts = useMemo(() => levelConcepts(doc, spaceId), [doc, spaceId]);
+  // Ordine alfabetico nei menu: l'ordine del documento potrebbe suggerire quale concetto è l'hub.
+  const concepts = useMemo(() => [...levelConcepts(doc, spaceId)].sort((a, b) => a.title.localeCompare(b.title, "it")), [doc, spaceId]);
   const props = useMemo(() => levelPropositions(doc, spaceId), [doc, spaceId]);
   const title = (id: string) => doc.concepts.find((c) => c.id === id)?.title ?? "?";
   // Cambio livello: chiude soluzione e bozza della carta.
@@ -71,7 +77,18 @@ export default function MapExercise({ editor, mapId, domainId, levels, onLevelsC
     setBusy(label); setError("");
     try { await fn(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(""); }
   }
-  const saveFirst = async () => { if (editor.getStatus().dirty) await editor.save(); };
+  /**
+   * Salva prima di chiamare il server, che legge il documento salvato. L'autosalvataggio di
+   * MapStudio può essere in corso (e `save()` lo rifiuterebbe con save_in_progress): si aspetta.
+   */
+  async function saveFirst() {
+    const until = Date.now() + SAVE_WAIT_MS;
+    while (editor.getStatus().saving) {
+      if (Date.now() > until) throw new Error("Il salvataggio della mappa non finisce: riprova fra poco.");
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (editor.getStatus().dirty) await editor.save();
+  }
 
   function add() {
     if (!from || !to || from === to || !verb.trim()) return;
@@ -94,9 +111,11 @@ export default function MapExercise({ editor, mapId, domainId, levels, onLevelsC
   const complete = () => run("completa", async () => {
     const { solution: full } = await call<{ solution: Solution }>("/api/maps/exercise/complete", { mapId, spaceId });
     onCloseSolution();
-    (editor as ExerciseEditor).applyCommands(completionCommands(doc, spaceId, full));
-    await editor.save();
-    onLevelsChange();
+    // Il livello è già segnato completato sul server: il pannello si riallinea anche se il salvataggio fallisce.
+    try {
+      (editor as ExerciseEditor).applyCommands(completionCommands(editor.getDocument() as unknown as ExerciseDoc, spaceId, full));
+      await saveFirst();
+    } finally { onLevelsChange(); }
   });
   const card = (relationId: string) => run("carta", async () => {
     const { draft: d } = await call<{ draft: CardDraft }>("/api/maps/exercise/card", { mapId, spaceId, relationId });
@@ -114,7 +133,7 @@ export default function MapExercise({ editor, mapId, domainId, levels, onLevelsC
           {solution && <p style={P.dim}>{solution.length} relazioni nella soluzione di questo livello.</p>}
           <div style={P.row}>
             <button style={P.ghost} onClick={onCloseSolution}>Torna alla tua mappa</button>
-            <button style={P.primary} onClick={complete} disabled={!!busy}>{busy === "completa" ? "Completo…" : "Completa la mappa"}</button>
+            <button style={btn(P.primary, !!busy)} onClick={complete} disabled={!!busy}>{busy === "completa" ? "Completo…" : "Completa la mappa"}</button>
           </div>
         </>
       ) : (
@@ -129,7 +148,7 @@ export default function MapExercise({ editor, mapId, domainId, levels, onLevelsC
               <option value="">A…</option>
               {concepts.filter((c) => c.id !== from).map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
             </select>
-            <button type="submit" style={P.primary} disabled={!from || !to || from === to || !verb.trim()}>Aggiungi</button>
+            <button type="submit" style={btn(P.primary, !from || !to || from === to || !verb.trim())} disabled={!from || !to || from === to || !verb.trim()}>Aggiungi</button>
           </form>
 
           <p style={P.label}>Le tue proposizioni · {props.length}/{MAX}</p>
@@ -145,7 +164,7 @@ export default function MapExercise({ editor, mapId, domainId, levels, onLevelsC
                   {v?.fix && <p style={P.small}><em>Correzione:</em> {v.fix}</p>}
                   <div style={P.row}>
                     <button style={P.link} onClick={() => remove(r.id)}>Rimuovi</button>
-                    {v?.verdict === "wrong" && <button style={P.link} onClick={() => card(r.id)} disabled={!!busy}>Crea carta</button>}
+                    {v?.verdict === "wrong" && v.inSolution && <button style={btn(P.link, !!busy)} onClick={() => card(r.id)} disabled={!!busy}>Crea carta</button>}
                   </div>
                 </li>
               );
@@ -153,10 +172,10 @@ export default function MapExercise({ editor, mapId, domainId, levels, onLevelsC
           </ul>
 
           <div style={P.row}>
-            <button style={P.primary} onClick={verify} disabled={!!busy || !props.length || props.length > MAX}>
+            <button style={btn(P.primary, !!busy || !props.length || props.length > MAX)} onClick={verify} disabled={!!busy || !props.length || props.length > MAX}>
               {busy === "verifica" ? "Verifico…" : "Verifica"}
             </button>
-            <button style={P.ghost} onClick={reveal} disabled={!!busy || !check}>Mostra soluzione</button>
+            <button style={btn(P.ghost, !!busy || !check)} onClick={reveal} disabled={!!busy || !check}>Mostra soluzione</button>
           </div>
           {props.length > MAX && <p style={P.error}>Massimo {MAX} proposizioni per verifica: togline qualcuna.</p>}
 
@@ -181,8 +200,15 @@ export default function MapExercise({ editor, mapId, domainId, levels, onLevelsC
   );
 }
 
+/** Stile del bottone, con lo stato disabilitato dai token (mai opacity, CLAUDE.md «Colori»). */
+function btn(style: React.CSSProperties, disabled: boolean): React.CSSProperties {
+  if (!disabled) return style;
+  const filled = style.background !== "transparent";
+  return { ...style, color: "var(--text-subtle)", cursor: "default", ...(filled ? { background: "var(--bg-subtle)" } : {}) };
+}
+
 const P: Record<string, React.CSSProperties> = {
-  panel: { width: 340, maxWidth: "100%", flexShrink: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 12, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 },
+  panel: { width: 340, maxWidth: "100%", maxHeight: STUDIO_HEIGHT, flexShrink: 0, background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 12, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 },
   label: { margin: 0, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--muted)" },
   focus: { margin: 0, fontWeight: 650, lineHeight: 1.4, color: "var(--text)" },
   dim: { margin: 0, color: "var(--muted)", fontSize: 13, lineHeight: 1.5 },

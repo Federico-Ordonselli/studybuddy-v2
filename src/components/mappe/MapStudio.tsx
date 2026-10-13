@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { mount, type MapDoc, type MapEditor, type Proposal, type SourceRef } from "./editor.js";
 import { download } from "./dom.js";
-import MapExercise from "@/components/study/MapExercise";
+import MapExercise, { STUDIO_HEIGHT } from "@/components/study/MapExercise";
 import type { LevelInfo } from "@/lib/mapExercise";
 
 interface MapSummary { id: string; title: string; revision: number; updatedAt: number; exercise?: boolean }
@@ -183,7 +183,7 @@ export default function MapStudio({ domainId, onAskTutor }: { domainId?: number;
         <input value={topic} onChange={(e) => setTopic(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") generate(); }}
           placeholder="Nuova mappa su un argomento…" style={{ ...S.input, flex: 1, minWidth: 200 }} disabled={!domainId || busy} />
         <label style={S.check}><input type="checkbox" checked={buildMode} onChange={(e) => setBuildMode(e.target.checked)} disabled={!domainId || busy} /> Costruisci tu</label>
-        <button onClick={generate} disabled={!domainId || busy || !topic.trim()} style={S.primary}>
+        <button onClick={generate} disabled={!domainId || busy || !topic.trim()} style={!domainId || busy || !topic.trim() ? { ...S.primary, ...S.disabled } : S.primary}>
           {busy ? <><span className="spin" /> genero…</> : buildMode ? "Crea esercizio" : "Genera mappa"}
         </button>
         {current && <>
@@ -234,11 +234,15 @@ const S: Record<string, React.CSSProperties> = {
   input: { background: "var(--panel-2)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 10px" },
   primary: { background: "var(--accent-2)", color: "var(--button-ink)", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 600 },
   ghost: { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 8, padding: "7px 12px" },
+  // Disabilitato: token dedicati, mai opacity (CLAUDE.md, «Colori»).
+  disabled: { background: "var(--bg-subtle)", color: "var(--text-subtle)", cursor: "default" },
   status: { color: "var(--muted)", fontSize: 12, marginLeft: "auto" },
   error: { color: "var(--color-danger)", fontSize: 13 },
-  studio: { flex: 1, minHeight: 0, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "stretch" },
+  // La tela ha un'altezza propria, indipendente dal pannello dell'esercizio: con `stretch` crescerebbe
+  // con il pannello e le bolle finirebbero fuori vista. Sotto i ~880px il pannello va a capo.
+  studio: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" },
   check: { display: "flex", alignItems: "center", gap: 6, color: "var(--muted)", fontSize: 13 },
-  host: { flex: "1 1 520px", minWidth: 0, minHeight: 520 },
+  host: { flex: "1 1 520px", minWidth: 0, height: STUDIO_HEIGHT, minHeight: 520 },
   empty: { color: "var(--muted)", textAlign: "center", margin: "auto", maxWidth: 520, lineHeight: 1.6 },
   source: { background: "var(--panel)", border: "1px solid var(--border)", borderRadius: 12, padding: 10 },
   sourceHead: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 },
