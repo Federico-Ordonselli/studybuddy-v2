@@ -257,3 +257,20 @@ test("judgePropositions: concetti e definizioni nel prompt", async () => {
   }), bodies);
   assert.match(JSON.stringify(bodies[0]), /«State»: Dati locali\./);
 });
+
+test("isGenericVerb: forme generiche IT/EN sì, verbi che dicono il rapporto no", () => {
+  const generic = [
+    "è collegato a", "è collegata con", "sono legati a", "è connesso con", "è associato a", "è relativo a", "è correlato a", "è correlata con",
+    "riguarda", "riguardano", "ha a che fare con", "ha a che vedere con", "si collega a", "si riferisce a", "si lega a", "si connette a",
+    "è in relazione con", "sono in relazione con", "è in rapporto con", "ha un rapporto con", "ha rapporto con", "ha una relazione con",
+    "ha un legame con", "ha un collegamento con", "hanno un legame con", "è legato", "collegato a", "in relazione con",
+    "is related to", "related to", "relates to", "is connected to", "is connected with", "is linked to", "is linked with",
+    "is associated with", "associated with", "has a relationship with", "has a link with", "concerns", "involves",
+  ];
+  const specific = [
+    "produce", "dipende da", "è un tipo di", "è una parte di", "si basa su", "interagisce con", "contrasta con", "usa",
+    "è il risultato di", "trasforma", "is part of", "depends on", "is a type of", "è causato da", "contiene",
+  ];
+  for (const v of generic) assert.equal(ex.isGenericVerb(v), true, v);
+  for (const v of specific) assert.equal(ex.isGenericVerb(v), false, v);
+});

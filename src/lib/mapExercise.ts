@@ -175,7 +175,19 @@ const JUDGE_SYSTEM = [
  * Verbo che non dice quale rapporto c'è («è collegato a», «riguarda»): per definizione la proposizione è
  * `imprecise` se la coppia è legata. Lo decide il codice, non il modello, che su questi verbi oscilla.
  */
-const GENERIC_VERB = /^(?:(?:è|sono)\s+)?(?:(?:collegat|legat|conness|associat|relativ)[oaie]\s+(?:a|con|ad)|riguard(?:a|ano)|(?:ha|hanno) a che fare con|si (?:collega|collegano|riferisce|riferiscono) a|is (?:related|connected|linked) to|relates? to|concerns?|involves?)$/i;
+const GENERIC_VERB = new RegExp("^(?:" + [
+  // «(è|sono) collegato a/con», anche senza ausiliare o senza preposizione («è legato»)
+  "(?:(?:è|sono)\\s+)?(?:collegat|legat|conness|associat|relativ|correlat)[oaie](?:\\s+(?:a|ad|con))?",
+  "riguard(?:a|ano)",
+  "(?:ha|hanno) a che (?:fare|vedere) con",
+  "si (?:collega|collegano|riferisce|riferiscono|lega|legano|connette|connettono) (?:a|ad|con)",
+  "(?:(?:è|sono)\\s+)?in (?:relazione|rapporto) (?:con|a)",
+  "(?:ha|hanno) (?:un |una )?(?:rapporto|relazione|legame|collegamento|connessione) (?:con|a)",
+  "(?:is |are )?(?:related|connected|linked|associated) (?:to|with)",
+  "relates? to",
+  "(?:has|have) (?:a )?(?:relationship|relation|link|connection) (?:with|to)",
+  "concerns?", "involves?",
+].join("|") + ")$", "i");
 export const isGenericVerb = (label: string) => GENERIC_VERB.test(label.trim().replace(/\s+/g, " "));
 const GENERIC_FIX = "Usa un verbo che dica che rapporto c'è fra i due concetti.";
 
