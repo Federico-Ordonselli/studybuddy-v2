@@ -90,7 +90,9 @@ test("«Nuovo problema» azzera livello e tentativi (JSON); action non valida �
     ev = await events(await POST(req({ message: attempt, sessionId })));
     const res = await POST(req({ action: "new-problem", sessionId }));
     assert.deepEqual(await res.json(), { sessionId, hint: { level: 1, attempts: 0, canReveal: false } });
-    assert.equal(state(sessionId).history.length, 4, "la cronologia resta");
+    const history = state(sessionId).history;
+    assert.equal(history.length, 5, "la cronologia resta, più il marker");
+    assert.equal(history.at(-1).tag, "Nuovo problema");
     assert.equal((await POST(req({ action: "boh", sessionId }))).status, 400);
   } finally { globalThis.fetch = original; }
 });

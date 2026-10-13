@@ -125,7 +125,8 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     try {
       const r = await post<{ hint: PublicHint }>("/api/chat", { mode, domainId, sessionId, action: "new-problem" });
       setHint(r.hint);
-      setMsgs((m) => [...m, { role: "assistant", content: "Nuovo problema: si riparte dal primo indizio.", tag: "Nuovo problema" }]);
+      // come `markNewProblem` sul server: niente marker doppi
+      setMsgs((m) => m.at(-1)?.tag === "Nuovo problema" ? m : [...m, { role: "assistant", content: "Nuovo problema: si riparte dal primo indizio.", tag: "Nuovo problema" }]);
     } catch (e) { setCardError(String(e)); } finally { setBusy(false); }
   }
   const revealSolution = () => !busy && streamSocratic("Mostra la soluzione", { action: "solution" }, "Soluzione");

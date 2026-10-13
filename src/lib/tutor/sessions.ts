@@ -17,6 +17,9 @@ import { afterSolution, canReveal, initialHint, nextHint, REVEAL_AFTER, type Hin
 export type SocraticAction = "reply" | "solution";
 /** Messaggio dello studente salvato quando chiede la soluzione col pulsante. */
 export const SOLUTION_MESSAGE = "Mostra la soluzione";
+/** Marker di «Nuovo problema»: salvato per la ripresa, mai mandato al modello. */
+export const NEW_PROBLEM_TAG = "Nuovo problema";
+export const NEW_PROBLEM_MESSAGE = "Nuovo problema: si riparte dal primo indizio.";
 
 /** Turno salvato: le risposte dell'assistente tengono le citazioni (e l'etichetta, es. «Soluzione») per la ripresa. */
 export interface TutorMessage extends ChatMessage {
@@ -31,6 +34,12 @@ export interface SocraticState {
 
 export function appendTurn(history: TutorMessage[], message: string, reply: string, citations: Citation[] = [], tag?: string): TutorMessage[] {
   return [...history, { role: "user", content: message }, { role: "assistant", content: reply, citations, ...(tag ? { tag } : {}) }];
+}
+
+/** Aggiunge il marker «Nuovo problema», salvo su una sessione vuota o subito dopo un altro marker. */
+export function markNewProblem(history: TutorMessage[]): TutorMessage[] {
+  if (!history.length || history.at(-1)?.tag === NEW_PROBLEM_TAG) return history;
+  return [...history, { role: "assistant", content: NEW_PROBLEM_MESSAGE, tag: NEW_PROBLEM_TAG }];
 }
 
 /** Livello di indizio da usare per questo turno. La soluzione si sblocca solo dopo `REVEAL_AFTER` tentativi. */
@@ -56,11 +65,11 @@ export function problemStatement(history: TutorMessage[], turns: number): string
   return users[users.length - (turns - 1)]?.content;
 }
 
-/** Al modello vanno solo i turni: le citazioni sono per la UI. */
+/** Al modello vanno solo i turni: le citazioni e i marker sono per la UI. */
 export function forModel(history: TutorMessage[], turns = rag.historyTurns, budget = rag.historyChars): ChatMessage[] {
   const selected: ChatMessage[] = [];
   let used = 0;
-  for (const { role, content } of history.slice(-Math.max(0, turns) * 2).reverse()) {
+  for (const { role, content } of history.filter((m) => m.tag !== NEW_PROBLEM_TAG).slice(-Math.max(0, turns) * 2).reverse()) {
     if (turns <= 0 || budget <= used) break;
     const text = content.slice(0, budget - used);
     selected.push({ role, content: text });

@@ -61,3 +61,13 @@ test("problemStatement: l'enunciato è il messaggio `turns - 1` posizioni indiet
   assert.equal(S.problemStatement(h, 3), "Esercizio: inverti una stringa");
   assert.equal(S.problemStatement(h, 2), "provo con split");
 });
+
+test("markNewProblem: il marker resta in cronologia (ripresa) ma non arriva al modello né all'enunciato", () => {
+  const h = S.markNewProblem(S.appendTurn([], "Esercizio: inverti una stringa", "indizio"));
+  assert.deepEqual(h.at(-1), { role: "assistant", content: S.NEW_PROBLEM_MESSAGE, tag: S.NEW_PROBLEM_TAG });
+  assert.equal(S.markNewProblem(h), h, "niente marker doppi");
+  assert.deepEqual(S.markNewProblem([]), [], "niente marker su una sessione vuota");
+  const next = S.appendTurn(h, "Esercizio: somma un array", "indizio");
+  assert.deepEqual(S.forModel(next).map((m) => m.content), ["Esercizio: inverti una stringa", "indizio", "Esercizio: somma un array", "indizio"]);
+  assert.equal(S.problemStatement(next, 2), "Esercizio: somma un array", "secondo messaggio sul problema");
+});

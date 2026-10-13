@@ -4,7 +4,7 @@ import { LibraryError } from "@/lib/errors";
 import { socraticResponse } from "@/lib/tutor/stream";
 import { NextRequest, NextResponse } from "next/server";
 import { socraticTurn, quizTurn, gradeTurn } from "@/lib/tutor/session";
-import { beginTurn, endTurn, forModel, problemStatement, getOrCreateSession, saveState, SOLUTION_MESSAGE } from "@/lib/tutor/sessions";
+import { beginTurn, endTurn, forModel, problemStatement, getOrCreateSession, markNewProblem, saveState, SOLUTION_MESSAGE } from "@/lib/tutor/sessions";
 import { initialHint, publicHint, resetProblem } from "@/lib/tutor/hints";
 
 export const runtime = "nodejs";
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       const session = await getOrCreateSession("socratic", domainId, sessionId);
       if (action === "new-problem") {
         const hint = resetProblem(session.state?.hint ?? initialHint());
-        saveState(session.id, { history: session.state?.history ?? [], hint });
+        saveState(session.id, { history: markNewProblem(session.state?.history ?? []), hint });
         return NextResponse.json({ sessionId: session.id, hint: publicHint(hint) });
       }
       const act = action as "reply" | "solution";
