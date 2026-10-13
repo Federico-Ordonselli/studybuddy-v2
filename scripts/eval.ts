@@ -26,9 +26,9 @@ import { guardedSocratic, socraticOptions, PROMPT_VERSION as TUTOR_VERSION } fro
 import { isSolutionRequest } from "@/lib/tutor/guard";
 import { generate } from "@/lib/providers";
 import { LEGACY_SYSTEM, parseTutorCases, tutorMetrics, tutorReviewSample, tutorReviewScore, type TutorOutcome } from "@/lib/evals/tutor";
-import { judgePropositions, PROMPT_VERSION as MAPS_VERSION } from "@/lib/mapExercise";
+import { capPassages, judgePropositions, PROMPT_VERSION as MAPS_VERSION } from "@/lib/mapExercise";
 import { proposeMap } from "@/lib/conceptmap";
-import { mapMetrics, parseMapCases, referenceFor, type MapOutcome } from "@/lib/evals/maps";
+import { mapMetrics, parseMapCases, referenceFor, referenceLabelFor, type MapOutcome } from "@/lib/evals/maps";
 import type { Retrieved } from "@/lib/rag/store";
 import { gradingMetrics, parseGradingCases, verdictFromGrade, VERDICTS, type GradingOutcome } from "@/lib/evals/grading";
 
@@ -319,12 +319,13 @@ async function runMaps(args: string[]) {
       try {
         const js = await judgePropositions({
           focusQuestion: c.focusQuestion,
-          propositions: block.map((p) => ({ id: p.id, from: p.from, label: p.label, to: p.to, reference: referenceFor(c, p) })),
-          passages: c.passages.map((p) => p.text),
+          propositions: block.map((p) => ({ id: p.id, from: p.from, label: p.label, to: p.to, reference: referenceFor(c, p), referenceLabel: referenceLabelFor(c, p) })),
+          passages: capPassages(c.passages.map((p) => p.text)),
           concepts: c.concepts,
         });
         for (const p of block) mine.push({ caseId: c.id, propId: p.id, kind: p.kind, gold: p.gold, got: js.find((j) => j.id === p.id)?.verdict ?? "unrated" });
-      } catch {
+      } catch (e) {
+        console.log(`  ! ${c.id} proposizioni ${i + 1}-${i + block.length}: ${e instanceof Error ? e.message : e}`);
         for (const p of block) mine.push({ caseId: c.id, propId: p.id, kind: p.kind, gold: p.gold, got: "error" });
       }
     }

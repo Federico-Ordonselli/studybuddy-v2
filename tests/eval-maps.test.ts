@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mapMetrics, parseMapCases, referenceFor } from "@/lib/evals/maps";
+import { mapMetrics, parseMapCases, referenceFor, referenceLabelFor } from "@/lib/evals/maps";
 
 const CASE = {
   id: "m1", course: "C", topic: "React", focusQuestion: "D?",
@@ -25,6 +25,7 @@ test("parseMapCases: valida i campi e rifiuta kind/gold sconosciuti e id duplica
 test("referenceFor: coppia non ordinata, titoli normalizzati", () => {
   const c = parseMapCases(JSON.stringify(CASE))[0];
   assert.equal(referenceFor(c, c.propositions[0]), "State provoca Rendering");
+  assert.equal(referenceLabelFor(c, c.propositions[0]), "provoca");
 });
 
 test("mapMetrics: accordo, confusione, per kind e absent-valid bocciate", () => {

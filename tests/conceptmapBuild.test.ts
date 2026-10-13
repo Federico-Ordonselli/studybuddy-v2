@@ -23,6 +23,8 @@ test("modalità normale: schema e prompt senza focus_question", async () => {
   await withJudge([reply()], () => generateMap(1, "React", FOUND), bodies);
   const body = JSON.stringify(bodies[0]);
   assert.ok(!body.includes("focus_question"));
+  const n = await withJudge([reply()], () => proposeMap(1, "React", FOUND));
+  assert.equal(n.sourceChunkIds, undefined, "modalità normale invariata");
 });
 
 test("modalità build: schema con focus_question e domanda focale restituita", async () => {
@@ -32,6 +34,7 @@ test("modalità build: schema con focus_question e domanda focale restituita", a
   assert.ok(JSON.stringify(bodies[0]).includes("focus_question"));
   assert.ok(r.relations.some((x) => x.from === "React" && x.to === "State" && x.label === "gestisce"));
   assert.equal(r.concepts[0].title, "React");
+  assert.deepEqual(r.sourceChunkIds, [10, 11], "id dei chunk usati, in ordine");
 });
 
 test("modalità build: domanda focale vuota → fallback", async () => {

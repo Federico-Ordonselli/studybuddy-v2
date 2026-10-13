@@ -31,6 +31,7 @@ test("createExercise: mappa senza archi né spiegazioni, riga root con la soluzi
   const row = sqlite.prepare("SELECT proposal FROM map_exercises WHERE map_id = ?").get(map.id) as { proposal: string };
   const solution = JSON.parse(row.proposal);
   assert.ok(solution.relations.length >= 3);
+  assert.deepEqual(solution.chunkIds, [10, 11], "chunk della generazione, in ordine");
   assert.equal(solution.concepts.find((c: { title: string }) => c.title === "State").explanation, "Lo state cambia.");
 });
 
@@ -90,6 +91,8 @@ test("expandExercise: proposta spogliata, riga del livello con la soluzione, sec
   const keys = merged.relations.map((r: { from: string; to: string; label: string }) => `${r.from}|${r.to}|${r.label}`);
   assert.equal(new Set(keys).size, keys.length, "relazioni senza duplicati");
   assert.ok(merged.relations.length > first.relations.length);
+  assert.deepEqual(first.chunkIds, [10, 11]);
+  assert.deepEqual(merged.chunkIds, [10, 11], "chunk fusi senza duplicati");
   assert.ok(ex.exerciseLevels(map.id).some((l) => l.levelKey === stateId));
 });
 
@@ -147,6 +150,21 @@ test("levelPassages: chunk dei concetti del livello, deduplicati, tagliati a 150
   assert.deepEqual(ps.map((p) => p.length), [1500, "Le props arrivano dal genitore.".length]);
 });
 
+test("levelPassages: con chunkIds usa i chunk della generazione, in ordine, non i sourceRefs", () => {
+  const ref = (chunkId: string) => ({ documentId: "1", documentRevision: "h", chunkId });
+  const sol = { concepts: [{ title: "State", sourceRefs: [ref("10")] }], relations: [], chunkIds: [11, 10, 11, 99] };
+  const ps = ex.levelPassages(sol, ["State"]);
+  assert.deepEqual(ps.map((p) => p.length), ["Le props arrivano dal genitore.".length, 1500]);
+});
+
+test("capPassages: ogni passaggio ≤ 1500, ≤ 10000 in tutto, un passaggio troppo lungo si salta ma i corti dopo entrano", () => {
+  assert.deepEqual(ex.capPassages(["x".repeat(2000)]).map((p) => p.length), [1500]);
+  const ps = ex.capPassages([...Array(6).fill("a".repeat(1500)), "b".repeat(1200), "c".repeat(900)]);
+  // 6 × 1500 = 9000; 1200 sforerebbe (10200), 900 entra (9900).
+  assert.deepEqual(ps.map((p) => p.length), [1500, 1500, 1500, 1500, 1500, 1500, 900]);
+  assert.ok(ps.join("").length <= 10000);
+});
+
 test("evaluateLevel: legge il documento salvato, voci mancanti unrated, coppie mancanti per nome, last_check salvato", async () => {
   const { map } = await withJudge([MAP_REPLY], () => ex.createExercise(1, "React", FOUND));
   const id = (t: string) => (map.concepts as { id: string; title: string }[]).find((c) => c.title === t)!.id;
@@ -166,12 +184,12 @@ test("evaluateLevel: senza proposizioni → ExerciseError 400", async () => {
   await assert.rejects(ex.evaluateLevel(map.id, map.rootSpaceId), (e: unknown) => e instanceof ex.ExerciseError && e.status === 400);
 });
 
-test("relationCardDraft: risposta dalla soluzione se la coppia c'è, altrimenti dal fix della verifica", async () => {
+test("relationCardDraft: risposta dalla soluzione per la coppia, chunk dei due concetti", async () => {
   const { map } = await withJudge([MAP_REPLY], () => ex.createExercise(1, "React", FOUND));
   const id = (t: string) => (map.concepts as { id: string; title: string }[]).find((c) => c.title === t)!.id;
   const inSol = createRelation(id("State"), id("Props"), "è uguale a");
-  const outSol = createRelation(id("React"), id("Props"), "ignora");
-  const saved = saveMap(1, applyMapCommands(map, [{ type: "addRelation", relation: inSol }, { type: "addRelation", relation: outSol }]), map.revision);
+  const reversed = createRelation(id("Props"), id("React"), "ignora");
+  const saved = saveMap(1, applyMapCommands(map, [{ type: "addRelation", relation: inSol }, { type: "addRelation", relation: reversed }]), map.revision);
   await withJudge([judged([
     { id: "P1", reason: "No.", verdict: "wrong", fix: "Lo state differisce dalle props." },
     { id: "P2", reason: "No.", verdict: "wrong", fix: "React riceve le props." },
@@ -181,11 +199,11 @@ test("relationCardDraft: risposta dalla soluzione se la coppia c'è, altrimenti 
   assert.equal(a.answer, "State differisce da Props");
   assert.equal(a.sourceChunkId, 10);
   assert.deepEqual(a.issues, []);
-  const b = ex.relationCardDraft(saved.id, saved.rootSpaceId, outSol.id);
+  const b = ex.relationCardDraft(saved.id, saved.rootSpaceId, reversed.id);
   assert.equal(b.answer, "React riceve Props");
 });
 
-test("relationCardDraft: coppia fuori soluzione → risposta = fix della verifica", async () => {
+test("relationCardDraft: coppia fuori soluzione → ExerciseError 409, niente carta dal fix", async () => {
   const { map } = await withJudge([MAP_REPLY], () => ex.createExercise(1, "React-fix", FOUND));
   const id = (t: string) => (map.concepts as { id: string; title: string }[]).find((c) => c.title === t)!.id;
   const extra = createConcept("Redux");
@@ -195,11 +213,9 @@ test("relationCardDraft: coppia fuori soluzione → risposta = fix della verific
     { type: "addRelation", relation: rel },
   ]), map.revision);
   await withJudge([judged([{ id: "P1", reason: "No.", verdict: "wrong", fix: "Redux gestisce lo state globale." }])], () => ex.evaluateLevel(saved.id, saved.rootSpaceId));
-  const d = ex.relationCardDraft(saved.id, saved.rootSpaceId, rel.id);
-  assert.equal(d.answer, "Redux gestisce lo state globale.");
-  assert.equal(d.sourceChunkId, 10);
+  assert.throws(() => ex.relationCardDraft(saved.id, saved.rootSpaceId, rel.id),
+    (e: unknown) => e instanceof ex.ExerciseError && e.status === 409 && /non è nella soluzione/.test(e.message));
 });
-
 
 test("judgePropositions: verbo generico → imprecise (coppia in soluzione) o valid declassato (fuori soluzione)", async () => {
   const props = [
@@ -218,6 +234,15 @@ test("judgePropositions: verbo generico → imprecise (coppia in soluzione) o va
   assert.equal(r[0].fix, "State provoca Rendering");
   assert.match(r[1].fix, /verbo/);
   assert.equal(r[2].fix, "Non sono legati.");
+});
+
+test("judgePropositions: verbo generico con riferimento anch'esso generico → consiglio generale, non il riferimento", async () => {
+  const props = [{ id: "P1", from: "State", label: "riguarda", to: "Rendering", reference: "State è collegato a Rendering", referenceLabel: "è collegato a" }];
+  const r = await withJudge([judged([{ id: "P1", reason: "r", verdict: "valid", fix: "" }])],
+    () => ex.judgePropositions({ focusQuestion: "D?", propositions: props, passages: [] }));
+  assert.equal(r[0].verdict, "imprecise");
+  assert.match(r[0].fix, /verbo/);
+  assert.notEqual(r[0].fix, "State è collegato a Rendering");
 });
 
 test("judgePropositions: concetti e definizioni nel prompt", async () => {

@@ -30,7 +30,9 @@ interface Row { map_id: string; level_key: string; focus_question: string; propo
 const now = () => Math.floor(Date.now() / 1000);
 const getRow = (mapId: string, levelKey: string) =>
   sqlite.prepare("SELECT * FROM map_exercises WHERE map_id = ? AND level_key = ?").get(mapId, levelKey) as Row | undefined;
-const toSolution = (p: BuildResult): Solution => ({ concepts: p.concepts, relations: p.relations });
+const toSolution = (p: BuildResult): Solution => ({
+  concepts: p.concepts, relations: p.relations, ...(p.sourceChunkIds?.length ? { chunkIds: p.sourceChunkIds } : {}),
+});
 
 /** Esercizio nuovo: genera in modalità build, salva mappa spogliata e soluzione `root` insieme. */
 export async function createExercise(domainId: number, topic: string, sourceChunks?: Retrieved[]): Promise<{ map: MapDocument }> {
@@ -45,14 +47,16 @@ export async function createExercise(domainId: number, topic: string, sourceChun
   return { map };
 }
 
-/** Fonde due soluzioni: concetti deduplicati per titolo, relazioni accodate senza duplicati. */
+/** Fonde due soluzioni: concetti deduplicati per titolo, relazioni e chunk accodati senza duplicati. */
 function merge(a: Solution, b: Solution): Solution {
   const seen = new Set(a.concepts.map((c) => titleKey(c.title)));
   const rel = (r: SolutionRelation) => `${titleKey(r.from)}|${titleKey(r.to)}|${r.label.trim().toLowerCase()}`;
   const rels = new Set(a.relations.map(rel));
+  const chunkIds = [...new Set([...(a.chunkIds ?? []), ...(b.chunkIds ?? [])])];
   return {
     concepts: [...a.concepts, ...b.concepts.filter((c) => !seen.has(titleKey(c.title)) && seen.add(titleKey(c.title)))],
     relations: [...a.relations, ...b.relations.filter((r) => !rels.has(rel(r)) && rels.add(rel(r)))],
+    ...(chunkIds.length ? { chunkIds } : {}),
   };
 }
 
@@ -126,7 +130,8 @@ const VERDICTS = ["valid", "imprecise", "wrong"] as const;
 const PASSAGE_CHARS = 1500;
 const PASSAGES_TOTAL = 10000;
 
-export interface JudgeProposition { id: string; from: string; label: string; to: string; reference?: string }
+/** `reference` = «A verbo B» della soluzione per la stessa coppia; `referenceLabel` = il suo solo verbo. */
+export interface JudgeProposition { id: string; from: string; label: string; to: string; reference?: string; referenceLabel?: string }
 export interface Judgement { id: string; reason: string; verdict: Verdict; fix: string }
 
 /** Ordine delle proprietà = ordine di generazione: il motivo prima del verdetto. */
@@ -173,10 +178,16 @@ const GENERIC_VERB = /^(?:(?:è|sono)\s+)?(?:(?:collegat|legat|conness|associat|
 export const isGenericVerb = (label: string) => GENERIC_VERB.test(label.trim().replace(/\s+/g, " "));
 const GENERIC_FIX = "Usa un verbo che dica che rapporto c'è fra i due concetti.";
 
-/** Coppia nella soluzione → imprecise; fuori soluzione un `valid` scende a imprecise, un `wrong` resta. */
+/**
+ * Coppia nella soluzione → imprecise; fuori soluzione un `valid` scende a imprecise, un `wrong` resta.
+ * Se anche il riferimento ha un verbo generico non serve come correzione: si usa il consiglio generale.
+ */
 function capGeneric(j: Judgement, p: JudgeProposition): Judgement {
   if (!isGenericVerb(p.label)) return j;
-  if (p.reference) return { ...j, verdict: "imprecise", fix: j.verdict === "imprecise" && j.fix ? j.fix : p.reference };
+  if (p.reference) {
+    const fallback = p.referenceLabel && isGenericVerb(p.referenceLabel) ? GENERIC_FIX : p.reference;
+    return { ...j, verdict: "imprecise", fix: j.verdict === "imprecise" && j.fix ? j.fix : fallback };
+  }
   if (j.verdict === "valid") return { ...j, verdict: "imprecise", fix: GENERIC_FIX };
   return j;
 }
@@ -231,28 +242,41 @@ export async function judgePropositions(input: {
   throw new Error("Il modello non ha prodotto una valutazione valida delle proposizioni. Riprova.");
 }
 
-/** Passaggi sorgente dei concetti del livello (per titolo), deduplicati, ≤ 1500 caratteri l'uno e 10 000 in tutto. */
-export function levelPassages(solution: Solution, titles: string[]): string[] {
-  const keys = new Set(titles.map(titleKey));
-  const ids: number[] = [];
-  for (const c of solution.concepts) {
-    if (!keys.has(titleKey(c.title))) continue;
-    for (const r of c.sourceRefs ?? []) {
-      const n = Number(r.chunkId);
-      if (Number.isSafeInteger(n) && !ids.includes(n)) ids.push(n);
-    }
-  }
-  const get = sqlite.prepare("SELECT content FROM chunks WHERE id = ?");
+/**
+ * Tetto del materiale per il valutatore: ogni passaggio ≤ 1500 caratteri, ≤ 10 000 in tutto. Un
+ * passaggio che sforerebbe il totale si salta, ma i successivi più corti possono ancora entrare.
+ * Lo usano sia la verifica sia l'eval, così il contesto è lo stesso.
+ */
+export function capPassages(texts: string[]): string[] {
   const out: string[] = [];
   let total = 0;
-  for (const id of ids) {
-    const row = get.get(id) as { content: string } | undefined;
-    if (!row) continue;
-    const text = row.content.slice(0, PASSAGE_CHARS);
-    if (total + text.length > PASSAGES_TOTAL) break;
+  for (const t of texts) {
+    const text = t.slice(0, PASSAGE_CHARS);
+    if (total + text.length > PASSAGES_TOTAL) continue;
     out.push(text); total += text.length;
   }
   return out;
+}
+
+/**
+ * Materiale del livello per il valutatore: i chunk usati per generarlo (`solution.chunkIds`, come
+ * nell'eval); per le soluzioni salvate prima, i `sourceRefs` dei concetti della tela (per titolo).
+ * Deduplicati e passati da `capPassages`.
+ */
+export function levelPassages(solution: Solution, titles: string[]): string[] {
+  const ids: number[] = [];
+  const push = (n: number) => { if (Number.isSafeInteger(n) && !ids.includes(n)) ids.push(n); };
+  if (solution.chunkIds?.length) solution.chunkIds.forEach(push);
+  else {
+    const keys = new Set(titles.map(titleKey));
+    for (const c of solution.concepts) {
+      if (!keys.has(titleKey(c.title))) continue;
+      for (const r of c.sourceRefs ?? []) push(Number(r.chunkId));
+    }
+  }
+  const get = sqlite.prepare("SELECT content FROM chunks WHERE id = ?");
+  const texts = ids.map((id) => (get.get(id) as { content: string } | undefined)?.content).filter((t): t is string => t !== undefined);
+  return capPassages(texts);
 }
 
 /** Verifica del livello: confronto delle coppie in codice + una chiamata LLM; l'esito resta in `last_check`. */
@@ -262,15 +286,18 @@ export async function evaluateLevel(mapId: string, spaceId: string): Promise<Che
   if (!props.length) throw new ExerciseError("nessuna proposizione da verificare: aggiungine almeno una");
   if (props.length > MAX_PROPOSITIONS) throw new ExerciseError(`massimo ${MAX_PROPOSITIONS} proposizioni per verifica: togline qualcuna`);
   const title = new Map(doc.concepts.map((c) => [c.id, c.title]));
-  const reference = new Map<string, string>();
+  const reference = new Map<string, { text: string; label: string }>();
   for (const r of resolveSolution(doc, spaceId, solution)) {
     const k = pairKey(r.sourceId, r.targetId);
-    if (!reference.has(k)) reference.set(k, `${title.get(r.sourceId)} ${r.label} ${title.get(r.targetId)}`);
+    if (!reference.has(k)) reference.set(k, { text: `${title.get(r.sourceId)} ${r.label} ${title.get(r.targetId)}`, label: r.label });
   }
-  const propositions: JudgeProposition[] = props.map((r, i) => ({
-    id: `P${i + 1}`, from: title.get(r.sourceConceptId) ?? "", label: r.label || r.predicate, to: title.get(r.targetConceptId) ?? "",
-    reference: reference.get(pairKey(r.sourceConceptId, r.targetConceptId)),
-  }));
+  const propositions: JudgeProposition[] = props.map((r, i) => {
+    const ref = reference.get(pairKey(r.sourceConceptId, r.targetConceptId));
+    return {
+      id: `P${i + 1}`, from: title.get(r.sourceConceptId) ?? "", label: r.label || r.predicate, to: title.get(r.targetConceptId) ?? "",
+      reference: ref?.text, referenceLabel: ref?.label,
+    };
+  });
   const passages = levelPassages(solution, levelConcepts(doc, spaceId).map((c) => c.title));
   const judged = new Map((await judgePropositions({ focusQuestion: row.focus_question, propositions, passages, concepts: levelConcepts(doc, spaceId).map(({ title, definition }) => ({ title, definition })) })).map((j) => [j.id, j]));
   const result: CheckResult = {
@@ -291,21 +318,20 @@ export async function evaluateLevel(mapId: string, spaceId: string): Promise<Che
 }
 
 /**
- * Bozza di carta da una proposizione sbagliata: «Che relazione c'è tra X e Y?», risposta dalla
- * soluzione se la coppia c'è, altrimenti dalla correzione dell'ultima verifica. Passa da checkCard.
+ * Bozza di carta da una proposizione sbagliata la cui coppia è nella soluzione: «Che relazione c'è
+ * tra X e Y?», risposta dalla soluzione. Fuori soluzione non c'è una risposta di riferimento (la
+ * correzione del modello non è verificata): 409. Passa da checkCard.
  */
 export function relationCardDraft(mapId: string, spaceId: string, relationId: string): CardDraft {
-  const { doc, row, solution } = loadLevel(mapId, spaceId);
+  const { doc, solution } = loadLevel(mapId, spaceId);
   const rel = doc.relations.find((r) => r.id === relationId);
   if (!rel) throw new ExerciseError("relazione inesistente", 404);
   const title = new Map(doc.concepts.map((c) => [c.id, c.title]));
   const a = title.get(rel.sourceConceptId) ?? "", b = title.get(rel.targetConceptId) ?? "";
   const k = pairKey(rel.sourceConceptId, rel.targetConceptId);
   const ref = resolveSolution(doc, spaceId, solution).find((r) => pairKey(r.sourceId, r.targetId) === k);
-  const check = row.last_check ? JSON.parse(row.last_check) as CheckResult : null;
-  const fix = check?.verdicts.find((v) => v.relationId === relationId)?.fix ?? "";
-  const answer = ref ? `${title.get(ref.sourceId)} ${ref.label} ${title.get(ref.targetId)}` : fix;
-  if (!answer) throw new ExerciseError("nessuna risposta disponibile: verifica prima la mappa");
+  if (!ref) throw new ExerciseError("questa coppia non è nella soluzione: nessuna carta da creare", 409);
+  const answer = `${title.get(ref.sourceId)} ${ref.label} ${title.get(ref.targetId)}`;
   const keys = new Set([titleKey(a), titleKey(b)]);
   const chunk = solution.concepts.filter((c) => keys.has(titleKey(c.title))).flatMap((c) => c.sourceRefs ?? [])
     .map((r) => Number(r.chunkId)).find((n) => Number.isSafeInteger(n));

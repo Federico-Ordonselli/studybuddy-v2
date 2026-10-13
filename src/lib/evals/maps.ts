@@ -48,11 +48,21 @@ export function parseMapCases(text: string, { requirePropositions = true } = {})
   return out;
 }
 
+/** La relazione della soluzione per la stessa coppia (direzione ignorata), se c'è. */
+function solutionFor(c: MapCase, p: MapCaseProposition) {
+  const key = (a: string, b: string) => [titleKey(a), titleKey(b)].sort().join("|");
+  return c.solution.find((s) => key(s.from, s.to) === key(p.from, p.to));
+}
+
 /** La formulazione di riferimento della soluzione per la stessa coppia (direzione ignorata), se c'è. */
 export function referenceFor(c: MapCase, p: MapCaseProposition): string | undefined {
-  const key = (a: string, b: string) => [titleKey(a), titleKey(b)].sort().join("|");
-  const r = c.solution.find((s) => key(s.from, s.to) === key(p.from, p.to));
+  const r = solutionFor(c, p);
   return r ? `${r.from} ${r.label} ${r.to}` : undefined;
+}
+
+/** Il solo verbo del riferimento (per `referenceLabel` di `judgePropositions`), se c'è. */
+export function referenceLabelFor(c: MapCase, p: MapCaseProposition): string | undefined {
+  return solutionFor(c, p)?.label;
 }
 
 export function mapMetrics(rows: MapOutcome[]) {

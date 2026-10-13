@@ -63,7 +63,8 @@ const BUILD_NOTE =
   " `focus_question`: una domanda, per chi studia, a cui questa mappa risponde (es. \"Come decide React quando " +
   "ridisegnare un componente?\"); una sola frase, nella lingua del materiale.";
 
-export interface BuildResult extends Proposal { focusQuestion?: string }
+/** Modalità build: anche gli id dei chunk usati per generare, in ordine (contesto del valutatore). */
+export interface BuildResult extends Proposal { focusQuestion?: string; sourceChunkIds?: number[] }
 
 const FIELDS =
   "Per ogni concetto: `title` breve (2-5 parole), `definition` in una frase, `explanation` di 2-4 frasi " +
@@ -132,7 +133,7 @@ async function propose(system: string, user: string, found: Retrieved[], centerT
   const focusQuestion = build
     ? (parsed.focus_question?.trim() || `Come si collegano fra loro i concetti di «${centerName ?? centerTitle ?? center ?? ""}»?`)
     : undefined;
-  return focusQuestion === undefined ? { concepts, relations } : { concepts, relations, focusQuestion };
+  return focusQuestion === undefined ? { concepts, relations } : { concepts, relations, focusQuestion, sourceChunkIds: found.map((c) => c.chunkId) };
 }
 
 function sourceRef(c: Retrieved, cite: Citation): SourceRef {
