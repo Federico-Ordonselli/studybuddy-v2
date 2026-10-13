@@ -74,10 +74,12 @@ export default function MapStudio({ domainId, onAskTutor }: { domainId?: number;
           setSource(citation);
         },
         requestQuiz: async (req) => {
-          const { created } = await json<{ created: number }>("/api/cards", {
+          // Salvataggio diretto (niente anteprima): entrano solo le carte che passano il controllo di qualità.
+          const { created, flagged } = await json<{ created: number; flagged: number }>("/api/cards", {
             method: "POST", body: JSON.stringify({ domainId: domainRef.current, topic: req.concepts[0].title, n: 3 }),
           });
-          return created ? `${created} carte su «${req.concepts[0].title}» aggiunte al Ripasso.` : "Nessuna carta generata da questo concetto.";
+          const skipped = flagged ? ` ${flagged} ${flagged === 1 ? "scartata perché da rivedere o già presente" : "scartate perché da rivedere o già presenti"}.` : "";
+          return (created ? `${created === 1 ? "1 carta" : `${created} carte`} su «${req.concepts[0].title}» ${created === 1 ? "aggiunta" : "aggiunte"} al Ripasso.` : "Nessuna carta valida generata da questo concetto.") + skipped;
         },
         askTutor: (req) => askRef.current(`Spiegami «${req.concepts[0].title}»`),
       },

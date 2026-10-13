@@ -23,6 +23,8 @@ export const S: Record<string, React.CSSProperties> = {
   optOn: { background: "var(--accent-soft)", color: "var(--on-accent-soft)", borderColor: "var(--accent)" },
   kbd: { fontFamily: "var(--font-mono, monospace)", fontSize: 11, color: "inherit", marginLeft: 4 },
   confidentWrong: { background: "var(--danger-soft)", color: "var(--on-danger-soft)", borderRadius: 10, padding: "10px 12px", marginBottom: 10, lineHeight: 1.5 },
+  previewItem: { borderTop: "1px solid var(--border)", padding: "12px 0" },
+  issues: { margin: "6px 0 0", paddingLeft: 0, listStyle: "none", color: "var(--danger)", fontSize: 13.5, lineHeight: 1.5 },
   opt: { textAlign: "left", background: "var(--panel-2)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", lineHeight: 1.4 },
   cites: { display: "flex", flexDirection: "column", gap: 6, marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--border)" },
   cite: { display: "flex", alignItems: "center", gap: 8, background: "var(--panel-2)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 9px", textAlign: "left", color: "var(--text)", fontSize: 12.5, width: "fit-content", maxWidth: "100%" },
