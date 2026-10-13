@@ -29,6 +29,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
   const [sessionId, setSessionId] = useState<number | undefined>();
   const [hint, setHint] = useState<PublicHint | null>(null);
   const [guarded, setGuarded] = useState(false);
+  const [busy, setBusy] = useState(false); // «Nuovo problema» in corso
   const [video, setVideo] = useState<PlayingVideo | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -119,14 +120,15 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
   }
 
   async function newProblem() {
-    if (!sessionId || loading) return;
+    if (!sessionId || loading || busy) return;
+    setBusy(true);
     try {
       const r = await post<{ hint: PublicHint }>("/api/chat", { mode, domainId, sessionId, action: "new-problem" });
       setHint(r.hint);
       setMsgs((m) => [...m, { role: "assistant", content: "Nuovo problema: si riparte dal primo indizio.", tag: "Nuovo problema" }]);
-    } catch (e) { setCardError(String(e)); }
+    } catch (e) { setCardError(String(e)); } finally { setBusy(false); }
   }
-  const revealSolution = () => streamSocratic("Mostra la soluzione", { action: "solution" }, "Soluzione");
+  const revealSolution = () => !busy && streamSocratic("Mostra la soluzione", { action: "solution" }, "Soluzione");
 
   async function addToReview(index: number, quiz: QuizQuestion) {
     setAdding(true);setCardError("");
@@ -197,8 +199,8 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
           {mode === "socratic" && sessionId && (
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 13, color: "var(--muted)" }}>
               <span>Indizio {hint?.level ?? 1}/4 · tentativi {Math.min(hint?.attempts ?? 0, 2)}/2</span>
-              <button style={S.ghost} onClick={newProblem} disabled={loading}>Nuovo problema</button>
-              <button style={S.ghost} onClick={revealSolution} disabled={loading || !hint?.canReveal}
+              <button style={{ ...S.ghost, ...(loading || busy ? S.ghostDisabled : null) }} onClick={newProblem} disabled={loading || busy}>Nuovo problema</button>
+              <button style={{ ...S.ghost, ...(loading || busy || !hint?.canReveal ? S.ghostDisabled : null) }} onClick={revealSolution} disabled={loading || busy || !hint?.canReveal}
                 title={hint?.canReveal ? "Mostra la soluzione completa" : "Si sblocca dopo 2 tentativi"}>
                 {hint?.canReveal ? "Mostra soluzione" : "Mostra soluzione (dopo 2 tentativi)"}
               </button>
