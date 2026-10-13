@@ -321,6 +321,7 @@ async function runMaps(args: string[]) {
           focusQuestion: c.focusQuestion,
           propositions: block.map((p) => ({ id: p.id, from: p.from, label: p.label, to: p.to, reference: referenceFor(c, p) })),
           passages: c.passages.map((p) => p.text),
+          concepts: c.concepts,
         });
         for (const p of block) mine.push({ caseId: c.id, propId: p.id, kind: p.kind, gold: p.gold, got: js.find((j) => j.id === p.id)?.verdict ?? "unrated" });
       } catch {

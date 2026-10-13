@@ -200,3 +200,31 @@ test("relationCardDraft: coppia fuori soluzione → risposta = fix della verific
   assert.equal(d.sourceChunkId, 10);
 });
 
+
+test("judgePropositions: verbo generico → imprecise (coppia in soluzione) o valid declassato (fuori soluzione)", async () => {
+  const props = [
+    { id: "P1", from: "State", label: "è collegato a", to: "Rendering", reference: "State provoca Rendering" },
+    { id: "P2", from: "State", label: "riguarda", to: "Props" },
+    { id: "P3", from: "Props", label: "Ha a che fare con", to: "Rendering" },
+    { id: "P4", from: "State", label: "provoca", to: "Rendering", reference: "State provoca Rendering" },
+  ];
+  const r = await withJudge([judged([
+    { id: "P1", reason: "r", verdict: "wrong", fix: "" },
+    { id: "P2", reason: "r", verdict: "valid", fix: "" },
+    { id: "P3", reason: "r", verdict: "wrong", fix: "Non sono legati." },
+    { id: "P4", reason: "r", verdict: "valid", fix: "" },
+  ])], () => ex.judgePropositions({ focusQuestion: "D?", propositions: props, passages: [] }));
+  assert.deepEqual(r.map((j) => j.verdict), ["imprecise", "imprecise", "wrong", "valid"]);
+  assert.equal(r[0].fix, "State provoca Rendering");
+  assert.match(r[1].fix, /verbo/);
+  assert.equal(r[2].fix, "Non sono legati.");
+});
+
+test("judgePropositions: concetti e definizioni nel prompt", async () => {
+  const bodies: Record<string, unknown>[] = [];
+  await withJudge([judged([{ id: "P1", reason: "r", verdict: "valid", fix: "" }])], () => ex.judgePropositions({
+    focusQuestion: "D?", passages: [], concepts: [{ title: "State", definition: "Dati locali." }],
+    propositions: [{ id: "P1", from: "State", label: "provoca", to: "Rendering" }],
+  }), bodies);
+  assert.match(JSON.stringify(bodies[0]), /«State»: Dati locali\./);
+});

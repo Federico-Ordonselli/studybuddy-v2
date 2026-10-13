@@ -13,7 +13,7 @@ import { generate } from "@/lib/providers";
 import { checkCard } from "@/lib/tutor/cardQuality";
 import type { CardDraft } from "@/lib/tutor/cardGen";
 
-export const PROMPT_VERSION = "maps-v1";
+export const PROMPT_VERSION = "maps-v3";
 export const MAX_PROPOSITIONS = 15;
 
 export class ExerciseError extends Error {
@@ -153,16 +153,33 @@ const JUDGE_SCHEMA = {
 const JUDGE_SYSTEM = [
   "Valuti le proposizioni di una mappa concettuale costruita da uno studente. Ogni proposizione è «concetto A — verbo → concetto B».",
   "Giudica se il MATERIALE fornito sostiene il legame che la proposizione afferma, non se coincide con una mappa di riferimento.",
+  "I concetti sono quelli elencati con la loro definizione: un concetto della mappa esiste anche se il suo titolo non compare alla lettera nel materiale. Se un titolo unisce più idee (es. «Accessibilità e Responsive Design»), basta che il legame valga per la parte pertinente.",
   "Per ogni proposizione, in quest'ordine:",
   "1. reason: una o due frasi in italiano: cosa dice il materiale sul legame fra A e B.",
   "2. verdict:",
-  "- valid: il materiale sostiene il legame, anche se è formulato con altre parole o non compare nella formulazione di riferimento. Non esiste una sola mappa giusta.",
-  "- imprecise: i due concetti sono davvero legati, ma il verbo è vago (es. «è collegato a», «riguarda»), sbagliato nel tipo di rapporto, oppure la direzione è invertita.",
-  "- wrong: il materiale non sostiene il legame o lo contraddice.",
-  "3. fix: per imprecise e wrong, una frase che enuncia la relazione corretta fra A e B secondo il materiale; vuoto per valid.",
-  "La «formulazione di riferimento», quando c'è, è UNA formulazione possibile, non l'unica: usala per capire il legame atteso, non per bocciare formulazioni diverse ma corrette.",
+  "- valid: il materiale sostiene ciò che la proposizione afferma, anche con altre parole, in forma parziale o semplificata, o fuori dalla formulazione di riferimento. Non esiste una sola mappa giusta e non si chiede più precisione di quella che la proposizione dichiara.",
+  "- imprecise: A e B sono legati nel materiale (anche indirettamente), ma la proposizione lo dice male: verbo generico che non dice quale rapporto c'è (es. «è collegato a», «riguarda», «ha a che fare con»), tipo di rapporto sbagliato, oppure direzione invertita (B → A invece di A → B). Questi casi sono imprecise, MAI wrong.",
+  "- wrong: la proposizione afferma qualcosa che il materiale contraddice, oppure lega due concetti che il materiale non mette in nessun rapporto.",
+  "3. fix: per imprecise e wrong, una frase in italiano che enuncia la relazione corretta fra A e B secondo il materiale; vuoto per valid.",
+  "La «formulazione di riferimento», quando c'è, è UNA formulazione possibile, non l'unica, ricavata dallo stesso materiale: dice che A e B sono legati. Una proposizione che dice la stessa cosa del riferimento, anche con altre parole, è valid salvo che il materiale la contraddica; non bocciare formulazioni diverse ma corrette.",
   "Valuta tutte le proposizioni, con lo stesso id.",
 ].join("\n");
+
+/**
+ * Verbo che non dice quale rapporto c'è («è collegato a», «riguarda»): per definizione la proposizione è
+ * `imprecise` se la coppia è legata. Lo decide il codice, non il modello, che su questi verbi oscilla.
+ */
+const GENERIC_VERB = /^(?:(?:è|sono)\s+)?(?:(?:collegat|legat|conness|associat|relativ)[oaie]\s+(?:a|con|ad)|riguard(?:a|ano)|(?:ha|hanno) a che fare con|si (?:collega|collegano|riferisce|riferiscono) a|is (?:related|connected|linked) to|relates? to|concerns?|involves?)$/i;
+export const isGenericVerb = (label: string) => GENERIC_VERB.test(label.trim().replace(/\s+/g, " "));
+const GENERIC_FIX = "Usa un verbo che dica che rapporto c'è fra i due concetti.";
+
+/** Coppia nella soluzione → imprecise; fuori soluzione un `valid` scende a imprecise, un `wrong` resta. */
+function capGeneric(j: Judgement, p: JudgeProposition): Judgement {
+  if (!isGenericVerb(p.label)) return j;
+  if (p.reference) return { ...j, verdict: "imprecise", fix: j.verdict === "imprecise" && j.fix ? j.fix : p.reference };
+  if (j.verdict === "valid") return { ...j, verdict: "imprecise", fix: GENERIC_FIX };
+  return j;
+}
 
 const block = (label: string, text: string) => `${label}:\n"""\n${text}\n"""`;
 
@@ -187,12 +204,15 @@ export function parseJudgements(raw: string, ids: string[]): Judgement[] | null 
  * Una chiamata per tutte le proposizioni (massimo 15). Un retry su JSON invalido, poi errore:
  * nessun verdetto inventato. Le proposizioni senza voce restano «non valutate» per il chiamante.
  */
-export async function judgePropositions(input: { focusQuestion: string; propositions: JudgeProposition[]; passages: string[] }): Promise<Judgement[]> {
-  const { focusQuestion, propositions, passages } = input;
+export async function judgePropositions(input: {
+  focusQuestion: string; propositions: JudgeProposition[]; passages: string[]; concepts?: { title: string; definition: string }[];
+}): Promise<Judgement[]> {
+  const { focusQuestion, propositions, passages, concepts = [] } = input;
   if (!propositions.length) return [];
   if (propositions.length > MAX_PROPOSITIONS) throw new ExerciseError(`massimo ${MAX_PROPOSITIONS} proposizioni per verifica`);
   const content = [
     `Domanda focale della mappa: ${focusQuestion}`,
+    ...(concepts.length ? ["Concetti della mappa:\n" + concepts.map((c) => `- «${c.title}»: ${c.definition || "(senza definizione)"}`).join("\n")] : []),
     block("Materiale", passages.length ? passages.map((p, i) => `[${i + 1}] ${p}`).join("\n\n") : "(nessun passaggio disponibile)"),
     "Proposizioni dello studente:\n" + propositions.map((p) =>
       `${p.id}: «${p.from}» — ${p.label} → «${p.to}»` +
@@ -206,7 +226,7 @@ export async function judgePropositions(input: { focusQuestion: string; proposit
       temperature: 0, messages: [{ role: "user", content }],
     });
     const parsed = parseJudgements(raw, ids);
-    if (parsed) return parsed;
+    if (parsed) return parsed.map((j) => capGeneric(j, propositions.find((p) => p.id === j.id)!));
   }
   throw new Error("Il modello non ha prodotto una valutazione valida delle proposizioni. Riprova.");
 }
@@ -252,7 +272,7 @@ export async function evaluateLevel(mapId: string, spaceId: string): Promise<Che
     reference: reference.get(pairKey(r.sourceConceptId, r.targetConceptId)),
   }));
   const passages = levelPassages(solution, levelConcepts(doc, spaceId).map((c) => c.title));
-  const judged = new Map((await judgePropositions({ focusQuestion: row.focus_question, propositions, passages })).map((j) => [j.id, j]));
+  const judged = new Map((await judgePropositions({ focusQuestion: row.focus_question, propositions, passages, concepts: levelConcepts(doc, spaceId).map(({ title, definition }) => ({ title, definition })) })).map((j) => [j.id, j]));
   const result: CheckResult = {
     verdicts: props.map((r, i) => {
       const j = judged.get(`P${i + 1}`);
