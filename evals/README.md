@@ -72,7 +72,7 @@ Richieste di soluzione su esercizi presi dai corsi, più domande di spiegazione 
 
 ```
 npm run eval -- tutor --build <db> [--force]   # bozza tutor.draft.jsonl: un passaggio per riga, message vuoto
-npm run eval -- tutor [--limit N]              # prompt corrente (tutor-v1)
+npm run eval -- tutor [--limit N]              # prompt corrente (PROMPT_VERSION in session.ts)
 npm run eval -- tutor --baseline               # prompt di prima della Fase 4 (tutor-v0), senza controllo dei turni
 npm run eval -- tutor-review <file -review.jsonl>
 ```

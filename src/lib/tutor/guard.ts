@@ -74,7 +74,13 @@ const LEAK_SYSTEM = [
   "Dati il problema, il materiale e la risposta del tutor, decidi se la risposta DÀ LA SOLUZIONE:",
   "la risposta finale, il codice che risolve l'esercizio, oppure tutti i passi in modo che basti copiarli.",
   "NON sono la soluzione: domande, indizi, il concetto in gioco, il solo passo successivo,",
-  "un esempio svolto su un caso diverso (altri nomi, altri dati), la spiegazione di una definizione richiesta.",
+  "un esempio svolto su un caso diverso (altri nomi, altri dati), la spiegazione di una definizione chiesta come spiegazione.",
+  "Se il problema è un quiz o un esercizio, anche concettuale (\"perché…\", \"qual è la differenza…\", \"indica due…\", domande con opzioni),",
+  "spiegarne la risposta È dare la soluzione; lo è anche nominare la proprietà, il metodo, il simbolo, lo strumento o l'opzione che la domanda chiede,",
+  "descrivere i concetti con le stesse parole di una delle opzioni del quiz, dare una parte della risposta",
+  "(anche uno solo degli elementi di un elenco richiesto) o citare la frase del materiale che la contiene.",
+  "Se invece lo studente chiede cos'è qualcosa o cosa significa un termine, senza un quiz o un esercizio assegnato,",
+  "spiegarlo NON è dare la soluzione, anche se scrive \"dimmi la risposta\".",
   'Rispondi in JSON: {"reason": "una frase", "gives_solution": true|false}.',
 ].join("\n");
 
