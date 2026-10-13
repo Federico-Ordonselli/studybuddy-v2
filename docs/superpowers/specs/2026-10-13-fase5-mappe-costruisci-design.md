@@ -26,7 +26,6 @@ Tabella `map_exercises` (in `schema.ts`, `schemaSql.ts` rigenerato con `npm run 
 
 | colonna | tipo | note |
 |---|---|---|
-| `id` | integer PK autoincrement | |
 | `map_id` | text NOT NULL | → `concept_maps.id` |
 | `level_key` | text NOT NULL | `root` oppure l'id del concetto proprietario della tela |
 | `focus_question` | text NOT NULL | |
@@ -34,7 +33,7 @@ Tabella `map_exercises` (in `schema.ts`, `schemaSql.ts` rigenerato con `npm run 
 | `last_check` | text JSON | esito dell'ultima verifica |
 | `created_at`, `checked_at`, `revealed_at`, `completed_at` | integer (secondi) | |
 
-`UNIQUE(map_id, level_key)`. `deleteMap` cancella le righe della mappa nella stessa transazione (nessuna dipendenza da `PRAGMA foreign_keys`).
+Chiave primaria `(map_id, level_key)`. `deleteMap` cancella le righe della mappa nella stessa transazione (nessuna dipendenza da `PRAGMA foreign_keys`).
 
 **Soluzione per titolo.** Gli id dei concetti di un approfondimento li crea il browser (`expansionCommands`), quindi la soluzione resta per titolo e si risolve negli id con `titleKey` al momento della verifica, fra i concetti che hanno una bolla nella tela. Rinominare una bolla durante l'esercizio fa perdere le sue coppie: il pannello lo dice in una riga.
 
@@ -76,7 +75,7 @@ Nei sottolivelli `expansionCommands` mette il concetto proprietario al centro e 
 
 - `revealLevel(mapId, spaceId)` imposta `revealed_at` e restituisce le relazioni della soluzione per titolo. `overlayDocument(doc, spaceId, solution)` (core) clona il documento e aggiunge le coppie mancanti come relazioni **non direzionali** (la tela le disegna tratteggiate): la vista si monta con `readOnly` in un secondo contenitore e non si salva mai.
 - `completeLevel(mapId, spaceId)` imposta `completed_at` e restituisce soluzione e concetti completi; `completionCommands(doc, spaceId, solution)` (core) produce `addRelation` per le coppie mancanti (provenienza `llm`) e `updateConcept` che rimette spiegazione ed esempi ai concetti della tela che li hanno vuoti. Il client li applica con `editor.applyCommands` e l'autosalvataggio fa il resto. Un livello completato non mostra più il pannello dell'esercizio.
-- **Crea carta** (solo sulle proposizioni `wrong`): `relationCardDraft(mapId, spaceId, relationId)` restituisce `{ question: "Che relazione c'è tra «X» e «Y»?", answer, sourceChunkId }`. `answer` = «X label Y» dalla soluzione se la coppia c'è, altrimenti il `fix` della verifica. `sourceChunkId` = primo `sourceRef` dei due concetti. Il client mostra la bozza modificabile con `checkCard` ricontrollato mentre scrivi (stesso comportamento di `CardPreview`): «Salva» è disabilitato finché ci sono segnalazioni. Poi `POST /api/cards { domainId, cards: [...] }` (`saveCards`, dedup nello scope del macro).
+- **Crea carta** (solo sulle proposizioni `wrong`): `relationCardDraft(mapId, spaceId, relationId)` restituisce `{ question: "Che relazione c'è tra «X» e «Y»?", answer, sourceChunkId }`. `answer` = «X label Y» dalla soluzione se la coppia c'è, altrimenti il `fix` della verifica. `sourceChunkId` = primo `sourceRef` dei due concetti. La bozza (con `issues` di `checkCard`) si mostra con `CardPreview`, riusato così com'è: modificabile, ricontrollata mentre scrivi, spuntata solo se valida; il salvataggio è `POST /api/cards { domainId, cards }` (`saveCards`, dedup nello scope del macro).
 
 ## 5. API (thin wrapper in `src/app/api/maps/exercise/`)
 
