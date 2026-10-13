@@ -51,3 +51,13 @@ test("saveState aggiorna sessions.updated_at (per gli «ultimi corsi studiati» 
   const { updated_at } = sqlite.prepare("SELECT updated_at FROM sessions WHERE id = ?").get(s.id) as { updated_at: number };
   assert.ok(updated_at > 1_700_000_000, `updated_at = ${updated_at}`);
 });
+
+test("problemStatement: l'enunciato è il messaggio `turns - 1` posizioni indietro; spiegazioni precedenti escluse", () => {
+  const u = (content: string) => ({ role: "user" as const, content });
+  const a = (content: string) => ({ role: "assistant" as const, content });
+  assert.equal(S.problemStatement([], 1), undefined);
+  assert.equal(S.problemStatement([u("spiegami X"), a("ok")], 1), undefined);
+  const h = [u("cos'è X?"), a("spiegazione"), u("Esercizio: inverti una stringa"), a("indizio"), u("provo con split"), a("indizio 2")];
+  assert.equal(S.problemStatement(h, 3), "Esercizio: inverti una stringa");
+  assert.equal(S.problemStatement(h, 2), "provo con split");
+});

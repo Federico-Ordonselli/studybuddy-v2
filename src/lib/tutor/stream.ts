@@ -1,18 +1,20 @@
 import { OllamaUnavailableError } from '@/lib/errors';
-import { prepareSocraticStream } from './session';
-import { appendTurn, forModel, saveState, type SessionRow } from './sessions';
+import { publicHint } from './hints';
+import { prepareSocratic } from './session';
+import { beginTurn, endTurn, forModel, problemStatement, saveState, type SessionRow, type SocraticAction } from './sessions';
 
-/** La cronologia viene salvata solo quando il provider ha terminato con successo. */
-export async function socraticResponse(session: SessionRow, message: string, domainId: number | undefined, requestSignal: AbortSignal): Promise<Response> {
+/** La cronologia viene salvata solo quando il provider ha terminato con successo. I turni a rischio arrivano come un solo token, già controllati. */
+export async function socraticResponse(session: SessionRow, message: string, domainId: number | undefined, requestSignal: AbortSignal, action: SocraticAction = 'reply'): Promise<Response> {
+  const hint = beginTurn(session.state, message, action); // 409 prima di aprire lo stream
   const abort = new AbortController();
   const onAbort = () => abort.abort(requestSignal.reason);
   requestSignal.addEventListener('abort', onAbort, {once:true});
   if (requestSignal.aborted) onAbort();
   const history = session.state?.history ?? [];
   let prepared;
-  try { prepared = await prepareSocraticStream(forModel(history), message, domainId, abort.signal); }
+  try { prepared = await prepareSocratic(forModel(history), message, domainId, hint, action, abort.signal, true, problemStatement(history, hint.turns)); }
   catch (e) { requestSignal.removeEventListener('abort', onAbort); throw e; }
-  const {citations, tokens} = prepared;
+  const {citations} = prepared;
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -21,12 +23,20 @@ export async function socraticResponse(session: SessionRow, message: string, dom
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       };
       let reply = '';
+      let blocked = 0;
       try {
-        emit('metadata', {citations, sessionId:session.id});
-        for await (const token of tokens) { reply += token; emit('token', {text:token}); }
+        emit('metadata', {citations, sessionId:session.id, guarded:prepared.guarded, hint:publicHint(hint)});
+        if (prepared.guarded) {
+          const r = await prepared.reply();
+          reply = r.reply; blocked = r.blocked;
+          emit('token', {text:reply});
+        } else {
+          for await (const token of prepared.tokens) { reply += token; emit('token', {text:token}); }
+        }
         abort.signal.throwIfAborted();
-        saveState(session.id, {history:appendTurn(history,message,reply,citations)});
-        emit('done', {});
+        const next = endTurn(session.state, hint, action, message, reply, citations, blocked);
+        saveState(session.id, next);
+        emit('done', {hint:publicHint(next.hint!)});
         controller.close();
       } catch (e) {
         if (!abort.signal.aborted) {

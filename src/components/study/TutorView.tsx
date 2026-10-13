@@ -10,7 +10,7 @@ import Markdown from "./Markdown";
 import { S } from "./styles";
 import VerdictPanel from "./VerdictPanel";
 import VideoPanel from "./VideoPanel";
-import { sessionKey, type Citation, type Confidence, type Grade, type Msg, type PlayingVideo, type QuizQuestion } from "./types";
+import { sessionKey, type Citation, type Confidence, type Grade, type Msg, type PlayingVideo, type PublicHint, type QuizQuestion } from "./types";
 
 async function chat(body: Record<string, unknown>) {
   return post<{ reply: string; citations?: Citation[]; question?: QuizQuestion; grade?: Grade; source?: Citation; sessionId?: number }>("/api/chat", body);
@@ -27,6 +27,9 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
   const [pendingQ, setPendingQ] = useState<QuizQuestion | null>(null);
   const [confidence, setConfidence] = useState<Confidence | null>(null); // per le domande aperte del quiz
   const [sessionId, setSessionId] = useState<number | undefined>();
+  const [hint, setHint] = useState<PublicHint | null>(null);
+  const [guarded, setGuarded] = useState(false);
+  const [busy, setBusy] = useState(false); // «Nuovo problema» in corso
   const [video, setVideo] = useState<PlayingVideo | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -40,7 +43,8 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
     fetch(`/api/session?id=${sid}`).then((r) => r.json()).then((s) => {
       if (s.history?.length) {
         setSessionId(sid);
-        setMsgs(s.history.map((m: { role: "user" | "assistant"; content: string; citations?: Citation[] }) => ({ role: m.role, content: m.content, citations: m.citations })));
+        if (s.hint) setHint(s.hint);
+        setMsgs(s.history.map((m: { role: "user" | "assistant"; content: string; citations?: Citation[]; tag?: string }) => ({ role: m.role, content: m.content, citations: m.citations, tag: m.tag })));
       }
     }).catch(() => {});
   }, [domainId, mode]);
@@ -69,43 +73,62 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
       setInput(""); await submitAnswer(text, pendingQ, confidence ?? undefined); return;
     }
     setInput("");
+    if (mode === "socratic") { await streamSocratic(text, { message: text }); return; }
     setMsgs((m) => [...m, { role: "user", content: text }]);
     setLoading(true);
+    try {
+      const turn = await chat({ mode: "quiz", domainId, message: text });
+      setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Domanda", citations: turn.citations, question: turn.question }]);
+      if (turn.question) setPendingQ(turn.question);
+    } catch (e) {
+      setMsgs((m) => [...m, { role: "assistant", content: `Errore: ${e}` }]);
+    } finally { setLoading(false); }
+  }
+
+  /** Un turno socratico in streaming; `userText` è ciò che compare nel thread. */
+  async function streamSocratic(userText: string, extra: Record<string, unknown>, tag?: string) {
+    setMsgs((m) => [...m, { role: "user", content: userText }]);
+    setLoading(true); setGuarded(false);
     let streamPlaceholder = false;
     try {
-      if (mode === "socratic") {
-        abortRef.current = new AbortController();
-        const response = await fetch("/api/chat", {method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({mode,domainId,message:text,sessionId,stream:true}), signal:abortRef.current.signal});
-        if (!response.ok) throw new Error((await response.json()).error ?? "Errore del tutor");
-        if (!response.body) throw new Error("Stream assente");
-        streamPlaceholder = true;
-        setMsgs(m => [...m,{role:"assistant",content:""}]);
-        let completed = false;
-        for await (const {event,data} of decodedSse(response.body)) {
-          if (event === "metadata") {
-            setSessionId(data.sessionId);
-            try { localStorage.setItem(sessionKey(domainId),String(data.sessionId)); } catch {}
-            setMsgs(m => m.map((msg,i) => i === m.length-1 ? {...msg,citations:data.citations} : msg));
-          } else if (event === "token") {
-            setMsgs(m => m.map((msg,i) => i === m.length-1 ? {...msg,content:msg.content+data.text} : msg));
-          } else if (event === "error") throw new Error(data.error);
-          else if (event === "done") completed = true;
-        }
-        if (!completed) throw new Error("Risposta incompleta. Riprova.");
-      } else {
-        const turn = await chat({ mode: "quiz", domainId, message: text });
-        setMsgs((m) => [...m, { role: "assistant", content: turn.reply, tag: "Domanda", citations: turn.citations, question: turn.question }]);
-        if (turn.question) setPendingQ(turn.question);
+      abortRef.current = new AbortController();
+      const response = await fetch("/api/chat", {method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({mode,domainId,sessionId,stream:true,...extra}), signal:abortRef.current.signal});
+      if (!response.ok) throw new Error((await response.json()).error ?? "Errore del tutor");
+      if (!response.body) throw new Error("Stream assente");
+      streamPlaceholder = true;
+      setMsgs(m => [...m,{role:"assistant",content:"",tag}]);
+      let completed = false;
+      for await (const {event,data} of decodedSse(response.body)) {
+        if (event === "metadata") {
+          setSessionId(data.sessionId); setHint(data.hint); setGuarded(Boolean(data.guarded));
+          try { localStorage.setItem(sessionKey(domainId),String(data.sessionId)); } catch {}
+          setMsgs(m => m.map((msg,i) => i === m.length-1 ? {...msg,citations:data.citations} : msg));
+        } else if (event === "token") {
+          setMsgs(m => m.map((msg,i) => i === m.length-1 ? {...msg,content:msg.content+data.text} : msg));
+        } else if (event === "error") throw new Error(data.error);
+        else if (event === "done") { completed = true; setHint(data.hint); }
       }
+      if (!completed) throw new Error("Risposta incompleta. Riprova.");
     } catch (e) {
       setMsgs((m) => {
         const last = m.at(-1);
         const history = streamPlaceholder && last?.role === "assistant" && !last.content ? m.slice(0, -1) : m;
         return [...history, { role: "assistant", content: `Errore: ${e}` }];
       });
-    } finally { setLoading(false); }
+    } finally { setLoading(false); setGuarded(false); }
   }
+
+  async function newProblem() {
+    if (!sessionId || loading || busy) return;
+    setBusy(true);
+    try {
+      const r = await post<{ hint: PublicHint }>("/api/chat", { mode, domainId, sessionId, action: "new-problem" });
+      setHint(r.hint);
+      setMsgs((m) => [...m, { role: "assistant", content: "Nuovo problema: si riparte dal primo indizio.", tag: "Nuovo problema" }]);
+    } catch (e) { setCardError(String(e)); } finally { setBusy(false); }
+  }
+  const revealSolution = () => !busy && streamSocratic("Mostra la soluzione", { action: "solution" }, "Soluzione");
 
   async function addToReview(index: number, quiz: QuizQuestion) {
     setAdding(true);setCardError("");
@@ -130,7 +153,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
             {msgs.length === 0 && (
               <div style={S.empty}>
                 {mode === "socratic"
-                  ? "Modalità socratica: il tutor ti guida con domande e indizi, citando il materiale. La conversazione viene salvata e ripresa."
+                  ? "Modalità socratica: alle domande di spiegazione il tutor risponde citando il materiale; sugli esercizi ti guida un indizio alla volta. Dopo 2 tentativi puoi chiedere la soluzione. Prima di un esercizio diverso premi «Nuovo problema»."
                   : "Modalità quiz: dai un argomento, rispondi alla domanda, ricevi una valutazione."}
               </div>
             )}
@@ -162,7 +185,7 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
                 </div>
               </div>
             ))}
-            {loading && <div style={{ ...S.row, justifyContent: "flex-start" }}><div style={{ ...S.bubble, ...S.assistant }}><span className="spin" /> <span style={{ color: "var(--muted)" }}>sto pensando…</span></div></div>}
+            {loading && <div style={{ ...S.row, justifyContent: "flex-start" }}><div style={{ ...S.bubble, ...S.assistant }}><span className="spin" /> <span style={{ color: "var(--muted)" }}>{guarded ? "preparo un indizio…" : "sto pensando…"}</span></div></div>}
           </div>
 
           {cardError && <p role="alert" style={{color:"var(--danger)"}}>{cardError}</p>}
@@ -173,6 +196,16 @@ export default function TutorView({ domainId, mode, initialInput = "" }: { domai
               placeholder={placeholder} rows={1} style={S.textarea} disabled={!domainId} />
             <button onClick={send} disabled={loading || !domainId || !input.trim() || (needsConfidence && !confidence)} style={S.send}>Invia</button>
           </div>
+          {mode === "socratic" && sessionId && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 13, color: "var(--muted)" }}>
+              <span>Indizio {hint?.level ?? 1}/4 · tentativi {Math.min(hint?.attempts ?? 0, 2)}/2</span>
+              <button style={{ ...S.ghost, ...(loading || busy ? S.ghostDisabled : null) }} onClick={newProblem} disabled={loading || busy}>Nuovo problema</button>
+              <button style={{ ...S.ghost, ...(loading || busy || !hint?.canReveal ? S.ghostDisabled : null) }} onClick={revealSolution} disabled={loading || busy || !hint?.canReveal}
+                title={hint?.canReveal ? "Mostra la soluzione completa" : "Si sblocca dopo 2 tentativi"}>
+                {hint?.canReveal ? "Mostra soluzione" : "Mostra soluzione (dopo 2 tentativi)"}
+              </button>
+            </div>
+          )}
     </>
   );
 }

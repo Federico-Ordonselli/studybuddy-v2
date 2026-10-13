@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadSession } from "@/lib/tutor/sessions";
+import { initialHint, publicHint } from "@/lib/tutor/hints";
 
 export const runtime = "nodejs";
 
@@ -14,5 +15,6 @@ export async function GET(req: NextRequest) {
     mode: session.mode,
     domainId: session.domainId,
     history: session.state?.history ?? [],
+    hint: publicHint(session.state?.hint ?? initialHint()),
   });
 }

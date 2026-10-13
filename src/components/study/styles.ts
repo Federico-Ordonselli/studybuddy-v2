@@ -11,6 +11,7 @@ export const S: Record<string, React.CSSProperties> = {
   playerHead: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   x: { background: "transparent", border: "none", color: "var(--muted)", fontSize: 14 },
   ghost: { background: "transparent", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", fontSize: 13, marginTop: 8, cursor: "pointer" },
+  ghostDisabled: { color: "var(--text-subtle)", background: "var(--bg-subtle)", cursor: "default" },
   thread: { flex: 1, overflowY: "auto", padding: "16px 0", display: "flex", flexDirection: "column", gap: 12 },
   empty: { color: "var(--muted)", textAlign: "center", margin: "auto", maxWidth: 460, lineHeight: 1.6 },
   row: { display: "flex" },

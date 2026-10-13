@@ -39,6 +39,10 @@ export interface Msg {
   confidence?: Confidence; // fiducia dichiarata sulla risposta valutata
 }
 
+/** Stato della scala di indizi (Fase 4) come lo manda il server. */
+// Rispecchia PublicHint in src/lib/tutor/hints.ts (duplicato apposta: il codice client non importa moduli server).
+export interface PublicHint { level: number; attempts: number; canReveal: boolean }
+
 export interface ReviewCard { id: number; question: string }
 /** Rating FSRS (1–4) con le etichette della UI. */
 export type Rating = 1 | 2 | 3 | 4;
