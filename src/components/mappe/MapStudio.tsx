@@ -87,7 +87,7 @@ export default function MapStudio({ domainId, onAskTutor }: { domainId?: number;
             method: "POST",
             body: JSON.stringify({ mapId: req.mapId, domainId: domainRef.current, conceptId: req.conceptId, concept: req.concept, path: req.path, existing: req.existing, present: req.present }),
           });
-          loadLevels(req.mapId).catch(() => {});
+          loadLevels(req.mapId).catch((e) => setError(String(e)));
           return proposal;
         },
         resolveSource: async (ref: SourceRef) => {
@@ -143,7 +143,7 @@ export default function MapStudio({ domainId, onAskTutor }: { domainId?: number;
     setError(""); setSource(null);
     try {
       const { map } = await json<{ map: MapDoc }>(`/api/maps/${encodeURIComponent(id)}`);
-      await loadLevels(map.id).catch(() => {});
+      await loadLevels(map.id);
       setCurrent(map);
     } catch (e) { setError(String(e)); }
   }
@@ -154,7 +154,7 @@ export default function MapStudio({ domainId, onAskTutor }: { domainId?: number;
     try {
       const { map } = await json<{ map: MapDoc }>(buildMode ? "/api/maps/exercise" : "/api/maps", { method: "POST", body: JSON.stringify({ domainId, topic: topic.trim() }) });
       setTopic(""); await refresh(); setLevels([]); setOverlay(null);
-      if (buildMode) await loadLevels(map.id).catch(() => {});
+      if (buildMode) await loadLevels(map.id);
       setCurrent(map);
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }

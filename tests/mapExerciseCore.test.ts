@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { assertMapDocument } from "@/lib/mappe/formato-mappa.js";
 import { applyMapCommands } from "@/lib/mappe/comandi.js";
-import { createRelation } from "@/lib/mappe/modello.js";
+import { createConcept, createPlacement, createRelation } from "@/lib/mappe/modello.js";
 import {
   comparePairs, completionCommands, exerciseDocument, levelConcepts, levelKeyOf, levelPropositions,
   overlayDocument, pairKey, resolveSolution, stripProposal, type ExerciseDoc, type Solution,
@@ -94,6 +94,34 @@ test("overlayDocument: aggiunge solo le coppie mancanti, non direzionali, docume
   const added = view.relations.filter((r) => !doc.relations.some((d) => d.id === r.id));
   assert.equal(added.length, 2);
   assert.ok(added.every((r) => r.directed === false));
+  assert.equal(doc.relations.length, 1, "l'originale non cambia");
+  assert.equal(view.relations.length, 3, "proposizione dello studente + 2 mancanti");
+  assert.equal(view.concepts.length, 4);
+});
+
+test("overlayDocument: un sotto-livello diventa la tela radice della vista, con l'arco mancante", () => {
+  const doc0 = exerciseDocument("React", SOLUTION, { seed: "s1" });
+  const hub = doc0.placements.find((p) => p.conceptId === idOf(doc0, "Rendering"))!;
+  const subs = ["State", "Props", "Virtual DOM"].map((t) => createConcept(t, { definition: `def ${t}` }));
+  const space = { id: "child-space", title: "Rendering", ownerConceptId: hub.conceptId };
+  const doc = applyMapCommands(doc0, [
+    { type: "addChildSpace", placementId: hub.id, space },
+    ...subs.map((c, i) => ({ type: "addConcept", concept: c, placement: createPlacement(space.id, c.id, { x: i * 300, y: 5, width: 210, height: 90 }) })),
+    { type: "addRelation", relation: createRelation(subs[0].id, subs[1].id, "alimenta") },
+  ]) as ExerciseDoc;
+  const sol: Solution = { concepts: [], relations: [{ from: "State", to: "Props", label: "x" }, { from: "Props", to: "Virtual DOM", label: "mancante" }] };
+  const view = overlayDocument(doc, space.id, sol);
+  assertMapDocument(view);
+  assert.equal(view.title, "Rendering");
+  const rootIds = view.placements.filter((p) => p.spaceId === view.rootSpaceId).map((p) => p.conceptId).sort();
+  assert.deepEqual(rootIds, subs.map((c) => c.id).sort());
+  assert.equal(view.placements.length, 3);
+  assert.ok(view.placements.every((p) => !p.childSpaceId));
+  assert.equal(view.concepts.length, 3);
+  const dashed = view.relations.filter((r) => !r.directed);
+  assert.equal(dashed.length, 1);
+  assert.deepEqual([dashed[0].sourceConceptId, dashed[0].targetConceptId], [subs[1].id, subs[2].id]);
+  assert.equal(view.relations.length, 2);
   assert.equal(doc.relations.length, 1, "l'originale non cambia");
 });
 

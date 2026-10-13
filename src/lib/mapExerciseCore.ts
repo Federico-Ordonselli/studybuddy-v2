@@ -5,7 +5,7 @@
  */
 import { mapFromProposal, titleKey } from "@/lib/mappe/proposte.js";
 import { applyMapCommands } from "@/lib/mappe/comandi.js";
-import { createRelation } from "@/lib/mappe/modello.js";
+import { createMapDocument, createPlacement, createRelation } from "@/lib/mappe/modello.js";
 
 export interface SourceRefLike {
   documentId: string; documentRevision: string; chunkId: string;
@@ -135,13 +135,31 @@ export function comparePairs(doc: ExerciseDoc, spaceId: string, solution: Soluti
 
 const predicate = (label: string) => label.trim().slice(0, 120) || "è collegato a";
 
-/** Vista «Mostra soluzione»: le coppie mancanti come archi non direzionali (la tela li tratteggia). Mai salvata. */
+/**
+ * Vista «Mostra soluzione»: documento a livello singolo (mai salvato) con i concetti della tela,
+ * le proposizioni dello studente e le coppie mancanti come archi non direzionali (la tela li
+ * tratteggia). `mount()` parte sempre dalla tela radice, quindi un sotto-livello va «appiattito».
+ */
 export function overlayDocument(doc: ExerciseDoc, spaceId: string, solution: Solution): ExerciseDoc {
-  const commands = comparePairs(doc, spaceId, solution).missing.map((m) => ({
-    type: "addRelation",
-    relation: createRelation(m.sourceId, m.targetId, predicate(m.label), { directed: false, provenance: { origin: "llm" } }),
-  }));
-  return applyMapCommands(doc, commands) as ExerciseDoc;
+  const title = doc.spaces.find((s) => s.id === spaceId)?.title ?? doc.title;
+  const view = createMapDocument(title) as ExerciseDoc;
+  const commands: MapCommand[] = [];
+  for (const pl of doc.placements.filter((x) => x.spaceId === spaceId)) {
+    const concept = doc.concepts.find((c) => c.id === pl.conceptId);
+    if (!concept) continue;
+    commands.push({
+      type: "addConcept", concept,
+      placement: createPlacement(view.rootSpaceId, concept.id, { x: pl.x, y: pl.y, width: pl.width, height: pl.height }),
+    });
+  }
+  for (const r of levelPropositions(doc, spaceId)) commands.push({ type: "addRelation", relation: r });
+  for (const m of comparePairs(doc, spaceId, solution).missing) {
+    commands.push({
+      type: "addRelation",
+      relation: createRelation(m.sourceId, m.targetId, predicate(m.label), { directed: false, provenance: { origin: "llm" } }),
+    });
+  }
+  return applyMapCommands(view, commands) as ExerciseDoc;
 }
 
 /** «Completa la mappa»: archi mancanti e spiegazioni/esempi dei concetti della tela che li hanno vuoti. */
