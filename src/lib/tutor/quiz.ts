@@ -1,4 +1,5 @@
 import { generate } from "@/lib/providers";
+import { REFERS_TO_HIDDEN } from "./cardQuality";
 
 export interface QuizQuestion {
   type: "open" | "mcq";
@@ -58,9 +59,8 @@ function ensureGradable(q: QuizQuestion): QuizQuestion {
  * Rete di sicurezza oltre al prompt: il modello a volte scrive "quale dei seguenti…"
  * o "secondo il testo…" anche quando gli si chiede di non farlo. Lo studente non vede
  * né il contesto né (nelle domande aperte) delle opzioni: la domanda va scartata.
+ * La regex è condivisa con il controllo delle flashcard (`cardQuality.ts`).
  */
-const REFERS_TO_HIDDEN = /\b(seguent[ie]|following|(nel|il|del|secondo il) (testo|contesto|passaggio)|(in|the) (text|context|passage))\b/i;
-
 function isSelfContained(q: QuizQuestion): boolean {
   if (q.type === "mcq" && q.options?.length) return !/\b(testo|contesto|text|context|passage|passaggio)\b/i.test(q.question);
   return !REFERS_TO_HIDDEN.test(q.question);
