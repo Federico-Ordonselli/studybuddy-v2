@@ -32,7 +32,10 @@ test('generazione usa tutti i chunk del modulo, salva riassunti e flashcard senz
  const prompts:string[]=[];
  globalThis.fetch=async(_url,init)=>{
   const body=JSON.parse(String(init?.body));prompts.push(JSON.stringify(body.messages));
-  const content=body.format ? JSON.stringify({questions:[{type:'open',question:'Come funziona il concetto A?',answer:'Primo modulo A',rationale:'Definizione'}]}) : '# Sintesi\nPrimo modulo A';
+  const content=body.format ? JSON.stringify({facts:['Il concetto A è il primo modulo'],cards:[
+   {fact:0,type:'qa',question:'Come funziona il concetto A?',answer:'Primo modulo A',source:1},
+   {fact:0,type:'qa',question:'È vero che A è il primo modulo?',answer:'Sì',source:1},
+  ]}) : '# Sintesi\nPrimo modulo A';
   return Response.json({message:{content}});
  };
  try {
@@ -40,7 +43,9 @@ test('generazione usa tutti i chunk del modulo, salva riassunti e flashcard senz
   assert.ok(prompts.every(p=>p.includes('Primo modulo A') && !p.includes('Secondo modulo A') && !p.includes('Primo modulo B')));
   assert.match(listMaterials(2).find(m=>m.kind==='summary')!.content,/Sintesi/);
   await generateStep({...step,kind:'flashcards'});await generateStep({...step,kind:'flashcards'});
-  const cards=sqlite.prepare('SELECT * FROM cards WHERE domain_id=2').all() as {source_chunk_id:number}[];
-  assert.equal(cards.length,1);assert.equal(cards[0].source_chunk_id,moduleChunks(step)[0].chunkId);
+  const cards=sqlite.prepare('SELECT * FROM cards WHERE domain_id=2').all() as {source_chunk_id:number;fsrs_state:number|null}[];
+  // la carta sì/no non passa il controllo di qualità: senza anteprima non entra
+  assert.equal(cards.length,1);assert.equal(cards[0].source_chunk_id,moduleChunks(step)[0].chunkId);assert.equal(cards[0].fsrs_state,0);
+  assert.match(listMaterials(2).find(m=>m.kind==='flashcards')!.content,/0 nuove flashcard.*1 carta non atomica\./);
  }finally {globalThis.fetch=original;}
 });

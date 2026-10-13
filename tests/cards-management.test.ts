@@ -25,3 +25,21 @@ test('dal quiz al ripasso: dominio, contenuto, dedup e nessuna carta in altri co
  assert.equal(createCardFromQuiz(2,{question:'Come funziona il ripasso?',answer:'Con intervalli progressivi'}).created,false);
  assert.throws(()=>createCardFromQuiz(999,{question:'q',answer:'a'}));
 });
+
+test('saveCards: carte scelte nell anteprima, dedup nello scope, fonte solo se del corso', async()=>{
+ const {saveCards}=await import('@/lib/tutor/cards');
+ sqlite.exec("INSERT INTO documents(id,domain_id,title) VALUES(50,2,'doc figlio'),(51,3,'doc altro'); INSERT INTO chunks(id,document_id,ordinal,content) VALUES(500,50,0,'testo'),(510,51,0,'altro testo')");
+ const r=saveCards(1,[
+  {question:'Cosa fa una closure?',answer:'Ricorda lo scope',sourceChunkId:500},
+  {question:'cosa fa una closure',answer:'doppione'},
+  {question:'Cosa restituisce map?',answer:'Un nuovo array',sourceChunkId:510},
+ ]);
+ assert.deepEqual(r,{created:2,skipped:1});
+ const rows=sqlite.prepare("SELECT question,source_chunk_id AS s,domain_id AS d,fsrs_state AS f FROM cards WHERE question LIKE 'Cosa%' ORDER BY id").all();
+ assert.deepEqual(rows,[{question:'Cosa fa una closure?',s:500,d:1,f:0},{question:'Cosa restituisce map?',s:null,d:1,f:0}]);
+ // una carta già presente in un corso figlio è un duplicato anche dal macro
+ sqlite.exec("INSERT INTO cards(domain_id,question,answer) VALUES(2,'Cos è il DOM?','Un albero')");
+ assert.equal(saveCards(1,[{question:'Cos è il DOM?',answer:'x'}]).created,0);
+ assert.throws(()=>saveCards(1,[{question:' ',answer:'x'}]));
+ assert.throws(()=>saveCards(999,[{question:'q',answer:'a'}]));
+});

@@ -4,8 +4,8 @@ import { resolveScope, type Retrieved } from "@/lib/rag/store";
 import { LibraryError } from "@/lib/errors";
 import { mapReduceSummary } from "@/lib/summarize";
 import { generate } from "@/lib/providers";
-import { generateQuiz } from "@/lib/tutor/quiz";
-import { isDuplicateQuestion, sourceForAnswer } from "@/lib/tutor/cards";
+import { generateCardDrafts } from "@/lib/tutor/cardGen";
+import { saveCards } from "@/lib/tutor/cards";
 import { generateMap } from "@/lib/conceptmap";
 import { getMap, saveMap } from "@/lib/mappe/store";
 
@@ -60,20 +60,17 @@ export async function generateStep(step: Step, summaries = new Map<string,string
   const texts = chunks.map(c => c.content);
   let content = "";
   if (step.kind === "flashcards") {
-    let created = 0;
+    let created = 0, flagged = 0;
     for (let i=0;i<chunks.length;i+=6) {
       const batch = chunks.slice(i,i+6);
-      const questions = await generateQuiz(batch.map(c => c.content).join("\n\n"),5,{kind:"open",focus:"concepts"});
-      if (!questions.length) throw new Error("Il modello non ha prodotto flashcard valide");
-      sqlite.transaction(() => {
-        const existing = (sqlite.prepare("SELECT question FROM cards WHERE domain_id = ?").all(step.domainId) as {question:string}[]).map(c => c.question);
-        for (const q of questions) if (!isDuplicateQuestion(q.question,existing)) {
-          sqlite.prepare("INSERT INTO cards(domain_id, question, answer, source_chunk_id, due_at, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(step.domainId,q.question,q.answer,sourceForAnswer(q.answer,batch),Math.floor(Date.now()/1000),Math.floor(Date.now()/1000));
-          existing.push(q.question); created++;
-        }
-      })();
+      const drafts = await generateCardDrafts(batch,{n:5});
+      if (!drafts.length) throw new Error("Il modello non ha prodotto flashcard valide");
+      // Senza anteprima: entrano solo le carte che passano il controllo di qualità (Fase 3).
+      const valid = drafts.filter(d => !d.issues.length);
+      const saved = valid.length ? saveCards(step.domainId,valid) : {created:0,skipped:0};
+      created += saved.created; flagged += drafts.length - valid.length;
     }
-    content = `${created} nuove flashcard aggiunte al ripasso. Le domande già presenti sono state saltate.`;
+    content = `${created} nuove flashcard aggiunte al ripasso. Saltate le domande già presenti${flagged ? ` e ${flagged} ${flagged === 1 ? "carta non atomica" : "carte non atomiche"}` : ""}.`;
   } else {
     const summary = summaries.get(step.key) ?? await mapReduceSummary(texts,step.module);
     if (!summary.trim()) throw new Error("Sintesi del modulo vuota");
