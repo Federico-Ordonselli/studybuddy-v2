@@ -66,4 +66,39 @@ che **si capisce senza aver visto il video** (nomina lo strumento, il linguaggio
 **la materia** e non il corso (niente logistica, statistiche motivazionali, slogan, storie d'esempio),
 con una risposta precisa e un italiano corretto, e che **non serve riscrivere**.
 
-Da aggiungere con le fasi successive: `tutor.jsonl` (Fase 4), `maps.jsonl` (Fase 5).
+## tutor.jsonl (Fase 4)
+
+Richieste di soluzione su esercizi presi dai corsi, più domande di spiegazione a cui il tutor deve continuare a rispondere.
+
+```
+npm run eval -- tutor --build <db> [--force]   # bozza tutor.draft.jsonl: un passaggio per riga, message vuoto
+npm run eval -- tutor [--limit N]              # prompt corrente (tutor-v1)
+npm run eval -- tutor --baseline               # prompt di prima della Fase 4 (tutor-v0), senza controllo dei turni
+npm run eval -- tutor-review <file -review.jsonl>
+```
+
+La bozza ha 30 passaggi da 3 corsi (sola lettura del DB): `message` va scritto a mano (la richiesta di soluzione o la domanda
+di spiegazione) e `kind` corretto, poi si salva come `tutor.jsonl`. Una riga per caso:
+
+| Campo | Contenuto |
+|---|---|
+| `id` | identificativo unico |
+| `course` | nome del corso |
+| `kind` | `exercise` (richiesta di soluzione) o `explanation` (domanda di spiegazione) |
+| `context` | passaggio del corso, passato al tutor come `[1]` |
+| `history` | turni precedenti `{role, content}` (default vuoto) |
+| `message` | messaggio dello studente |
+| `level` | livello di indizio del turno, 1–4 (default 1) |
+| `chunkId` | chunk di origine |
+
+Metriche automatiche: turni a rischio, quanti intercettati (almeno una risposta bloccata dal controllo), indizi fissi, tempo medio dei
+turni a rischio contro gli altri; `--baseline` produce lo stesso rapporto col prompt `tutor-v0` per il confronto.
+Ogni run scrive `results/<data>-tutor-<versione>-review.jsonl` con `"leak": null` sugli esercizi e `"explains": null` sulle spiegazioni.
+
+Obiettivi: **meno del 10%** di esercizi con la soluzione data, tempo medio dei turni a rischio < baseline + 4 s, **tutte** le spiegazioni date.
+
+Criterio della revisione: `leak: true` se la risposta contiene la risposta finale, il codice che risolve l'esercizio, o tutti i passi in modo
+che basti copiarli; un esempio su un caso diverso, il concetto o il solo passo successivo non sono una perdita. `explains: true` se risponde
+alla domanda di spiegazione invece di rimandare con altre domande.
+
+Da aggiungere con le fasi successive: `maps.jsonl` (Fase 5).
