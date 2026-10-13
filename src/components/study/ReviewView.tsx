@@ -4,14 +4,16 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { post } from "@/lib/client/api";
 import { timeUntil } from "@/lib/format";
+import type { CardDraft } from "@/lib/tutor/cardGen";
 import CardManager from "./CardManager";
+import CardPreview from "./CardPreview";
 import ConfidencePicker from "./ConfidencePicker";
 import { S } from "./styles";
 import VerdictPanel from "./VerdictPanel";
 import VideoPanel from "./VideoPanel";
 import { RATING_LABEL, type Confidence, type OverrideResult, type PlayingVideo, type Rating, type ReviewCard, type ReviewResult } from "./types";
 
-/** Ripasso FSRS: coda delle carte in scadenza (figli inclusi se è un macro) + generazione carte. */
+/** Ripasso FSRS: coda delle carte in scadenza (figli inclusi se è un macro) + generazione carte con anteprima. */
 export default function ReviewView({ domainId }: { domainId: number }) {
   const router = useRouter();
   const [version, setVersion] = useState(0);
@@ -24,6 +26,8 @@ export default function ReviewView({ domainId }: { domainId: number }) {
   const [fixing, setFixing] = useState(false);   // pannello «Il voto è sbagliato» aperto
   const [corrected, setCorrected] = useState(false);
   const [genTopic, setGenTopic] = useState("");
+  const [drafts, setDrafts] = useState<CardDraft[] | null>(null); // anteprima delle carte generate
+  const [genMsg, setGenMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [video, setVideo] = useState<PlayingVideo | null>(null);
   const [loaded, setLoaded] = useState(false); // senza, al primo render compariva «nessuna carta»
@@ -33,19 +37,26 @@ export default function ReviewView({ domainId }: { domainId: number }) {
     setDue(r.due ?? 0); setCard(r.card ?? null); setResult(null); setError(""); setFixing(false); setCorrected(false); setAnswer(""); setConfidence(null); setVideo(null); setLoaded(true);
   }
 
+  /** Genera le carte in anteprima: si salvano solo quelle scelte (Fase 3). */
   async function generateCards() {
     if (!domainId || !genTopic.trim() || busy) return;
-    setBusy(true);
+    setBusy(true); setGenMsg(""); setDrafts(null);
     try {
-      const res = await fetch("/api/cards", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domainId, topic: genTopic.trim(), n: 5 }),
-      });
-      setGenTopic("");
-      await loadDue(domainId);
-      setVersion(v=>v+1);
-      if (res.ok) router.refresh(); // aggiorna i badge della sidebar
+      const r = await post<{ cards: CardDraft[] }>("/api/cards", { domainId, topic: genTopic.trim(), n: 5, preview: true });
+      if (r.cards.length) setDrafts(r.cards);
+      else setGenMsg("Nessuna carta generata su questo argomento: prova a formularlo diversamente.");
+    } catch (e) {
+      setGenMsg(`Errore: ${e instanceof Error ? e.message : e}`);
     } finally { setBusy(false); }
+  }
+
+  async function previewDone(message: string) {
+    setDrafts(null); setGenMsg(message);
+    if (!message) return; // scartate
+    setGenTopic("");
+    await loadDue(domainId);
+    setVersion((v) => v + 1);
+    router.refresh(); // aggiorna i badge della sidebar
   }
 
   async function submitReview() {
@@ -94,6 +105,9 @@ export default function ReviewView({ domainId }: { domainId: number }) {
           </button>
         </div>
       </div>
+
+      {genMsg && <p role="status" style={{ margin: 0, color: genMsg.startsWith("Errore") ? "var(--danger)" : "var(--muted)" }}>{genMsg}</p>}
+      {drafts && <CardPreview key={drafts.map((d) => d.question).join("|")} domainId={domainId} drafts={drafts} onDone={previewDone} />}
 
       {!loaded ? (
         <div style={S.empty}><span className="spin" /></div>
