@@ -10,6 +10,7 @@
     "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts",
     "eval": "tsx --env-file-if-exists=.env.local scripts/eval.ts",
     "import-vault": "tsx --env-file-if-exists=.env.local scripts/import-vault.ts",
+    "desktop:install": "bash scripts/desktop/install.sh",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:schema": "tsx scripts/schema-sql.ts",
