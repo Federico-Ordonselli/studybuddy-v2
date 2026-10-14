@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import AutoGenerate from "./AutoGenerate";
+import LessonStudyView from "./LessonStudyView";
 import MapStudio from "@/components/mappe/MapStudio";
 import { post } from "@/lib/client/api";
 import Markdown from "./Markdown";
 import { S } from "./styles";
 import type { SlideT } from "./types";
 
-type Tool = "summary" | "map" | "slides";
+type Tool = "summary" | "map" | "slides" | "cornell" | "pretest";
 
 export default function StudioView({ domainId, onWide, onAskTutor }: { domainId: number; onWide: (wide: boolean) => void; onAskTutor: (text: string) => void }) {
   const [topic, setTopic] = useState("");
@@ -21,7 +22,7 @@ export default function StudioView({ domainId, onWide, onAskTutor }: { domainId:
 
   async function run(t: Tool) {
     // La mappa ha il suo editor (elenco, generazione, salvataggio): basta aprirlo.
-    if (t === "map") { setTool(t); setSummary(null); setSlides(null); return; }
+    if (t === "map" || t === "cornell" || t === "pretest") { setTool(t); setSummary(null); setSlides(null); return; }
     if (!topic.trim() || !domainId || loading) return;
     setTool(t); setLoading(true); setSummary(null); setSlides(null);
     try {
@@ -46,18 +47,18 @@ export default function StudioView({ domainId, onWide, onAskTutor }: { domainId:
     }
   }
 
-  const tools: [Tool, string][] = [["summary", "Riassunto"], ["map", "Mappa concettuale"], ["slides", "Slide"]];
+  const tools: [Tool, string][] = [["cornell", "Appunti guidati"], ["pretest", "Prima della lezione"], ["summary", "Riassunto"], ["map", "Mappa concettuale"], ["slides", "Slide"]];
 
   return (
     <div style={S.review}>
       <AutoGenerate key={domainId} domainId={domainId} onMap={() => setTool("map")} onAskTutor={onAskTutor} />
       <div style={S.reviewBar}>
-        {tool !== "map" && <input value={topic} onChange={(e) => setTopic(e.target.value)}
+        {tool !== "map" && tool !== "cornell" && tool !== "pretest" && <input value={topic} onChange={(e) => setTopic(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && tool) run(tool); }}
           placeholder="Argomento da studiare…" style={{ ...S.select, flex: 1, minWidth: 220 }} disabled={!domainId} />}
         {tools.map(([t, label]) => (
-          <button key={t} onClick={() => run(t)} disabled={loading || !domainId || (t !== "map" && !topic.trim())}
-            style={{ ...S.tab, border: "1px solid var(--border)", borderRadius: 8, ...(tool === t ? S.tabActive : {}) }}>
+          <button key={t} onClick={() => run(t)} disabled={loading || !domainId || ((t === "summary" || t === "slides") && !topic.trim())}
+            style={{ ...S.tab, border: "1px solid var(--border)", borderRadius: 8, ...(tool === t ? S.tabActive : {}), ...((loading || !domainId || ((t === "summary" || t === "slides") && !topic.trim())) ? S.ghostDisabled : {}) }}>
             {label}
           </button>
         ))}
@@ -65,10 +66,11 @@ export default function StudioView({ domainId, onWide, onAskTutor }: { domainId:
 
       {loading && <div style={{ ...S.empty, marginTop: 24 }}><span className="spin" /> {tool === "slides" ? "genero le slide…" : "riassumo il materiale…"}</div>}
 
-      {!loading && !tool && <div style={S.empty}>Scrivi un argomento e scegli uno strumento: riassunto map-reduce o slide con immagini generate. La mappa concettuale si esplora entrando nelle bolle.</div>}
+      {!loading && !tool && <div style={S.empty}>Scegli una lezione per gli appunti guidati o le domande prima di studiare. Puoi anche esplorare una mappa, oppure scrivere un argomento per riassunti e slide.</div>}
 
       {summary !== null && <div style={S.card}><Markdown text={summary} /></div>}
       {tool === "map" && <MapStudio domainId={domainId} onAskTutor={onAskTutor} />}
+      {(tool === "cornell" || tool === "pretest") && <LessonStudyView key={`${domainId}-${tool}`} domainId={domainId} mode={tool} />}
       {slides !== null && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {slides.map((s, i) => (

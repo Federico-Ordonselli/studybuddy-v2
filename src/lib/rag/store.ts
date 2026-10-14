@@ -40,6 +40,9 @@ export function deleteDocumentChunks(documentId: number) {
       delFts.run(r.id);
     }
     unlinkCards.run(documentId);
+    // L'attività usa una fotografia dei passaggi: dopo il re-ingest va rigenerata.
+    // La nota Cornell già salvata resta nel corso.
+    sqlite.prepare("DELETE FROM lesson_studies WHERE document_id = ?").run(documentId);
     db.delete(chunks).where(eq(chunks.documentId, documentId)).run();
   })();
 }

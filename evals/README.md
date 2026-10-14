@@ -133,3 +133,34 @@ Criterio dei verdetti (le regole di `JUDGE_SYSTEM`): `valid` se il materiale sos
 Obiettivo: **accordo esatto ≥ 80%** col verdetto di riferimento. Metrica di controllo: `absent-valid bocciate X/Y`, cioè le proposizioni valide ma
 assenti dalla soluzione giudicate `wrong` (il valutatore non deve penalizzare chi trova un legame buono diverso da quello della soluzione).
 Ogni run scrive `results/maps-<ISO>.json` con `promptVersion`, `model`, `metrics` e le righe.
+
+## Lezioni: Cornell e pretesting (Fasi 7.2–7.3)
+
+Il set **sintetico e committabile** `fixtures/lessons.json` contiene sei lezioni di materie diverse,
+senza estratti dei corsi. La generazione usa `cornell-v1` (`lessonPrompts.ts`) e il prompt esistente
+`quiz-v1` (`tutor/quiz.ts`, invariato). Il pretesting non chiama un giudice e non crea carte o review.
+
+```bash
+DB_PATH=/tmp/studybuddy-eval-lessons.db npm run eval -- lessons
+# Riusa le domande guida della run appena prodotta per verificare i sei riassunti di riferimento:
+DB_PATH=/tmp/studybuddy-eval-lessons.db npm run eval -- lessons --summary-results evals/results/lessons-<ISO>.json
+```
+
+`--limit N` limita le lezioni generate. Il primo comando verifica 5–8 domande guida con fonte valida,
+tre domande di pretesting diverse, e segnala domande sì/no, riferimenti nascosti o risposte nella domanda.
+Scrive anche domande, attese, passaggi e campi `review`: la validità dello schema **non dimostra**
+che una domanda sia utile o fondata; la revisione confronta domanda e risposta con il passaggio.
+Le domande guida possono chiedere un confronto o più aspetti: la conversione in carta passa
+da `checkCard` e dall'anteprima modificabile, senza salvataggio automatico.
+
+Il secondo comando misura l'accordo su tre riassunti corretti e tre sbagliati, con le domande guida
+effettivamente generate e il contesto usato in produzione. Usa `grade-v2` invariato e la domanda
+`cornell-summary-v2`; scrive `results/lesson-summaries-<ISO>.json` e fallisce sotto l'80%.
+
+**Misura del 2026-10-14:** 6/6 generazioni complete, 38 domande guida e 18 di pretesting.
+Revisione di Codex sui passaggi: 38/38 attese Cornell e 18/18 attese pretesting fondate, domande utili
+e comprensibili senza il testo. Riassunti: la prima domanda chiedeva anche vaghi «rapporti principali»
+e faceva 4/6, segnando quel requisito come mancante in due sintesi corrette; tolta quella richiesta,
+**v2 6/6** sugli stessi casi. È una run su materiale sintetico breve, non una misura sui corsi reali
+o sulle lezioni lunghe. Risultati locali gitignored:
+`lessons-2026-10-14T17-38-06-292Z.json` e `lesson-summaries-2026-10-14T17-47-27-013Z.json`.

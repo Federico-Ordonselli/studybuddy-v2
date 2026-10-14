@@ -76,6 +76,15 @@ export const chunks = sqliteTable("chunks", {
   meta: text("meta", { mode: "json" }), // { startSec?, endSec? } per trascrizioni
 });
 
+/** Appunti guidati per documento. Le risposte di riferimento non sono esposte al client. */
+export const lessonStudies = sqliteTable("lesson_studies", {
+  documentId: integer("document_id").notNull().references(() => documents.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  state: text("state").notNull(),
+  revision: integer("revision").notNull().default(1),
+  noteId: integer("note_id").references(() => notes.id, { onDelete: "set null" }),
+}, (t) => [primaryKey({ columns: [t.documentId, t.kind] })]);
+
 /** Carte per lo spaced repetition (SM-2). */
 export const cards = sqliteTable("cards", {
   id: integer("id").primaryKey({ autoIncrement: true }),

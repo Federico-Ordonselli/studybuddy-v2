@@ -1,0 +1,62 @@
+[
+  {
+    "id": "memoria",
+    "title": "Memoria e processi",
+    "content": "La memoria virtuale assegna a ogni processo uno spazio di indirizzi indipendente. La MMU traduce gli indirizzi virtuali in indirizzi fisici usando le tabelle delle pagine. Una pagina ha dimensione fissa ed è l'unità di traduzione e protezione. La TLB conserva traduzioni recenti per evitare di leggere la tabella delle pagine a ogni accesso. Un page fault si verifica quando la pagina richiesta non è disponibile in memoria fisica o l'accesso viola i permessi. Il sistema operativo gestisce il fault: può caricare la pagina dal disco, oppure segnalare un accesso illegale. Il paging permette di usare memoria virtuale più ampia della RAM, ma gli accessi al disco sono molto più lenti degli accessi alla RAM. Il thrashing è un eccesso di page fault che costringe il sistema a trascorrere gran parte del tempo spostando pagine. Un working set è l'insieme di pagine usate da un processo in un intervallo di tempo. Tenere il working set in RAM riduce i fault."
+  },
+  {
+    "id": "energia",
+    "title": "Calore e temperatura",
+    "content": "La temperatura descrive lo stato termico di un corpo; il calore è energia trasferita a causa di una differenza di temperatura. Il calore fluisce spontaneamente dal corpo più caldo a quello più freddo fino all'equilibrio termico. La capacità termica è l'energia necessaria per aumentare di un grado la temperatura di un corpo. Il calore specifico è la capacità termica per unità di massa. In assenza di cambiamenti di fase, Q = m c ΔT esprime il calore scambiato da un corpo di massa m e calore specifico c. Durante un cambiamento di fase, l'energia trasferita può cambiare lo stato fisico senza aumentare la temperatura. Il calore latente per unità di massa descrive l'energia richiesta dal cambiamento di fase. La conduzione trasferisce energia tramite interazioni locali nella materia, senza trasporto macroscopico di materia. La convezione comporta il movimento di un fluido. L'irraggiamento trasferisce energia tramite onde elettromagnetiche e può avvenire anche nel vuoto.",
+    "summaryChecks": [
+      {
+        "answer": "La temperatura descrive lo stato termico, mentre il calore è energia trasferita per una differenza di temperatura dal corpo più caldo al più freddo fino all’equilibrio. La capacità termica è l’energia per aumentare di un grado la temperatura e il calore specifico è tale capacità per unità di massa; senza cambiamento di fase Q = m c ΔT. Durante un cambiamento di fase il calore può cambiare lo stato fisico senza aumentare la temperatura e il calore latente per unità di massa descrive l’energia richiesta. La conduzione usa interazioni locali senza trasporto macroscopico di materia, la convezione il movimento di un fluido e l’irraggiamento onde elettromagnetiche, anche nel vuoto.",
+        "gold": "correct"
+      },
+      {
+        "answer": "La temperatura è la quantità di calore contenuta nel corpo e il calore passa spontaneamente dal freddo al caldo. Il calore specifico è la massa totale del corpo. Nei cambiamenti di fase la temperatura aumenta sempre, mentre l’irraggiamento richiede il movimento di un fluido.",
+        "gold": "wrong"
+      }
+    ]
+  },
+  {
+    "id": "cellule",
+    "title": "Membrane cellulari",
+    "content": "La membrana cellulare è un doppio strato di fosfolipidi con proteine inserite. Le teste idrofile dei fosfolipidi si rivolgono verso l'acqua, mentre le code idrofobe si rivolgono all'interno dello strato. La permeabilità selettiva permette alla membrana di controllare quali sostanze attraversano il confine della cellula. La diffusione semplice trasporta piccole molecole lungo il gradiente di concentrazione senza consumo diretto di ATP. La diffusione facilitata usa proteine di trasporto e avviene anch'essa lungo il gradiente. L'osmosi è il movimento dell'acqua attraverso una membrana selettivamente permeabile verso la soluzione con maggiore concentrazione di soluti. Il trasporto attivo muove sostanze contro il gradiente e richiede energia. Una pompa può usare ATP direttamente per questo trasporto. L'endocitosi introduce materiale nella cellula tramite vescicole formate dalla membrana; l'esocitosi rilascia materiale all'esterno tramite fusione delle vescicole con la membrana.",
+    "summaryChecks": [
+      {
+        "answer": "La membrana è un doppio strato di fosfolipidi con proteine inserite, teste idrofile verso l’acqua e code idrofobe all’interno; la permeabilità selettiva controlla quali sostanze attraversano il confine della cellula. La diffusione semplice trasporta piccole molecole lungo il gradiente senza consumo diretto di ATP, mentre quella facilitata usa proteine e procede sempre lungo il gradiente. L’osmosi sposta acqua attraverso una membrana selettivamente permeabile verso la soluzione più concentrata in soluti. Il trasporto attivo usa energia per muovere sostanze contro il gradiente e alcune pompe usano ATP direttamente. L’endocitosi introduce materiale tramite vescicole formate dalla membrana, mentre l’esocitosi rilascia materiale tramite fusione delle vescicole con la membrana.",
+        "gold": "correct"
+      },
+      {
+        "answer": "La membrana è uno strato solido impermeabile formato esclusivamente da proteine. La diffusione semplice consuma ATP per spostare molecole contro il gradiente e l’osmosi trasporta i soluti al posto dell’acqua. Il trasporto attivo non richiede energia e l’endocitosi rilascia materiale all’esterno.",
+        "gold": "wrong"
+      }
+    ]
+  },
+  {
+    "id": "statistica",
+    "title": "Descrivere una distribuzione",
+    "content": "La media aritmetica è la somma dei valori divisa per il loro numero. La mediana è il valore centrale dei dati ordinati; con un numero pari di valori è la media dei due centrali. La moda è il valore più frequente e può non essere unica. La media è sensibile ai valori estremi; la mediana è più robusta. Il range è la differenza tra valore massimo e minimo. La varianza della popolazione è la media dei quadrati degli scarti dalla media. La deviazione standard è la radice quadrata della varianza e ha la stessa unità di misura dei dati. Il primo e il terzo quartile separano rispettivamente il 25% e il 75% dei dati ordinati. Il range interquartile è Q3 meno Q1 e descrive la dispersione della metà centrale dei dati. Un istogramma raggruppa i dati numerici in intervalli e mostra la frequenza di ciascun intervallo; le sue barre sono contigue perché rappresentano intervalli di una scala numerica.",
+    "summaryChecks": [
+      {
+        "answer": "La media è la somma dei valori divisa per il numero ed è sensibile agli estremi, la mediana è il centro dei dati ordinati ed è più robusta: con un numero pari si fa la media dei due valori centrali. La moda è il valore più frequente e può non essere unica; il range è massimo meno minimo. La varianza della popolazione è la media dei quadrati degli scarti dalla media e la deviazione standard è la sua radice quadrata, con le stesse unità dei dati. Q1 e Q3 separano il 25% e il 75% dei dati ordinati, e Q3 meno Q1 è il range interquartile, dispersione della metà centrale. Un istogramma mostra le frequenze di intervalli numerici con barre contigue.",
+        "gold": "correct"
+      },
+      {
+        "answer": "La media è il valore più frequente e la moda è la somma divisa per il numero di osservazioni. La mediana è sempre il valore massimo e non serve ordinare i dati. La deviazione standard è il quadrato della varianza; il range interquartile è massimo meno minimo e un istogramma mostra solo categorie senza intervalli numerici.",
+        "gold": "wrong"
+      }
+    ]
+  },
+  {
+    "id": "musica",
+    "title": "Ritmo e misura",
+    "content": "La pulsazione è la successione regolare di battiti che sostiene il ritmo. Il tempo indica la velocità della pulsazione, spesso espressa in battiti al minuto. Il ritmo descrive come durate e accenti si organizzano nel tempo e può variare pur mantenendo la stessa pulsazione. Una misura raggruppa un numero di pulsazioni; le stanghette separano le misure nella notazione. L'indicazione 4/4 specifica quattro pulsazioni di semiminima per misura. La semiminima dura un battito in 4/4; la minima dura due battiti; la semibreve dura quattro battiti; la croma dura mezzo battito. Una pausa indica una durata di silenzio ed è misurata come una figura di nota corrispondente. Un punto dopo una figura aggiunge metà della durata di quella figura. Una legatura di valore unisce durate di note della stessa altezza. La sincope sposta un accento su una parte debole della pulsazione o prolunga una nota debole oltre una parte forte."
+  },
+  {
+    "id": "reti",
+    "title": "Trasmissione affidabile",
+    "content": "TCP offre un flusso di byte ordinato e affidabile tra due estremi. UDP invia datagrammi senza garantire consegna o ordine e non stabilisce una connessione come TCP. In TCP un numero di sequenza identifica la posizione dei byte nel flusso; i riscontri ACK indicano quali byte sono stati ricevuti. Se manca un riscontro entro il timeout, il mittente può ritrasmettere i dati. Il controllo di flusso limita la quantità di dati in transito in base alla capacità del ricevitore; la finestra annunciata comunica lo spazio disponibile. Il controllo di congestione adatta l'invio alle condizioni della rete ed è distinto dal controllo di flusso. Una porta identifica un servizio o un'applicazione nell'host. Un indirizzo IP identifica l'interfaccia di rete usata per instradare i pacchetti. La latenza è il tempo impiegato dai dati a raggiungere la destinazione; la banda è una capacità di trasferimento per unità di tempo, quindi una banda maggiore non implica necessariamente latenza minore."
+  }
+]

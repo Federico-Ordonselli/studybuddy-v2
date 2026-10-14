@@ -32,6 +32,20 @@ Flashcards are generated from a topic or from a concept-map node. You answer in 
 
 <img src="docs/screenshots/review-sm2.png" alt="Review card graded and rescheduled" width="640">
 
+### Guided lesson notes and pretesting
+In **Studio**, choose **Appunti guidati** for Cornell notes on one lesson: 5–8 guiding questions,
+your notes, and a final summary of 3–5 sentences. Save to keep one editable course note; verify
+the summary to see covered points, omissions and errors grounded in that lesson. Each guiding
+question can become a flashcard through the editable quality preview after you write and save
+your notes. Unsaved drafts survive a tool change in the same browser.
+
+Choose **Prima della lezione** to attempt three open questions before studying. There is no grade,
+FSRS scheduling or automatic flashcard creation. After three attempts (including “non so”), read
+the lesson material, watch its video when available, or request reference answers. A specialization
+offers lessons from its courses, but each activity uses only the selected lesson. Long lessons use
+a disclosed selection of passages for generation and checking. Re-importing invalidates activities
+based on old passages while preserving saved notes.
+
 ### Explorable concept maps
 The model proposes a central concept, related concepts, and labelled relations. Each concept comes with a definition, an explanation, examples, and **sources**. Double-click a bubble to **enter** it (animated zoom). The first time, the sub-level is generated from the material, reusing titles already on the map. This creates cross-level links (dashed "portal" pills) instead of duplicate nodes. Every AI proposal is applied as atomic commands, so undo/redo works on AI edits too.
 

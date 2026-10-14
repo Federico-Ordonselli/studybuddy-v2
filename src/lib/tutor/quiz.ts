@@ -1,6 +1,8 @@
 import { generate } from "@/lib/providers";
 import { REFERS_TO_HIDDEN } from "./cardQuality";
 
+export const PROMPT_VERSION = "quiz-v1";
+
 export interface QuizQuestion {
   type: "open" | "mcq";
   question: string;

@@ -356,6 +356,13 @@ Solo dentro lo stesso corso o specializzazione: mescolare domini lontani non dà
 
 ### **7.2 Appunti guidati (stile Cornell)**
 
+☑ **Implementata il 2026-10-14.** Studio → Appunti guidati → scelta della lezione (anche dentro un macro).
+Domande e attese in `lesson_studies`; appunti, riassunto e verifica salvati nella stessa nota del corso
+effettivo. Ripresa da server e bozza locale; revisioni contro i salvataggi concorrenti. Carte da ogni
+domanda tramite anteprima, dopo aver scritto e salvato l'appunto. Eval: sei lezioni sintetiche,
+38 domande guida revisionate sui passaggi; verifica dei riassunti 6/6 su tre corrette e tre sbagliate
+(`cornell-summary-v2`, `grade-v2` invariato). Limiti e comandi in `evals/README.md`.
+
 Nuova modalità in StudioView.tsx, accanto a riassunti e slide, per una singola lezione:
 
 1. Il modello genera da 5 a 8 domande guida dalla trascrizione della lezione (stesso schema delle carte, solo domande).  
@@ -366,6 +373,12 @@ Nuova modalità in StudioView.tsx, accanto a riassunti e slide, per una singola 
 Il riassunto map-reduce esistente resta disponibile: lo usi dopo, per confronto o per ripassare.
 
 ### **7.3 Pretesting prima di una lezione**
+
+☑ **Implementata il 2026-10-14.** Studio → Prima della lezione → scelta della lezione → tre tentativi
+senza voto né scheduling. Le attese restano sul server fino al confronto richiesto dopo i tentativi;
+video (quando presente) e materiale testuale disponibili dopo aver provato. Riusa `generateQuiz`
+senza modificarne il prompt. Eval: 18 domande su sei lezioni sintetiche, tutte fondate nella revisione
+sui passaggi. I chunk si leggono per `document_id`, senza ricerca fra documenti diversi.
 
 Pulsante "Domande prima di guardare" sulla lezione: 3 domande aperte generate dalla lezione, risposte senza voto e senza scheduling. Rispondere prima, anche sbagliando, aiuta a notare i punti giusti durante il video. Riusa generateQuiz(); serve un retrieve limitato a un documento: verifica se src/lib/rag/store.ts lo supporta già, altrimenti aggiungi un filtro per documentId.
 
