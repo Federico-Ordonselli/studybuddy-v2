@@ -8,6 +8,7 @@ import type { Library } from "@/lib/library";
 import FolderBrowser from "./FolderBrowser";
 import ImportProgress from "./ImportProgress";
 import PlanEditor from "./PlanEditor";
+import CourseraDownload from "./CourseraDownload";
 
 type Phase = "loading" | "edit" | "browse" | "importing";
 
@@ -109,6 +110,8 @@ export default function AddWizard({ libraryDirName }: { libraryDirName: string }
           </div>
         )}
       </header>
+
+      {phase === "edit" && <CourseraDownload onReady={(path) => void analyze(path)} />}
 
       {err && <p className="text-danger text-sm">{err}</p>}
       {phase === "edit" && skipped.length > 0 && (

@@ -134,7 +134,7 @@ cp .env.example .env        # set COURSES_DIR to the absolute path of your cours
 docker compose up -d --build
 ```
 
-Open http://localhost:3000. Courses are mounted read-only at the same path as on the host; the database and model caches live in `./data`. Check the setup at http://localhost:3000/api/health (`?warm=1` loads the reranker, runs one test inference and reports `cuda` or `cpu`). Set `STUDYBUDDY_PORT` / `STUDYBUDDY_HOST` in `.env` to change the port or bind address. Video files for the SF6 module go in `data/vods/`.
+Open http://localhost:3000. Courses are mounted read-write at the same path as on the host (for integrated Coursera downloads); the database and model caches live in `./data`. Check the setup at http://localhost:3000/api/health (`?warm=1` loads the reranker, runs one test inference and reports `cuda` or `cpu`). Set `STUDYBUDDY_PORT` / `STUDYBUDDY_HOST` in `.env` to change the port or bind address. Video files for the SF6 module go in `data/vods/`.
 
 No GPU: `docker compose -f docker-compose.yml -f compose.cpu.yaml up -d --build` (reranker and Whisper fall back to CPU).
 
@@ -244,3 +244,68 @@ aperti con l'argomento di ricerca (o il modulo) precompilato.
 Le cartelle copiate in `Courses/` devono essere importate prima di generare materiali;
 la generazione non importa automaticamente i file. Nessuna dipendenza da un corso
 specifico o da un provider esterno.
+
+### Scaricare un corso da Coursera
+
+In **Corsi → Aggiungi corso → Scarica da Coursera** incolla un URL
+`https://www.coursera.org/learn/nome-corso` e lascia **Usa la sessione Firefox**:
+basta essere già collegati a Coursera in Firefox sul computer dove gira StudyBuddy.
+La ricerca comprende i profili Linux classici/XDG, Flatpak, Snap, macOS e Windows.
+`STUDYBUDDY_FIREFOX_DIR` permette di indicare una cartella profili o un singolo profilo.
+Leggiamo soltanto CAUTH di Coursera da una copia temporanea del DB (incluso il WAL
+per Firefox aperto), senza aprire né modificare l'originale. La copia è eliminata subito.
+
+In alternativa scegli **Inserisci CAUTH manualmente** (il pannello spiega dove
+trovarlo). Occorre avere accesso al corso. Il cookie non viene salvato nel database,
+nei log o in una configurazione; quello manuale viene passato al processo Python
+in memoria. A ogni download la sessione viene letta nuovamente.
+
+Il motore esterno è la cartella locale `courseradown/Coursera-Downloader`, esclusa
+da Git e dal contesto Docker perché può contenere credenziali e corsi personali.
+Puoi indicare un'altra installazione con `STUDYBUDDY_COURSERA_DIR`.
+Installa le sole dipendenze headless nella venv di StudyBuddy:
+
+```bash
+.venv/bin/pip install -r scripts/requirements-coursera.txt
+```
+
+`STUDYBUDDY_COURSERA_PYTHON` permette di scegliere un altro interprete Python.
+Il download comprende video a 720p, tutte le lingue disponibili dei sottotitoli e
+le risorse fornite dal motore; quiz e notebook interattivi sono esclusi. Per ora
+si accettano link a singoli corsi, non alle specializzazioni.
+
+Se Coursera nega l’accesso ad alcuni materiali ma restituisce moduli utilizzabili,
+il download prosegue e mostra **Download parziale** prima dell’importazione.
+Le letture o lezioni mancanti vanno verificate sul sito. Se nessun modulo è
+disponibile, oppure fallisce il download dei file selezionati, il corso non viene
+pubblicato nella libreria. Gli errori distinguono sessione Firefox assente,
+accesso negato, problemi di rete e dipendenze mancanti, senza esporre credenziali.
+
+Un download alla volta, in background (massimo 24 ore). Al termine premi
+**Download completato: analizza e importa**: l'anteprima esistente permette di
+scegliere il dominio e avviare l'indicizzazione. Ollama serve per questa fase,
+non per scaricare. I corsi già presenti non vengono sovrascritti.
+I file parziali restano in una cartella nascosta nella libreria e vengono rimossi
+a fine tentativo; un riavvio del server interrompe il download e perde lo stato.
+Dopo un arresto forzato puoi eliminare le cartelle `.studybuddy-download-*`
+rimaste nella libreria. Non è prevista la ripresa automatica.
+
+Il collegamento desktop usa il normale `docker compose up -d`: motore Coursera,
+libreria in scrittura e profili Firefox in sola lettura sono già nella configurazione
+base. Non serve avviare il downloader separatamente né usare file Compose aggiuntivi.
+Dopo un aggiornamento del codice ricostruisci l'immagine una volta:
+
+```bash
+docker compose build
+```
+
+In `.env`, `FIREFOX_PROFILES_DIR` indica il percorso assoluto della cartella dei
+profili Firefox dell'host (per esempio `/home/utente/.config/mozilla/firefox` oppure
+`/home/utente/.mozilla/firefox`). In assenza della variabile il default è
+`$HOME/.mozilla/firefox`. Il container deve avere permessi di lettura.
+`COURSERA_DOWNLOADER_DIR` permette di scegliere un'altra installazione del motore
+(default `./courseradown/Coursera-Downloader`). Questi mount sono entrambi in sola
+lettura; solo la cartella dei corsi è scrivibile per salvare i download.
+
+Il codice del motore resta esterno e mantiene la propria licenza; l'adattatore
+usa direttamente estrattore e downloader, senza avviare la GUI.

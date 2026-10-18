@@ -34,11 +34,13 @@ RUN npm run build
 # av pinnato a 17.1.0 (quello dell'ambiente locale): con av 19 faster-whisper 1.2.1 fallisce
 # in decode_audio (metadata_errors) e il sidecar ripiega in silenzio su CPU.
 FROM base AS venv
+COPY scripts/requirements-coursera.txt /tmp/requirements-coursera.txt
 RUN python3 -m venv /app/.venv \
  && /app/.venv/bin/pip install --no-cache-dir \
       faster-whisper==1.2.1 ctranslate2==4.8.0 "av==17.1.0" \
       "nvidia-cublas-cu12>=12,<13" "nvidia-cudnn-cu12>=9,<10" \
-      yt-dlp
+      yt-dlp \
+ && /app/.venv/bin/pip install --no-cache-dir -r /tmp/requirements-coursera.txt
 
 # ---- runtime ----
 FROM base AS runner

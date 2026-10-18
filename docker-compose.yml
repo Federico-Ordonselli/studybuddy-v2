@@ -19,11 +19,15 @@ services:
       # i corsi stanno allo stesso percorso dell'host: i percorsi già nel DB restano validi
       STUDYBUDDY_LIBRARY_DIR: ${COURSES_DIR:?imposta COURSES_DIR in .env (percorso assoluto della cartella dei corsi)}
       STUDYBUDDY_FS_ROOT: ${COURSES_DIR}
+      STUDYBUDDY_COURSERA_DIR: /opt/coursera-downloader
+      STUDYBUDDY_FIREFOX_DIR: /opt/firefox-profiles
       HOST: ${STUDYBUDDY_HOST:-127.0.0.1}
       PORT: ${STUDYBUDDY_PORT:-3000}
     volumes:
       - ./data:/app/data
-      - ${COURSES_DIR}:${COURSES_DIR}:ro
+      - ${COURSES_DIR}:${COURSES_DIR}:rw
+      - ${COURSERA_DOWNLOADER_DIR:-./courseradown/Coursera-Downloader}:/opt/coursera-downloader:ro
+      - ${FIREFOX_PROFILES_DIR:-${HOME}/.mozilla/firefox}:/opt/firefox-profiles:ro
     deploy:
       resources:
         reservations:
