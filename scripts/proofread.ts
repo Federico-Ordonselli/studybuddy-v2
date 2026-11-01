@@ -1,16 +1,16 @@
 /**
  * Copia corretta (refusi, accenti, formattazione) di un vault Obsidian.
  *
- *   npm run proofread -- <vault> [--out <cartella>] [--watch] [--quiet <secondi>] [--force] [--dry-run]
+ *   npm run proofread -- <vault> [--out <cartella>] [--force] [--dry-run]
  *
  * Default della copia: cartella accanto al vault, `<vault>-pulito`. Gli originali non si
- * toccano. `--watch` resta acceso e corregge una nota quando non la modifichi da
- * `--quiet` secondi (default 45). Modello: task `proofread` in src/lib/config.ts.
+ * toccano. Stessa passata del bottone in Impostazioni («Appunti Obsidian»).
+ * Modello: task `proofread` in src/lib/config.ts.
  */
 import path from "node:path";
 import { models } from "@/lib/config";
 import { PROMPT_VERSION } from "@/lib/proofread/note";
-import { syncVault, watchVault, readState, validatePaths, type SyncEvent } from "@/lib/proofread/vault";
+import { syncVault, readState, validatePaths, type SyncEvent } from "@/lib/proofread/vault";
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -33,9 +33,9 @@ function log(e: SyncEvent) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const vault = args.find((a, i) => !a.startsWith("--") && !["--out", "--quiet"].includes(args[i - 1]));
+  const vault = args.find((a, i) => !a.startsWith("--") && args[i - 1] !== "--out");
   if (!vault) {
-    console.error("Uso: npm run proofread -- <vault> [--out <cartella>] [--watch] [--quiet <secondi>] [--force] [--dry-run]");
+    console.error("Uso: npm run proofread -- <vault> [--out <cartella>] [--force] [--dry-run]");
     process.exit(2);
   }
   const src = path.resolve(vault);
@@ -45,18 +45,6 @@ async function main() {
 
   console.log(`proofread · ${PROMPT_VERSION} · ${models.proofread.provider}:${models.proofread.model}`);
   console.log(`  vault: ${src}\n  copia: ${dest}${opts.dryRun ? "  (dry-run: non scrive nulla)" : ""}`);
-
-  if (args.includes("--watch")) {
-    const quiet = Number(flag(args, "--quiet") ?? 45);
-    if (!(quiet > 0)) throw new Error("--quiet vuole un numero di secondi > 0");
-    console.log(`  watch: correggo una nota ${quiet}s dopo l'ultima modifica (Ctrl+C per uscire)`);
-    const stop = watchVault(src, dest, quiet * 1000, opts);
-    process.on("SIGINT", () => {
-      stop();
-      process.exit(0);
-    });
-    return;
-  }
 
   const events = await syncVault(src, dest, opts);
   const count = (a: SyncEvent["action"]) => events.filter((e) => e.action === a).length;

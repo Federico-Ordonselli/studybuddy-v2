@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { models } from "@/lib/config";
+import { OllamaUnavailableError } from "@/lib/errors";
 import { proofreadNote, PROMPT_VERSION, type Generator, type NoteResult } from "./note";
 
 export const STATE_FILE = ".studybuddy-proofread.json";
@@ -43,6 +44,10 @@ export interface SyncOptions {
   dryRun?: boolean;
   signal?: AbortSignal;
   onEvent?: (e: SyncEvent) => void;
+  /** numero di file da esaminare, prima di cominciare (per l'avanzamento) */
+  onPlan?: (total: number) => void;
+  /** file che sta per essere esaminato */
+  onFile?: (file: string) => void;
 }
 
 /** Cartelle da non copiare: configurazione e cestino di Obsidian, cartelle nascoste. */
@@ -190,78 +195,20 @@ export async function syncVault(srcDir: string, destDir: string, opts: SyncOptio
     events.push(e);
     opts.onEvent?.(e);
   };
-  for (const rel of [...files, ...Object.keys(state.files).filter((f) => !present.has(f))]) {
+  const todo = [...files, ...Object.keys(state.files).filter((f) => !present.has(f))];
+  opts.onPlan?.(todo.length);
+  for (const rel of todo) {
     opts.signal?.throwIfAborted();
+    opts.onFile?.(rel);
     try {
       emit(await syncFile(src, dest, rel, state, opts));
     } catch (e) {
-      if (opts.signal?.aborted) throw e;
+      // interrotta o Ollama spento: inutile provare le note successive
+      if (opts.signal?.aborted || e instanceof OllamaUnavailableError) throw e;
       emit({ file: rel, action: "error", error: e instanceof Error ? e.message : String(e) });
     }
     // stato salvato a ogni file: un'interruzione non fa rifare il lavoro già fatto
     if (!opts.dryRun) writeState(dest, state);
   }
   return events;
-}
-
-/**
- * Modalità watch: una passata iniziale, poi rielabora una nota quando non cambia da
- * `quietMs` (stai ancora scrivendo = l'autosalvataggio di Obsidian la tocca ogni pochi
- * secondi). Un file alla volta, in coda. Restituisce una funzione per fermarsi.
- */
-export function watchVault(srcDir: string, destDir: string, quietMs: number, opts: SyncOptions = {}): () => void {
-  const { src, dest } = validatePaths(srcDir, destDir);
-  const timers = new Map<string, NodeJS.Timeout>();
-  const queue: string[] = [];
-  let busy = false;
-
-  const ALL = "\0all"; // cartella creata, rinominata o tolta: si riallinea tutto
-
-  const run = async () => {
-    if (busy) return;
-    busy = true;
-    while (queue.length) {
-      const rel = queue.shift()!;
-      try {
-        if (rel === ALL) {
-          await syncVault(src, dest, opts);
-          continue;
-        }
-        const state = readState(dest);
-        opts.onEvent?.(await syncFile(src, dest, rel, state, opts));
-        if (!opts.dryRun) writeState(dest, state);
-      } catch (e) {
-        opts.onEvent?.({ file: rel === ALL ? "(vault)" : rel, action: "error", error: e instanceof Error ? e.message : String(e) });
-      }
-    }
-    busy = false;
-  };
-
-  const schedule = (rel: string, delay: number) => {
-    clearTimeout(timers.get(rel));
-    timers.set(rel, setTimeout(() => {
-      timers.delete(rel);
-      if (!queue.includes(rel)) queue.push(rel);
-      void run();
-    }, delay));
-  };
-
-  const watcher = fs.watch(src, { recursive: true }, (_event, name) => {
-    if (!name) return;
-    const rel = name.toString().split(path.sep).join("/");
-    if (rel.split("/").some(ignored)) return;
-    const full = path.join(src, rel);
-    const stat = fs.statSync(full, { throwIfNoEntry: false });
-    const wasDir = !stat && Object.keys(readState(dest).files).some((f) => f.startsWith(`${rel}/`));
-    if (stat?.isDirectory() || wasDir) schedule(ALL, 2000);
-    else if (!stat || stat.isFile()) schedule(rel, isNote(rel) ? quietMs : 1000);
-  });
-  // passata iniziale in coda, dopo aver acceso il watcher: niente modifiche perse nel mezzo
-  schedule(ALL, 0);
-
-  return () => {
-    watcher.close();
-    for (const t of timers.values()) clearTimeout(t);
-    timers.clear();
-  };
 }
