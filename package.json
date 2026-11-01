@@ -9,6 +9,7 @@
     "start": "next start",
     "ingest": "tsx --env-file-if-exists=.env.local scripts/ingest.ts",
     "eval": "tsx --env-file-if-exists=.env.local scripts/eval.ts",
+    "proofread": "tsx --env-file-if-exists=.env.local scripts/proofread.ts",
     "import-vault": "tsx --env-file-if-exists=.env.local scripts/import-vault.ts",
     "desktop:install": "bash scripts/desktop/install.sh",
     "db:push": "drizzle-kit push",

@@ -13,12 +13,14 @@
  *   npm run eval -- maps --build <db> [--force]    bozza maps.draft.jsonl: 6 mappe in modalità build da 3 corsi (DB in sola lettura)
  *   npm run eval -- lessons [--limit N]           Cornell e pretesting su lezioni sintetiche committabili
  *   npm run eval -- lessons --summary-results <file>  verifica i riassunti con le domande della run
+ *   npm run eval -- proofread [--limit N]         correzione degli appunti su note sintetiche committabili
  *
  * Dati in evals/data/ (gitignored: estratti di corsi), risultati in
  * evals/results/<data>-<modulo>-<PROMPT_VERSION>.json per confrontare due versioni.
  */
 import fs from "node:fs";
 import { runLessons } from "./eval-lessons";
+import { runProofread } from "./eval-proofread";
 import path from "node:path";
 import { gradeAnswer, PROMPT_VERSION as GRADE_VERSION } from "@/lib/tutor/grade";
 import Database from "better-sqlite3";
@@ -364,7 +366,8 @@ async function main() {
   if (module === "tutor-review") return runTutorReview(args);
   if (module === "maps") return runMaps(args);
   if (module === "lessons") return runLessons(args);
-  throw new Error("Uso: npm run eval -- grading [--limit N] [--only-confirmed] | cards [--limit N] | cards --build <db> | cards-review <file> | tutor [--limit N] [--baseline] | tutor --build <db> | tutor-review <file> | maps [--limit N] | maps --build <db> | lessons [--limit N] | lessons --summary-results <file>");
+  if (module === "proofread") return runProofread(args);
+  throw new Error("Uso: npm run eval -- grading [--limit N] [--only-confirmed] | cards [--limit N] | cards --build <db> | cards-review <file> | tutor [--limit N] [--baseline] | tutor --build <db> | tutor-review <file> | maps [--limit N] | maps --build <db> | lessons [--limit N] | lessons --summary-results <file> | proofread [--limit N]");
 }
 
 main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });
