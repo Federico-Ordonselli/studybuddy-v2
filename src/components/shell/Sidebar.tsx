@@ -53,6 +53,7 @@ export default function Sidebar({ data, pathname, collapsed, onToggle, onCapture
         <Section label="Generale" collapsed={collapsed}>
           <Item href="/" symbol="⌂" label="Home" active={pathname === "/"} collapsed={collapsed} />
           <Item href="/corsi" symbol="▤" label="Corsi" active={on("/corsi") || on("/study")} collapsed={collapsed} badge={data.dueTotal} />
+          <Item href="/full-studio" symbol="♪" label="Full Studio" active={on("/full-studio")} collapsed={collapsed} />
         </Section>
         <Section label="Domini" collapsed={collapsed}>
           {data.areas.map((a) => (

@@ -4,7 +4,7 @@ import { sqlite } from "@/lib/db";
 import { realInsideRoot } from "@/lib/fsRoot";
 import { findByPath } from "@/lib/library";
 import {
-  walk, classify, uncoveredVideos, selectWork, fileHashOf, hasIngestibleContent, subdirs,
+  walk, classify, uncoveredVideos, selectWork, workHash, hasIngestibleContent, subdirs,
 } from "@/lib/rag/sources/coursera";
 import type { CourseAnalysis, FileCounts, ItemAnalysis, LibraryAnalysis, SkippedEntry } from "@/lib/ingestPlanTypes";
 
@@ -42,7 +42,7 @@ function knownHashes(domainId: number): Map<string, string> {
 
 async function analyzeCourse(dir: string, whisper: boolean): Promise<CourseAnalysis> {
   const files = await walk(dir);
-  const counts: FileCounts = { transcript: 0, html: 0, pdf: 0, text: 0, video: 0 };
+  const counts: FileCounts = { transcript: 0, html: 0, pdf: 0, text: 0, markdown: 0, studio: 0, video: 0 };
   for (const f of files) {
     const k = classify(f);
     if (k !== "skip") counts[k]++;
@@ -57,7 +57,7 @@ async function analyzeCourse(dir: string, whisper: boolean): Promise<CourseAnaly
     changedFiles = 0;
     for (const w of work) {
       const h = known.get(w.file);
-      if (!h || h !== fileHashOf(await fs.readFile(w.file))) changedFiles++;
+      if (!h || h !== await workHash(w.file, w.kind)) changedFiles++;
     }
   }
   return {

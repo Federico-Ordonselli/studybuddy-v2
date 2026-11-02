@@ -10,6 +10,8 @@ import { indexChunks, deleteDocumentChunks, type ChunkRecord } from "@/lib/rag/s
 import { chunkText, chunkTranscript, type TranscriptCue } from "@/lib/rag/chunk";
 import { transcribeToSrt, whisperAvailable } from "@/lib/transcribe";
 import { parseSubtitles } from "@/lib/subtitles";
+import { markdownRecords } from "@/lib/rag/sources/markdown";
+import { importStudioLesson, isStudioLessonPath, studyPathFor } from "@/lib/studio";
 export { parseSubtitles };
 
 /**
@@ -21,20 +23,31 @@ export { parseSubtitles };
 // Versione della logica di parsing/chunking: entra in `fileHash` così che, quando
 // migliora un parser, il re-ingest rielabori anche i file il cui contenuto non è
 // cambiato (altrimenti verrebbero saltati perché i byte sono identici). Bump = refresh.
-const PARSER_VERSION = "4";
+const PARSER_VERSION = "5";
 
 /** Hash con cui si riconosce un file già ingerito (contenuto + versione del parser). */
 export function fileHashOf(buf: Buffer): string {
   return createHash("sha1").update(PARSER_VERSION).update(buf).digest("hex");
 }
 
-export type Kind = "transcript" | "pdf" | "html" | "video" | "text" | "skip";
+/** Hash di un file da ingerire: per un pacchetto lezione conta anche il suo study.json (carte e quiz). */
+export async function workHash(file: string, kind: Kind): Promise<string> {
+  const buf = await fs.readFile(file);
+  if (kind !== "studio") return fileHashOf(buf);
+  const study = await fs.readFile(studyPathFor(file)).catch(() => Buffer.alloc(0));
+  return createHash("sha1").update(PARSER_VERSION).update(buf).update("\0study\0").update(study).digest("hex");
+}
+
+export type Kind = "transcript" | "pdf" | "html" | "markdown" | "studio" | "video" | "text" | "skip";
 
 export function classify(file: string): Kind {
   const ext = path.extname(file).toLowerCase();
   if (ext === ".srt" || ext === ".vtt") return "transcript";
   if (ext === ".pdf") return "pdf";
   if (ext === ".html" || ext === ".htm") return "html";
+  if (ext === ".md" || ext === ".markdown") return "markdown";
+  // Pacchetto lezione Full Studio (lib/studio.ts): niente chunk, registra il player e le carte.
+  if (isStudioLessonPath(file)) return "studio";
   if (ext === ".mp4" || ext === ".mkv" || ext === ".webm" || ext === ".mov") return "video";
   if (ext === ".txt") return "text";
   return "skip"; // zip/xlsx/docx/url/fig/... non sono testo ingeribile
@@ -143,6 +156,8 @@ async function recordsFor(file: string, buf: Buffer, kind: Kind): Promise<ChunkR
       return chunkText(buf.toString("utf8")).map((content) => ({ content }));
     case "html":
       return chunkText(parseHtml(buf.toString("utf8"))).map((content) => ({ content }));
+    case "markdown":
+      return markdownRecords(buf.toString("utf8"));
     case "pdf":
       return chunkText(await parsePdf(new Uint8Array(buf))).map((content) => ({ content }));
     case "video": {
@@ -172,7 +187,7 @@ async function recordsFor(file: string, buf: Buffer, kind: Kind): Promise<ChunkR
 // Priorità di processamento: le fonti più "ricche" vincono il dedup a parità di
 // contenuto (la trascrizione porta i timestamp, l'html è strutturato).
 const KIND_ORDER: Record<Kind, number> = {
-  transcript: 0, html: 1, pdf: 2, text: 3, video: 9, skip: 9,
+  transcript: 0, html: 1, markdown: 1, pdf: 2, text: 3, studio: 8, video: 9, skip: 9,
 };
 
 /**
@@ -243,8 +258,9 @@ export async function ingestCourse(
   const seen = new Set<string>(); // hash dei chunk già indicizzati nel run
   const stats = {
     documents: 0, chunks: 0, unchanged: 0, replaced: 0,
-    dedupedChunks: 0, skippedTxtTwins: 0, transcribed: 0, errors: 0,
+    dedupedChunks: 0, skippedTxtTwins: 0, transcribed: 0, errors: 0, studioLessons: 0,
   };
+  const knownFile = sqlite.prepare("SELECT file_hash AS h FROM ingested_files WHERE domain_id = ? AND source = ?");
   stats.skippedTxtTwins = files.filter(
     (f) => classify(f) === "text" && transcriptStems.has(stem(f))
   ).length;
@@ -253,14 +269,28 @@ export async function ingestCourse(
     const { file, kind } = work[wi];
     opts.onProgress?.(wi, work.length, path.relative(courseDir, file));
     let buf: Buffer;
+    let fileHash: string;
     try {
       buf = await fs.readFile(file);
+      fileHash = await workHash(file, kind);
     } catch (e) {
       stats.errors++;
       console.warn(`[ingestCourse] skip ${path.relative(courseDir, file)}: ${e}`);
       continue;
     }
-    const fileHash = fileHashOf(buf);
+
+    if (kind === "studio") {
+      if ((knownFile.get(domainId, file) as { h: string } | undefined)?.h === fileHash) { stats.unchanged++; continue; }
+      try {
+        await importStudioLesson(domainId, file);
+        recordIngested(domainId, file, fileHash);
+        stats.studioLessons++;
+      } catch (e) {
+        stats.errors++;
+        console.warn(`[ingestCourse] lezione ${path.relative(courseDir, file)}: ${e instanceof Error ? e.message : e}`);
+      }
+      continue;
+    }
 
     const prev = existing.get(file);
     if (prev && prev.fileHash === fileHash) { recordIngested(domainId, file, fileHash); stats.unchanged++; continue; } // invariato

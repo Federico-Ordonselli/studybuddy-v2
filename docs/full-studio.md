@@ -38,3 +38,30 @@ un blocco sconosciuto o un riferimento codice mancante interrompe la preparazion
 `Full_studio/` e i corsi generati sono esclusi da Git; il progetto Vite affiancato
 è escluso dal typecheck di StudyBuddy. I test del convertitore usano esempi
 sintetici e un DB temporaneo, senza dipendere dai materiali personali.
+
+## Lezioni audio dentro StudyBuddy (pagina Full Studio)
+
+Oltre al testo, una lezione della pipeline si può pubblicare come **pacchetto** nella cartella di un corso:
+
+```bash
+npm run prepare:full-studio -- package Full_studio/content/part11 "Courses/Corso/01_Capitolo" \
+  --md percorso/Capitolo_01.md        # facoltativo: copia la fonte accanto (ingerita come Markdown)
+```
+
+Il comando scrive `<modulo>/studio/` (`lesson.json`, `study.json` se c'è, `audio/partN/*.mp3`), sostituendo
+solo quella cartella. All'import del corso (`/corsi/add`) il pacchetto registra la lezione in
+`studio_lessons` senza generare chunk: il testo da cercare arriva dal `.md` o dall'HTML accanto.
+
+`content/partN/study.json` (scritto nella pipeline, come il copione) contiene carte e domande **per sezione**:
+
+```json
+{ "version": 1, "sections": { "p11-ch01-s00": {
+  "cards": [{ "q": "Che cos'è un sistema?", "a": "Un insieme di componenti che a ogni richiesta (input) fanno corrispondere una risposta (output)." }],
+  "quiz":  [{ "q": "…", "options": ["…", "…", "…", "…"], "answer": 1, "why": "…" }] } } }
+```
+
+Le carte nascono **sospese** e si sbloccano quando la sezione è ascoltata (fine dell'ultima frase o «Segna
+come ascoltata»); il quiz della pagina pesca solo dalle sezioni ascoltate, metà dalle ultime due. Le domande
+di fine capitolo di `lesson.json` entrano nella pool con l'ultima sezione del capitolo. La pagina è
+`/full-studio` (voce «Full Studio» nella sidebar); l'audio passa da `/api/studio/audio`, solo file dentro
+`studio/` di una lezione registrata.

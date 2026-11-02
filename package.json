@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "colors:check": "python3 color-boss/colorboss.py check src/app/tokens.css",
     "test": "tsx --test tests/*.test.ts",
-    "prepare:full-studio": "node --import tsx --env-file-if-exists=.env.local scripts/prepare-full-studio.ts"
+    "prepare:full-studio": "node --import tsx --env-file-if-exists=.env.local scripts/prepare-full-studio.ts",
+    "check:study": "tsx scripts/check-study.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

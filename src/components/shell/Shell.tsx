@@ -21,7 +21,7 @@ export function isTypingTarget(el: EventTarget | null): boolean {
  */
 export default function Shell({ data, children }: { data: ShellData; children: React.ReactNode }) {
   const pathname = usePathname();
-  const study = pathname.startsWith("/study/");
+  const study = pathname.startsWith("/study/") || pathname.startsWith("/full-studio/");
   const [expanded, setExpanded] = useState<boolean | null>(null); // null = default della pagina
   const [drawer, setDrawer] = useState(false);
   const [capture, setCapture] = useState(false);

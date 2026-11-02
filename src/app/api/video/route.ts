@@ -1,9 +1,8 @@
 import { NextRequest } from "next/server";
-import fs from "node:fs";
-import { Readable } from "node:stream";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
+import { rangeResponse } from "@/lib/rangeStream";
 
 export const runtime = "nodejs";
 
@@ -24,39 +23,8 @@ function isAllowed(mp4: string): boolean {
   return !!row;
 }
 
-function streamResponse(path: string, status: number, headers: Record<string, string>, range?: { start: number; end: number }) {
-  const stream = range ? fs.createReadStream(path, range) : fs.createReadStream(path);
-  return new Response(Readable.toWeb(stream) as unknown as ReadableStream, { status, headers });
-}
-
 export async function GET(req: NextRequest) {
   const path = req.nextUrl.searchParams.get("path");
   if (!path || !isAllowed(path)) return new Response("Forbidden", { status: 403 });
-
-  let size: number;
-  try {
-    size = fs.statSync(path).size;
-  } catch {
-    return new Response("Not found", { status: 404 });
-  }
-
-  const base = { "Content-Type": "video/mp4", "Accept-Ranges": "bytes" };
-  const range = req.headers.get("range");
-  if (range) {
-    const m = /bytes=(\d*)-(\d*)/.exec(range);
-    let start = m?.[1] ? parseInt(m[1], 10) : 0;
-    let end = m?.[2] ? parseInt(m[2], 10) : size - 1;
-    if (Number.isNaN(start)) start = 0;
-    if (Number.isNaN(end) || end >= size) end = size - 1;
-    if (start > end || start >= size) {
-      return new Response("Range Not Satisfiable", { status: 416, headers: { "Content-Range": `bytes */${size}` } });
-    }
-    return streamResponse(path, 206, {
-      ...base,
-      "Content-Range": `bytes ${start}-${end}/${size}`,
-      "Content-Length": String(end - start + 1),
-    }, { start, end });
-  }
-
-  return streamResponse(path, 200, { ...base, "Content-Length": String(size) });
+  return rangeResponse(path, "video/mp4", req.headers.get("range"));
 }
