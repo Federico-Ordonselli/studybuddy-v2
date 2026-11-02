@@ -56,6 +56,9 @@ export interface NewCard {
   question: string;
   answer: string;
   sourceChunkId?: number | null;
+  /** Sezione Full Studio ("<lessonId>:<sectionId>"): la carta nasce sospesa se `locked`. */
+  studioSection?: string;
+  locked?: boolean;
 }
 
 /**
@@ -70,6 +73,7 @@ export function saveCards(domainId: number, items: NewCard[]): { created: number
     question: cardText(c.question, "Domanda"),
     answer: cardText(c.answer, "Risposta"),
     sourceChunkId: Number.isSafeInteger(c.sourceChunkId) && inScope.get(c.sourceChunkId, ...scope) ? c.sourceChunkId! : null,
+    ...(c.studioSection ? { studioSection: c.studioSection, suspended: !!c.locked } : {}),
   }));
   let created = 0;
   sqlite.transaction(() => {

@@ -2,7 +2,7 @@
  * Tipi dell'analisi e del piano di import, condivisi tra server (lib/ingestPlan.ts,
  * lib/ingestTree.ts) e client (/add). Niente import Node qui.
  */
-export type FileCounts = { transcript: number; html: number; pdf: number; text: number; video: number };
+export type FileCounts = { transcript: number; html: number; pdf: number; text: number; markdown: number; studio: number; video: number };
 export type CourseStatus = "new" | "upToDate" | "changed";
 
 export interface CourseAnalysis {

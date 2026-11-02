@@ -9,7 +9,7 @@ const STATUS: Record<PlanCourse["status"], string> = { new: "nuovo", upToDate: "
 
 function summary(c: PlanCourse) {
   const n = c.counts;
-  return [n.transcript && `${n.transcript} trascrizioni`, n.html && `${n.html} html`, n.pdf && `${n.pdf} pdf`, n.text && `${n.text} txt`, n.video && `${n.video} video`]
+  return [n.transcript && `${n.transcript} trascrizioni`, n.html && `${n.html} html`, n.pdf && `${n.pdf} pdf`, n.text && `${n.text} txt`, n.markdown && `${n.markdown} md`, n.studio && `${n.studio} lezioni audio`, n.video && `${n.video} video`]
     .filter(Boolean).join(" · ");
 }
 

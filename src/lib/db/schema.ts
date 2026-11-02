@@ -107,6 +107,8 @@ export const cards = sqliteTable("cards", {
   learningSteps: integer("learning_steps").$defaultFn(() => 0),
   scheduledDays: integer("scheduled_days").$defaultFn(() => 0),
   lastReview: integer("last_review", { mode: "timestamp" }),
+  // Carta di una lezione Full Studio: "<lessonId>:<sectionId>". Nasce sospesa e si sblocca quando la sezione è ascoltata.
+  studioSection: text("studio_section"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
@@ -220,3 +222,29 @@ export const generationJobs = sqliteTable("generation_jobs", {
   domainId: integer("domain_id").notNull().references(() => domains.id),
   state: text("state").notNull(),
 });
+
+/** Lezioni audio Full Studio trovate nelle cartelle dei corsi (`<modulo>/studio/lesson.json`). */
+export const studioLessons = sqliteTable("studio_lessons", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  domainId: integer("domain_id").notNull().references(() => domains.id, { onDelete: "cascade" }),
+  path: text("path").notNull().unique(),        // percorso assoluto di lesson.json
+  title: text("title").notNull(),
+  sections: integer("sections").notNull(),
+  duration: real("duration").notNull().default(0), // secondi di audio
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+/** Punto di ascolto e sezioni completate (`{ segmentId, offset, rate, completedSections }`). */
+export const studioProgress = sqliteTable("studio_progress", {
+  lessonId: integer("lesson_id").primaryKey().references(() => studioLessons.id, { onDelete: "cascade" }),
+  state: text("state", { mode: "json" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
+/** Domande a scelta multipla di una lezione, per sezione (study.json) o di fine capitolo (lesson.json). */
+export const studioQuiz = sqliteTable("studio_quiz", {
+  lessonId: integer("lesson_id").notNull().references(() => studioLessons.id, { onDelete: "cascade" }),
+  sectionId: text("section_id").notNull(),
+  ordinal: integer("ordinal").notNull(),
+  question: text("question", { mode: "json" }).notNull(), // { q, options, answer, why }
+}, (t) => [primaryKey({ columns: [t.lessonId, t.sectionId, t.ordinal] })]);

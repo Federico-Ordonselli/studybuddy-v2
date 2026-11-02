@@ -122,7 +122,12 @@ export function ensureHubSchema() {
   ensureTable("review_logs");
   ensureTable("map_exercises");
   ensureTable("lesson_studies");
+  ensureTable("studio_lessons");
+  sqlite.exec("CREATE UNIQUE INDEX IF NOT EXISTS `studio_lessons_path_unique` ON `studio_lessons` (`path`)");
+  ensureTable("studio_progress");
+  ensureTable("studio_quiz");
   ensureColumn("cards", "suspended", "integer NOT NULL DEFAULT 0");
+  ensureColumn("cards", "studio_section", "text");
   ensureColumn("sessions", "updated_at", "integer");
   for (const [column, type] of FSRS_COLUMNS) ensureColumn("cards", column, type);
   convertCardsToFsrs();
