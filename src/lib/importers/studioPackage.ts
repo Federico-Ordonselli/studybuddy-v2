@@ -51,6 +51,8 @@ export async function publishStudioPackage(opts: { partDir: string; studioRoot: 
     }
     const had = await exists(dest);
     if (had) await fs.rename(dest, old);
+    // mkdtemp crea la cartella 0700: il server (anche in Docker) deve poterla leggere.
+    await fs.chmod(staging, 0o755);
     try {
       await fs.rename(staging, dest);
     } catch (e) {
