@@ -23,6 +23,7 @@ data/
 
 # corso scaricato (materiale, non versionato)
 Courses/
+Full_studio/
 
 # venv Python (sidecar Whisper)
 .venv/

@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
-    "learning-vault"
+    "learning-vault",
+    "Full_studio"
   ]
 }

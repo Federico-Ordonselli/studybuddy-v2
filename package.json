@@ -17,7 +17,8 @@
     "db:schema": "tsx scripts/schema-sql.ts",
     "typecheck": "tsc --noEmit",
     "colors:check": "python3 color-boss/colorboss.py check src/app/tokens.css",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "prepare:full-studio": "node --import tsx --env-file-if-exists=.env.local scripts/prepare-full-studio.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
