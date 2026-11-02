@@ -3,6 +3,7 @@ import { createCardFromQuiz, generateCards, previewCards, saveCards, listCards, 
 import { handle, handleLlm, readJson, badJson } from '@/lib/http';
 import { positiveId, text } from '@/lib/validation';
 import { LibraryError } from '@/lib/errors';
+import { parseMarkdownCards } from '@/lib/importers/markdownCards';
 export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   return handle(()=>{
@@ -16,6 +17,13 @@ export async function POST(req: NextRequest) {
   const body = await readJson(req); if (!body) return badJson();
   return handleLlm(async()=>{
     const domainId=positiveId(body.domainId,'domainId',true)!;
+    if(body.markdown !== undefined) {
+      if(typeof body.markdown !== 'string') throw new LibraryError('markdown deve essere testo');
+      let imported;
+      try { imported = parseMarkdownCards(body.markdown); }
+      catch(error) { throw new LibraryError(error instanceof Error ? error.message : 'Markdown non valido'); }
+      return saveCards(domainId, imported);
+    }
     if(body.question !== undefined) return createCardFromQuiz(domainId,{question:text(body.question,'question'),answer:text(body.answer,'answer')});
     // carte scelte nell'anteprima (eventualmente modificate)
     if(body.cards !== undefined){

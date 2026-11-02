@@ -6,6 +6,7 @@ import { post } from "@/lib/client/api";
 import { timeUntil } from "@/lib/format";
 import type { CardDraft } from "@/lib/tutor/cardGen";
 import CardManager from "./CardManager";
+import MarkdownCardImport from "./MarkdownCardImport";
 import CardPreview from "./CardPreview";
 import ConfidencePicker from "./ConfidencePicker";
 import { S } from "./styles";
@@ -161,6 +162,7 @@ export default function ReviewView({ domainId }: { domainId: number }) {
           )}
         </div>
       )}
+      <MarkdownCardImport key={domainId} domainId={domainId} onDone={previewDone} />
       <CardManager domainId={domainId} version={version} onChange={()=>{void loadDue(domainId);router.refresh();}} />
     </div>
   );
