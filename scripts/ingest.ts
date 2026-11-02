@@ -43,6 +43,7 @@ async function main() {
       `  documenti indicizzati : ${stats.documents}\n` +
       `  chunk indicizzati     : ${stats.chunks}\n` +
       `  video trascritti      : ${stats.transcribed}\n` +
+      `  lezioni audio         : ${stats.studioLessons}\n` +
       `  file invariati saltati : ${stats.unchanged}\n` +
       `  documenti sostituiti  : ${stats.replaced}\n` +
       `  chunk duplicati saltati: ${stats.dedupedChunks}\n` +

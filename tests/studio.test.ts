@@ -58,7 +58,7 @@ const cardsOf = (lessonId: number) => sqlite.prepare("SELECT question, suspended
 test("parseLesson: rifiuta codice mancante e id duplicati, accetta la forma della pipeline", () => {
   assert.equal(S.parseLesson(LESSON).chapters.length, 2);
   const missing = structuredClone(LESSON);
-  (missing.chapters[0].sections[0].segments[1] as { code: { ref: string } }).code.ref = "p9-c999";
+  (missing.chapters[0].sections[0].segments[1] as unknown as { code: { ref: string } }).code.ref = "p9-c999";
   assert.throws(() => S.parseLesson(missing), /mancante/);
   const dup = structuredClone(LESSON);
   dup.chapters[1].sections[0].id = "p9-ch01-s01";
