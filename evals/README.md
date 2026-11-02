@@ -164,3 +164,29 @@ e faceva 4/6, segnando quel requisito come mancante in due sintesi corrette; tol
 **v2 6/6** sugli stessi casi. È una run su materiale sintetico breve, non una misura sui corsi reali
 o sulle lezioni lunghe. Risultati locali gitignored:
 `lessons-2026-10-14T17-38-06-292Z.json` e `lesson-summaries-2026-10-14T17-47-27-013Z.json`.
+
+## Correzione degli appunti (`proofread`)
+
+Il set **sintetico e committabile** `fixtures/proofread.json` contiene dodici appunti con refusi noti
+(italiano e inglese): accenti e apostrofi, definizioni «Termine: definizione», codice con identificatori
+sbagliati di proposito, wikilink e tag, formule, frontmatter, una ripetizione, errori di **contenuto** da
+non correggere e una nota interrotta a metà parola. Ogni caso ha il testo di riferimento (`expected`) e
+le frasi che devono restare identiche (`keep`).
+
+```bash
+DB_PATH=/tmp/studybuddy-eval-proofread.db npm run eval -- proofread [--limit N]
+```
+
+Metriche in `lib/evals/proofread.ts`, calcolate in codice (non serve una revisione manuale): distanza in
+parole, sensibile ad accenti e apostrofi, fra input e riferimento e fra uscita e riferimento (quota
+recuperata, casi identici, casi peggiorati); parole vere tolte; codice/link/formule dell'input non più
+identici; frasi `keep` alterate (anche completate: «non volat» ≠ «non volatile»); sezioni scartate dal
+controllo. Punteggiatura, maiuscole e titoli non entrano nella distanza.
+
+**Misura del 2026-11-01** (`proofread-v1`, `gemma4:12b`, due run identiche): 97,4% della distanza
+recuperata, 11/12 identici al riferimento, 0 peggiorati, 0 parole tolte, 0 codice/link alterati, 0 frasi
+da non toccare alterate, 0 sezioni scartate, ~0,4 s per caso. L'unico residuo è «Inizio» → «Iniziò»
+(ambiguo: «inizio» è una parola valida). Le prove su un vault reale hanno guidato le regole del controllo
+prima del set: righe tolte sotto la soglia del 10% («l'unita' centrale di elaborazione»), titoli
+inventati sopra le definizioni («# Computer» + «Computer: …»), righe «Termine: definizione» spezzate in
+titolo + testo, la parola che si stava scrivendo completata («oper» → «operazioni»).

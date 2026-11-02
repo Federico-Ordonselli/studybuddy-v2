@@ -1,0 +1,124 @@
+[
+  {
+    "id": "accenti-apostrofi",
+    "tags": [
+      "it",
+      "accenti"
+    ],
+    "input": "La fotosintesi e' il processo con cui le piante producono glucosio. Perche avvenga serve la luce, oltre a un pò d'acqua. Qual'e il ruolo della clorofilla? assorbe la luce.\n",
+    "expected": "La fotosintesi è il processo con cui le piante producono glucosio. Perché avvenga serve la luce, oltre a un po' d'acqua. Qual è il ruolo della clorofilla? Assorbe la luce.\n"
+  },
+  {
+    "id": "definizioni-elenco",
+    "tags": [
+      "it",
+      "refusi",
+      "definizioni"
+    ],
+    "input": "Algoritmo: sequneza finita di istruzoni\nVariabile: contenitore di un vaolre\n- tipo intero: numeri sneza virgola\n- tipo stringa: seqeunza di caratteri\n",
+    "expected": "Algoritmo: sequenza finita di istruzioni\nVariabile: contenitore di un valore\n- tipo intero: numeri senza virgola\n- tipo stringa: sequenza di caratteri\n"
+  },
+  {
+    "id": "codice-intatto",
+    "tags": [
+      "it",
+      "codice"
+    ],
+    "input": "La funzione restitusice la lungezza dell'array con `arr.lenght`:\n\n```js\n// e' sbagliato di proposito\nconst n = arr.lenght;\n```\n\nSe l'array e' vuoto il risultato e' 0.\n",
+    "expected": "La funzione restituisce la lunghezza dell'array con `arr.lenght`:\n\n```js\n// e' sbagliato di proposito\nconst n = arr.lenght;\n```\n\nSe l'array è vuoto il risultato è 0.\n"
+  },
+  {
+    "id": "link-e-tag",
+    "tags": [
+      "it",
+      "link"
+    ],
+    "input": "Vedi [[Reti di calcolatori|le reti]] e il protocolo TCP. #da-rivedere\nLa documentazione [MDN](https://developer.mozilla.org/it/docs/Web/HTTP) spiega i metodi HTTP comee GET e POST.\n![[schema-osi.png]]\n",
+    "expected": "Vedi [[Reti di calcolatori|le reti]] e il protocollo TCP. #da-rivedere\nLa documentazione [MDN](https://developer.mozilla.org/it/docs/Web/HTTP) spiega i metodi HTTP come GET e POST.\n![[schema-osi.png]]\n"
+  },
+  {
+    "id": "inglese",
+    "tags": [
+      "en",
+      "refusi"
+    ],
+    "input": "The DOM is a tree of nodes. Each elemnt can have child nodes. querySelector retuns the first match, while querySelectorAll returns a NodeList wich is static.\n",
+    "expected": "The DOM is a tree of nodes. Each element can have child nodes. querySelector returns the first match, while querySelectorAll returns a NodeList which is static.\n"
+  },
+  {
+    "id": "errori-di-contenuto",
+    "tags": [
+      "it",
+      "contenuto"
+    ],
+    "input": "Il bit puo' valere 0, 1 o 2. Un byte e' formato da 10 bit e la CPU si trova nell'hard disk.\n",
+    "expected": "Il bit può valere 0, 1 o 2. Un byte è formato da 10 bit e la CPU si trova nell'hard disk.\n",
+    "keep": [
+      "0, 1 o 2",
+      "10 bit",
+      "nell'hard disk"
+    ]
+  },
+  {
+    "id": "frase-in-corso",
+    "tags": [
+      "it",
+      "incompleta"
+    ],
+    "input": "La memoria RAM e' volatile: perde i dati quando si spegne il computr. La ROM invece e' non volat",
+    "expected": "La memoria RAM è volatile: perde i dati quando si spegne il computer. La ROM invece è non volat",
+    "keep": [
+      "non volat"
+    ]
+  },
+  {
+    "id": "frontmatter-titoli",
+    "tags": [
+      "it",
+      "titoli",
+      "frontmatter"
+    ],
+    "input": "---\ntags: [storia]\naliases: [rivoluzione]\n---\nla rivoluzione francese\nInizio nel 1789 con la presa della Bastiglia. Le cause furono ecnomiche e sociali.\n\nconseguenze\n- fine dell'ancien régime\n- dichiarazione dei diritti dell'uomo e del cittadino\n",
+    "expected": "---\ntags: [storia]\naliases: [rivoluzione]\n---\n# La rivoluzione francese\nIniziò nel 1789 con la presa della Bastiglia. Le cause furono economiche e sociali.\n\n## Conseguenze\n- fine dell'ancien régime\n- dichiarazione dei diritti dell'uomo e del cittadino\n",
+    "keep": [
+      "---\ntags: [storia]\naliases: [rivoluzione]\n---\n"
+    ]
+  },
+  {
+    "id": "spazi-punteggiatura",
+    "tags": [
+      "it",
+      "punteggiatura"
+    ],
+    "input": "Il ciclo for  si usa quando il numero di iterazioni e' noto , mentre il while quando dipende da una condizione .Entrambi possono usare break\n",
+    "expected": "Il ciclo for si usa quando il numero di iterazioni è noto, mentre il while quando dipende da una condizione. Entrambi possono usare break.\n"
+  },
+  {
+    "id": "ripetizione",
+    "tags": [
+      "it",
+      "ripetizione"
+    ],
+    "input": "Il il protocollo HTTP e' senza stato: ogni richiesta e' indipendente dalle altre. I cookie servono a mantenre lo stato tra le richieste. HTTPS aggiunge la cifratura tramite TLS\n",
+    "expected": "Il protocollo HTTP è senza stato: ogni richiesta è indipendente dalle altre. I cookie servono a mantenere lo stato tra le richieste. HTTPS aggiunge la cifratura tramite TLS.\n"
+  },
+  {
+    "id": "formule",
+    "tags": [
+      "it",
+      "formule"
+    ],
+    "input": "La velocita' media si calcola come $v = \\Delta s / \\Delta t$ e si misura in m/s. L'accellerazione e' la variazione della velocita' nel tempo.\n",
+    "expected": "La velocità media si calcola come $v = \\Delta s / \\Delta t$ e si misura in m/s. L'accelerazione è la variazione della velocità nel tempo.\n"
+  },
+  {
+    "id": "appunti-lunghi",
+    "tags": [
+      "it",
+      "refusi",
+      "lungo"
+    ],
+    "input": "il sistema operativo\nIl sistema operativo gestisce le risorse hardware e fornisce servizi ai programmi. Le sue funzioni principali sono:\n- gestione dei processi: decide quale porcesso usa la CPU e per quanto tempo\n- gestione della memoria: assegna e libera la memoira ai processi\n- file system: organizza i dati sul disco in file e cartelle\n- gestione delle periferiche tramite i driver\nUn processo e' un programma in esecuzione. Puo' trovarsi in tre stati: pronto, in esecuzione o in attesa. Lo scheduler sceglie il prossimo processo da eseguire in base a una politica, per esempio round robin, che assegna a ogni processo un quanto di tempo fisso.\nIl kernel e' la parte del sistema operativo sempre caricata in memoria; le chiamate di sistema sono il modo con cui i programmi gli chiedono un servizio.\n",
+    "expected": "# Il sistema operativo\nIl sistema operativo gestisce le risorse hardware e fornisce servizi ai programmi. Le sue funzioni principali sono:\n- gestione dei processi: decide quale processo usa la CPU e per quanto tempo\n- gestione della memoria: assegna e libera la memoria ai processi\n- file system: organizza i dati sul disco in file e cartelle\n- gestione delle periferiche tramite i driver\nUn processo è un programma in esecuzione. Può trovarsi in tre stati: pronto, in esecuzione o in attesa. Lo scheduler sceglie il prossimo processo da eseguire in base a una politica, per esempio round robin, che assegna a ogni processo un quanto di tempo fisso.\nIl kernel è la parte del sistema operativo sempre caricata in memoria; le chiamate di sistema sono il modo con cui i programmi gli chiedono un servizio.\n"
+  }
+]

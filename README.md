@@ -57,6 +57,10 @@ Map-reduce summaries over a topic or a whole module. The slides come with SVG il
 
 <img src="docs/screenshots/summary.png" alt="Structured summary" width="49%"> <img src="docs/screenshots/slides.png" alt="Generated slide with SVG illustration" width="49%">
 
+### Proofread copy of your Obsidian notes
+
+In **Settings → Appunti Obsidian**, the *Correggi appunti* button writes a corrected copy of an Obsidian vault next to it (`<vault>-pulito`): typos, accents and apostrophes, punctuation and Markdown formatting, with the local model. It is a task you start when you want, with progress and a stop button; the original notes are never written. Code, links, wikilinks, tags, formulas, frontmatter and the word you were still typing are swapped for placeholders before the model sees the text, and a word-level check rejects any correction that drops, adds, completes or rewrites words (that part stays as you wrote it and is listed for review). Unchanged notes are skipped on the next run and renamed notes reuse their correction. Vaults are the subfolders of `obsidian/` (override `STUDYBUDDY_OBSIDIAN_DIR`; in Docker set `OBSIDIAN_DIR`). The same pass is available as `npm run proofread -- <vault> [--out <dir>] [--force] [--dry-run]`.
+
 ### Street Fighter 6 module
 
 Link a domain to the **Street Fighter 6** module in Settings and it gets a roster page, a combo list per character (notation rendered as button chips, status learning → practicing → consolidated) and tips per character or on the game's fundamentals. Tips come from guides: paste a transcript, give a YouTube/Twitch URL, pick a VOD from `data/vods/` or upload a file. YouTube subtitles are used when available; otherwise the audio is transcribed with Whisper — locally by default, or with Groq if you set `TRANSCRIBE_BACKEND=groq` and `GROQ_API_KEY` in `.env`. The local LLM then extracts an overview, combos and tips for you to review before saving.

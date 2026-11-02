@@ -51,3 +51,6 @@ learning-vault/
 
 # Downloader esterno: include cookie, cache e materiale personale
 courseradown/
+
+# Vault Obsidian personale e copie corrette (npm run proofread)
+obsidian/
