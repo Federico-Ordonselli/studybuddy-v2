@@ -20,6 +20,8 @@ L'input principale è un **corso Coursera scaricato** (cartella `corso/modulo/le
 
 **Full Studio** (progetto di lezioni JSON, `Full_studio/` gitignored): `npm run prepare:full-studio` (`lib/importers/fullStudio.ts`, solo lettura dei `content/*/structure.json` + `lesson.json`) lo converte in HTML in una cartella **nuova** della libreria (`Full Studio` = macro, parti = corsi, capitoli = moduli), poi import normale da `/corsi/add`. Dettagli in `docs/full-studio.md`.
 
+**Markdown e lezioni audio** (2026-11-02): i `.md` sono una fonte dell'ingest (`rag/sources/markdown.ts`: sezioni per titolo fino al livello 3, percorso dei titoli in testa al chunk e in `meta.section`). Un pacchetto `<modulo>/studio/lesson.json` (+ `study.json`, `audio/`) è il kind `studio`: `lib/studio.ts` registra `studio_lessons`, le domande in `studio_quiz` e le carte con `cards.studio_section` = `"<lessonId>:<sectionId>"`, **sospese** finché la sezione non è ascoltata (`saveState` le sblocca solo per le sezioni nuove; le query del ripasso restano su `suspended = 0`). Validazione pura in `lib/studioFormat.ts`, player puro in `lib/client/studioPlayer.ts`, UI `/full-studio` e `/full-studio/[id]` (`components/studio/`), API `/api/studio*`. Pubblicazione: `npm run prepare:full-studio -- package …` (`importers/studioPackage.ts`). Dettagli in `docs/full-studio.md`.
+
 Mappatura: corso → un **dominio**; ogni file testuale → un **documento** con `meta` { course, module, lesson, crumbs, path, fileHash }. `crumbs` è la breadcrumb completa (robusta alla profondità del path). I chunk di trascrizione portano `meta` { startSec, endSec } per citazioni cliccabili al minuto del video.
 `ingestCourse(courseDir, domainId)` fa il walk + ingestione end-to-end (transcript/text pronti).
 
